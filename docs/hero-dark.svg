@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-label="mimikoPlayer">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B0C0F"/>
+      <stop offset="0.55" stop-color="#12151B"/>
+      <stop offset="1" stop-color="#1B1F2A"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.82" cy="0.2" r="0.7">
+      <stop offset="0" stop-color="#D8F544" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#D8F544" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="320" rx="28" fill="url(#bg)"/>
+  <rect width="1280" height="320" rx="28" fill="url(#glow)"/>
+  <text x="72" y="146" font-family="Segoe UI, Roboto, Arial, sans-serif" font-size="72" font-weight="800" letter-spacing="-2.5">
+    <tspan fill="#F2F3F5">mimiko</tspan><tspan fill="#D8F544">Player</tspan>
+  </text>
+  <text x="74" y="196" font-family="Segoe UI, Roboto, Arial, sans-serif" font-size="24" fill="#A9AFBB">Яндекс Музыка · волна · коллекция · караоке</text>
+  <g fill="#D8F544">
+    <rect x="74" y="232" width="10" height="26" rx="5" opacity="0.55"/>
+    <rect x="94" y="222" width="10" height="46" rx="5" opacity="0.75"/>
+    <rect x="114" y="212" width="10" height="66" rx="5"/>
+    <rect x="134" y="228" width="10" height="34" rx="5" opacity="0.7"/>
+    <rect x="154" y="216" width="10" height="58" rx="5" opacity="0.9"/>
+    <rect x="174" y="236" width="10" height="18" rx="5" opacity="0.5"/>
+  </g>
+  <g transform="translate(880 118)" fill="none" stroke="#D8F544" stroke-width="7" stroke-linecap="round" opacity="0.95">
+    <path d="M0 44 L0 44"/>
+    <path d="M26 24 L26 64"/>
+    <path d="M52 6 L52 82"/>
+    <path d="M78 30 L78 58"/>
+    <path d="M104 16 L104 72"/>
+    <path d="M130 36 L130 52"/>
+    <path d="M156 22 L156 66"/>
+    <path d="M182 40 L182 48"/>
+  </g>
+</svg>

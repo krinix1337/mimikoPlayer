@@ -1,0 +1,27 @@
+name: Баг
+description: Что-то работает не так
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Что произошло
+      description: Что ты сделал, что ожидал и что получилось.
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Устройство и Android
+      placeholder: Xiaomi 2409FPCC4G, Android 16 (API 36)
+  - type: input
+    id: build
+    attributes:
+      label: Сборка
+      placeholder: release / debug, версия из настроек
+  - type: textarea
+    id: logs
+    attributes:
+      label: Лог
+      description: Настройки → Хранилище и данные → Журнал событий.
+      render: text
