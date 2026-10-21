@@ -212,27 +212,17 @@ class AppShell extends ConsumerWidget {
                   currentMotion.prefs.corner.radius,
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: MediaQuery.removePadding(
-                  context: context,
-                  removeBottom: true,
-                  child: NavigationBar(
-                    elevation: 0,
-                    backgroundColor: Colors.transparent,
-                    height: compact ? 64 : 80,
-                    indicatorShape: const StadiumBorder(),
-                    selectedIndex: index,
-                    onDestinationSelected: (i) {
-                      ref.read(shellTabProvider.notifier).select(i);
-                      context.go(_tabs[i].path);
-                    },
-                    destinations: [
-                      for (var i = 0; i < _tabs.length; i++)
-                        NavigationDestination(
-                          icon: Icon(_tabs[i].icon),
-                          label: labels[i],
-                        ),
-                    ],
-                  ),
+                child: _PillNavBar(
+                  height: compact ? 60 : 72,
+                  selected: index,
+                  onSelected: (i) {
+                    ref.read(shellTabProvider.notifier).select(i);
+                    context.go(_tabs[i].path);
+                  },
+                  destinations: [
+                    for (var i = 0; i < _tabs.length; i++)
+                      (icon: _tabs[i].icon, label: labels[i]),
+                  ],
                 ),
               ),
             ),
@@ -289,4 +279,81 @@ CustomTransitionPage<void> _slideUp(GoRouterState state, Widget child) {
       );
     },
   );
+}
+
+/// Панель навигации с точной геометрией: индикатор 56×32 по центру, подпись
+/// под ним. Стандартный NavigationBar на компактной высоте прижимал контент
+/// вниз и оставлял пустоту сверху.
+class _PillNavBar extends StatelessWidget {
+  const _PillNavBar({
+    required this.height,
+    required this.selected,
+    required this.onSelected,
+    required this.destinations,
+  });
+
+  final double height;
+  final int selected;
+  final ValueChanged<int> onSelected;
+  final List<({IconData icon, String label})> destinations;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final motion = currentMotion;
+
+    return SizedBox(
+      height: height,
+      child: Row(
+        children: [
+          for (var i = 0; i < destinations.length; i++)
+            Expanded(
+              child: InkWell(
+                onTap: () => onSelected(i),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    AnimatedContainer(
+                      duration: motion.micro(220),
+                      curve: Curves.easeOutCubic,
+                      width: 56,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: i == selected
+                            ? scheme.primaryContainer
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(
+                        destinations[i].icon,
+                        size: 22,
+                        color: i == selected
+                            ? scheme.onPrimaryContainer
+                            : scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      destinations[i].label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.1,
+                        fontWeight: i == selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: i == selected
+                            ? scheme.onSurface
+                            : scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
