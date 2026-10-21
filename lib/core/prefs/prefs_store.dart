@@ -23,7 +23,10 @@ Future<Prefs> loadPrefs(AppDatabase db) async {
     return Prefs(themeMode: mode);
   }
   try {
-    final decoded = jsonDecode(raw);
+    var decoded = jsonDecode(raw);
+    // Старый формат писал строку внутрь строки (jsonEncode в savePrefs и
+    // ещё один в SettingsDao.setValue) — такие данные тоже читаем.
+    if (decoded is String) decoded = jsonDecode(decoded);
     return decoded is Map<String, Object?>
         ? Prefs.fromJson(decoded)
         : const Prefs();
@@ -32,5 +35,7 @@ Future<Prefs> loadPrefs(AppDatabase db) async {
   }
 }
 
+/// `SettingsDao.setValue` кодирует значение сам — второй jsonEncode здесь
+/// превращал снимок в строку, и при чтении он молча откатывался к дефолту.
 Future<void> savePrefs(AppDatabase db, Prefs prefs) =>
-    db.settingsDao.setValue(prefsKey, jsonEncode(prefs.toJson()));
+    db.settingsDao.setValue(prefsKey, prefs.toJson());
