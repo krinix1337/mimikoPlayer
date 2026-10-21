@@ -1,0 +1,419 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'app_services.dart';
+import 'core/db/daos/library_dao.dart';
+import 'core/db/database.dart';
+import 'core/logging/app_logger.dart';
+import 'core/prefs/prefs.dart';
+import 'core/prefs/prefs_store.dart';
+import 'core/sources/source_dto.dart';
+import 'core/sources/source_id.dart';
+import 'sources/lyrics/lrclib.dart';
+import 'sources/lyrics/lyrics_service.dart';
+import 'features/player/playback_controller.dart';
+import 'features/player/player_snapshot.dart';
+import 'sources/yandex/yandex_source.dart';
+import 'sources/local/local_source.dart';
+
+/// Сборка зависимостей и провайдеры состояния для UI. Плеер сюда попадает
+/// только как интерфейс [PlaybackController] — типы audio_service UI не видит.
+final playbackControllerProvider = Provider<PlaybackController>(
+  (ref) => throw StateError('playbackControllerProvider не переопределён в main'),
+);
+
+final appServicesProvider = Provider<AppServices>((ref) => AppServices.ensure());
+
+final playerSnapshotProvider = StreamProvider<PlayerSnapshot>(
+  (ref) => ref.watch(playbackControllerProvider).snapshots,
+);
+
+final playerSnapshotProviderValue = Provider<PlayerSnapshot>(
+  (ref) => ref.watch(playerSnapshotProvider).value ?? const PlayerSnapshot(),
+);
+
+/// Файлы из `Music/` в наружном хранилище приложения. Каждый ingest приводит к
+/// локальной строке трека, поэтому дальше по ним идёт общая цепочка источников.
+final localTracksProvider = FutureProvider<List<Track>>((ref) async {
+  final services = ref.watch(appServicesProvider);
+  final result = await LocalSource().search('', pageSize: 500);
+
+  final ids = await services.db.tracksDao.ingestAll(result.tracks);
+  AppLogger.instance.info('найдено локальных файлов: ${result.tracks.length}');
+  if (ids.isEmpty) return const [];
+  return services.db.tracksDao.byIdList(ids);
+});
+
+final historyProvider = FutureProvider<List<RecentPlay>>((ref) async {
+  final services = ref.watch(appServicesProvider);
+  final rows = await services.db.historyDao.recent(limit: 30);
+  if (rows.isEmpty) return const [];
+
+  final tracks = await services.db.tracksDao.byIdList(
+    rows.map((e) => e.localTrackId).toSet().toList(),
+  );
+  final byId = {for (final t in tracks) t.id: t};
+
+  return [
+    for (final row in rows)
+      if (byId[row.localTrackId] case final track?)
+        RecentPlay(
+          localTrackId: row.localTrackId,
+          title: track.title,
+          playedAt: row.playedAt,
+          source: SourceId.fromWire(row.source),
+        ),
+  ];
+});
+
+final databaseInfoProvider = FutureProvider<DatabaseInfo>((ref) async {
+  final db = ref.watch(appServicesProvider).db;
+  return DatabaseInfo(
+    schemaVersion: await db.schemaVersionInDb(),
+    rows: await db.rowCountSnapshot(),
+  );
+});
+
+final sourcePriorityProvider = FutureProvider<List<SourceId>>(
+  (ref) => ref.watch(appServicesProvider).db.settingsDao.playbackPriority(),
+);
+
+/// Стартовое значение читает main() до runApp: провайдер берёт его при первом
+/// build, дальше только перезапись одним blob'ом в `app_settings`.
+Prefs initialPrefs = const Prefs();
+
+class PrefsController extends Notifier<Prefs> {
+  @override
+  Prefs build() => initialPrefs;
+
+  Future<void> _write(Prefs next) async {
+    state = next;
+    await savePrefs(AppServices.ensure().db, next);
+    AppServices.ensure().applyPreferences();
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) => _write(state.copyWith(themeMode: mode));
+
+  Future<void> setPalette(AppPalette palette) => _write(state.copyWith(palette: palette));
+
+  Future<void> setAccent(AccentColor accent) => _write(state.copyWith(accent: accent));
+
+  Future<void> setContrast(Contrast contrast) => _write(state.copyWith(contrast: contrast));
+
+  Future<void> setCorner(CornerRadius corner) => _write(state.copyWith(corner: corner));
+
+  Future<void> setMotion(AnimationsSpeed speed) =>
+      _write(state.copyWith(animations: speed));
+
+  Future<void> setLocaleCode(String? code) => _write(
+    code == null
+        ? state.copyWith(clearLocale: true)
+        : state.copyWith(localeCode: code),
+  );
+
+  Future<void> setCollectionSort(CollectionSort sort) =>
+      _write(state.copyWith(collectionSort: sort));
+
+  Future<void> setLauncherIcon(LauncherIcon icon) =>
+      _write(state.copyWith(launcherIcon: icon));
+
+  Future<void> setQuality(String quality) => _write(state.copyWith(quality: quality));
+
+  Future<void> setFrameHz(double hz) => _write(state.copyWith(frameHz: hz));
+
+  Future<void> setFade(bool value) => _write(state.copyWith(fade: value));
+
+  Future<void> setLyricsSize(LyricsSize size) =>
+      _write(state.copyWith(lyricsSize: size));
+
+  Future<void> setLyricsDim(bool value) =>
+      _write(state.copyWith(lyricsDimOthers: value));
+
+  Future<void> setCompactUi(bool value) =>
+      _write(state.copyWith(compactUi: value));
+
+  Future<void> setShowMiniPlayer(bool value) =>
+      _write(state.copyWith(showMiniPlayer: value));
+
+  Future<void> setHomeBackground(HomeBackground value) =>
+      _write(state.copyWith(homeBackground: value));
+
+  Future<void> reset() => _write(const Prefs());
+
+  Future<void> setWaveOnWifiOnly(bool value) =>
+      _write(state.copyWith(waveOnWifiOnly: value));
+}
+
+final prefsProvider = NotifierProvider<PrefsController, Prefs>(PrefsController.new);
+
+
+/// Заголовок трека по локальному id — для очередей и списков истории.
+final trackTitleProvider = FutureProvider.family<String, String>((ref, id) async {
+  final track = await ref.watch(appServicesProvider).db.tracksDao.byId(id);
+  return track?.title ?? id;
+});
+
+/// Поиск по всем подключённым источникам сразу. Источник без входа
+/// молча пропускается: просить логиниться — дело экрана входа.
+final combinedSearchProvider =
+    FutureProvider.family<List<SourceSearchHit>, String>((ref, query) async {
+  final registry = ref.watch(appServicesProvider).registry;
+  final needle = query.trim();
+  if (needle.isEmpty) return const [];
+
+  final hits = <SourceSearchHit>[];
+  for (final source in registry.all) {
+    if (!source.capabilities.canSearch) continue;
+    if (source.capabilities.requiresAuth && !source.auth.isReady) continue;
+    try {
+      final result = await source.search(needle, pageSize: 20);
+      hits.addAll([
+        for (final track in result.tracks)
+          SourceSearchHit(source.id, track),
+      ]);
+    } on Object {
+      // Один упавший источник не должен гасить весь поиск.
+      continue;
+    }
+  }
+  return hits;
+});
+
+final yandexSourceProvider = Provider<YandexSource?>((ref) {
+  final source = ref.watch(appServicesProvider).registry.byId(SourceId.yandex);
+  return source is YandexSource ? source : null;
+});
+
+final yandexAuthStateProvider = StreamProvider<AuthState>((ref) async* {
+  final source = ref.watch(yandexSourceProvider);
+  if (source == null) {
+    yield const AuthUnknown();
+    return;
+  }
+  yield source.auth;
+  yield* source.authChanges;
+});
+
+/// Готовность аккаунта одним флагом. Запросы каталога без неё уходят до
+/// восстановления токена и кэшируют пустой ответ — из-за этого волна
+/// оставалась пустой до перезапуска приложения.
+final yandexReadyProvider = Provider<bool>((ref) {
+  final auth = ref.watch(yandexAuthStateProvider).value;
+  return auth is AuthReady;
+});
+
+final class SourceSearchHit {
+  const SourceSearchHit(this.source, this.track);
+
+  final SourceId source;
+  final SourceTrack track;
+}
+
+/// Раздел коллекции: порядок стабильный, исполнитель и обложка достаются
+/// из тех же двух запросов — списки не дёргают базу на каждую строку.
+final collectionProvider =
+    FutureProvider.autoDispose
+        .family<List<CollectionRow>, CollectionKind>((ref, kind) async {
+          final db = ref.watch(appServicesProvider).db;
+          final sort = ref.watch(prefsProvider.select((p) => p.collectionSort));
+          return db.libraryDao.collectionRows(kind, sort: sort);
+        });
+
+/// Исполнители, которых чаще всего слушают: считается по истории.
+final topArtistsProvider = FutureProvider<List<ArtistPlaycount>>((ref) async {
+  final db = ref.watch(appServicesProvider).db;
+  return db.libraryDao.topArtists(limit: 12);
+});
+
+/// Текст трека из LRCLIB. Пустой `Lyrics` — это «текста нет», а не ошибка:
+/// экран караоке показывает именно это, без виджета загрузки на полчаса.
+final trackLyricsProvider = FutureProvider.autoDispose
+    .family<Lyrics, String>((ref, trackId) async {
+      final db = ref.watch(appServicesProvider).db;
+      final track = await db.tracksDao.byId(trackId);
+      if (track == null) return const Lyrics(lines: [], synced: false);
+      final artists = await db.tracksDao.artistNamesOf(trackId);
+      return LyricsService.shared.fetch(
+        title: track.title,
+        artist: artists.isEmpty ? '' : artists.first,
+        album: await db.tracksDao.albumTitleOf(trackId),
+        duration: Duration(seconds: track.durationSec),
+      );
+    });
+
+/// Карточка исполнителя из Яндекса: фото, счётчики, популярные треки, альбомы.
+final artistBriefProvider = FutureProvider.autoDispose
+    .family<ArtistBrief?, String>((ref, artistId) async {
+      final source = ref.watch(yandexSourceProvider);
+      if (source == null) return null;
+      return source.artist(artistId);
+    });
+
+/// Альбом целиком — треки приходят в порядке диска.
+final albumProvider = FutureProvider.autoDispose
+    .family<AlbumSnapshot?, String>((ref, albumId) async {
+      final source = ref.watch(yandexSourceProvider);
+      if (source == null) return null;
+      return source.album(albumId);
+    });
+
+/// Чарт Яндекса: позиция и трек.
+final chartProvider = FutureProvider<List<ChartEntry>>((ref) async {
+  final source = ref.watch(yandexSourceProvider);
+  if (source == null) return const [];
+  return source.chart();
+});
+
+/// Фоновая синхронизация коллекции: раз в сутки, уже после первого кадра.
+/// Без неё лайки остаются в том объёме, каким их застал прошлый импорт, —
+/// именно из-за этого в коллекции висело 500 из 1028.
+const String _likesSyncedKey = 'likes_synced_at_v2';
+
+final librarySyncProvider = FutureProvider<void>((ref) async {
+  final services = ref.watch(appServicesProvider);
+  final source = ref.watch(yandexSourceProvider);
+  if (source == null) return;
+
+  // Ждём восстановления аккаунта: до него auth не ready, и импорт вернёт
+  // пустой список, а отметка о синхронизации соврёт.
+  if (!source.auth.isReady) {
+    try {
+      await services.restoreAccount();
+    } on Object {
+      return;
+    }
+  }
+  if (!source.auth.isReady) return;
+
+  final lastRaw = await services.db.settingsDao.value(_likesSyncedKey);
+  final last = lastRaw == null ? null : DateTime.tryParse(lastRaw.replaceAll('"', ''));
+  if (last != null && DateTime.now().difference(last) < const Duration(hours: 24)) {
+    return;
+  }
+
+  var likes = 0;
+  try {
+    likes = await importYandexLikes(source: source, db: services.db);
+  } on Object catch (error) {
+    AppLogger.instance.warn('лайки не синхронизировались: $error');
+  }
+  if (likes > 0) {
+    await services.db.settingsDao.setValue(
+      _likesSyncedKey,
+      DateTime.now().toIso8601String(),
+    );
+    ref.invalidate(collectionProvider);
+  }
+
+  // Плейлисты — отдельно: падение одного не должно отменять лайки.
+  try {
+    final lists = await importYandexPlaylists(source: source, db: services.db);
+    AppLogger.instance.info('коллекция: $likes лайков, $lists плейлистов');
+    ref.invalidate(playlistsProvider);
+  } on Object catch (error) {
+    AppLogger.instance.warn('плейлисты не синхронизировались: $error');
+  }
+});
+
+final playlistsProvider = FutureProvider<List<PlaylistOverview>>(
+  (ref) => ref.watch(appServicesProvider).db.libraryDao.playlistsOverview(),
+);
+
+/// Плейлист по локальному id (`yandex:<kind>`): шапка и треки в порядке источника.
+final playlistProvider =
+    FutureProvider.autoDispose
+        .family<PlaylistDetail?, String>((ref, id) async {
+          final db = ref.watch(appServicesProvider).db;
+          final overview = await db.libraryDao.playlistById(id);
+          if (overview == null) return null;
+          return PlaylistDetail(
+            overview: overview,
+            rows: await db.libraryDao.playlistRows(id),
+          );
+        });
+
+/// Импортирует лайки Яндекса в локальную базу. Аргументы явные, чтобы
+/// функцию могли вызвать и провайдер, и виджет.
+///
+/// `refreshTimestamp: false` — повторный импорт не должен переставлять
+/// коллекцию: дата лайка ставится один раз, при первом попадании в базу.
+Future<int> importYandexLikes({
+  required YandexSource? source,
+  required AppDatabase db,
+}) async {
+  if (source == null) return 0;
+
+  final entries = await source.likedTracks();
+  // Одна транзакция на весь импорт, а дата лайка — из Яндекса, а не «сейчас»:
+  // повторный импорт не должен переставлять коллекцию.
+  await db.transaction(() async {
+    for (final entry in entries) {
+      final ingested = await db.tracksDao.ingest(entry.track);
+      await db.libraryDao.setLike(
+        ingested.localTrackId,
+        1,
+        remoteSource: SourceId.yandex,
+        refreshTimestamp: false,
+        likedAt: entry.likedAt,
+      );
+    }
+  });
+  return entries.length;
+}
+
+/// Сохраняет плейлисты Яндекса целиком: список + треки внутри.
+Future<int> importYandexPlaylists({
+  required YandexSource? source,
+  required AppDatabase db,
+  int limit = 50,
+}) async {
+  if (source == null) return 0;
+
+  // Сеть держим вне транзакции: под замком БД на время запроса остальные
+  // чтения встают на секунды.
+  final snapshots = <PlaylistSnapshot>[];
+  for (final summary in (await source.playlists()).take(limit)) {
+    final snapshot = await source.getPlaylist(summary.remotePlaylistId);
+    if (snapshot != null) snapshots.add(snapshot);
+  }
+  await db.transaction(() async {
+    for (final snapshot in snapshots) {
+      await db.libraryDao.importPlaylist(
+        source: SourceId.yandex,
+        snapshot: snapshot,
+      );
+    }
+  });
+  return snapshots.length;
+}
+
+final class RecentPlay {
+  const RecentPlay({
+    required this.localTrackId,
+    required this.title,
+    required this.playedAt,
+    required this.source,
+  });
+
+  final String localTrackId;
+  final String title;
+  final DateTime playedAt;
+  final SourceId source;
+}
+
+final class DatabaseInfo {
+  const DatabaseInfo({required this.schemaVersion, required this.rows});
+
+  final int schemaVersion;
+  final Map<String, int> rows;
+}
+
+/// Типизированный отказ цепочки источников в человеческом виде.
+String describeIssue(PlayerIssue issue) {
+  final lines = [
+    for (final failure in issue.failures)
+      '${failure.source.wire}: ${failure.reason.name}'
+          '${failure.httpStatus == null ? '' : ' (${failure.httpStatus})'}',
+  ];
+  return '${issue.headline}\n${lines.join('\n')}';
+}

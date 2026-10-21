@@ -1,0 +1,36 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart' show ThemeMode;
+
+import '../db/database.dart';
+import 'prefs.dart';
+
+/// Хранилище настроек: один JSON-snapshot на всё, чтобы смена темы, языка и
+/// иконки не расползалась по нескольким ключам.
+const String prefsKey = 'prefs_v1';
+
+/// Ключ до появления snapshot'а — читаем как fallback.
+const String legacyThemeModeKey = 'theme_mode';
+
+Future<Prefs> loadPrefs(AppDatabase db) async {
+  final raw = await db.settingsDao.value(prefsKey);
+  if (raw == null) {
+    final legacy = await db.settingsDao.value(legacyThemeModeKey);
+    final mode = ThemeMode.values.firstWhere(
+      (mode) => mode.name == legacy,
+      orElse: () => ThemeMode.dark,
+    );
+    return Prefs(themeMode: mode);
+  }
+  try {
+    final decoded = jsonDecode(raw);
+    return decoded is Map<String, Object?>
+        ? Prefs.fromJson(decoded)
+        : const Prefs();
+  } on FormatException {
+    return const Prefs();
+  }
+}
+
+Future<void> savePrefs(AppDatabase db, Prefs prefs) =>
+    db.settingsDao.setValue(prefsKey, jsonEncode(prefs.toJson()));

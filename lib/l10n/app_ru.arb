@@ -1,0 +1,464 @@
+{
+  "@@locale": "ru",
+  "appTitle": "mimikoPlayer",
+  "navWave": "Волна",
+  "navSearch": "Поиск",
+  "navCollection": "Коллекция",
+  "navSettings": "Настройки",
+  "commonPlay": "Играть",
+  "commonPause": "Пауза",
+  "commonNext": "Следующий",
+  "commonPrevious": "Предыдущий",
+  "commonCancel": "Отмена",
+  "commonSave": "Сохранить",
+  "commonRetry": "Повторить",
+  "commonTracks": "треков",
+  "commonLoading": "Загружается…",
+  "commonLike": "В любимое",
+  "commonUnlike": "Убрать из любимого",
+  "commonDislike": "Нелюбимое",
+  "waveTitle": "Моя волна",
+  "waveTune": "Настроить волну",
+  "waveStart": "Запустить волну",
+  "waveMood": "Настроение",
+  "waveEnergy": "Энергия",
+  "waveDiversity": "Разнообразие",
+  "waveStation": "Станция",
+  "wavePresets": "Пресеты",
+  "waveLanguage": "Язык музыки",
+  "waveSaved": "Настройки волны сохранены",
+  "waveSaveFailed": "Яндекс не принял настройки волны",
+  "waveNeedsLogin": "Войдите в Яндекс, чтобы включить волну",
+  "waveSignIn": "Войти в Яндекс",
+  "waveSignedInAs": "Аккаунт: {account}",
+  "@waveSignedInAs": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "waveQueueFailed": "Волна не отдала треки",
+  "waveStationMore": "Ещё волны",
+  "waveNotStarted": "Волна не запущена",
+  "sourceLibrary": "Моя коллекция",
+  "sourcePlaylist": "Плейлист",
+  "sourceSearch": "Поиск",
+  "sourceChart": "Чарт",
+  "sourceAlbum": "Альбом",
+  "sourceArtist": "Артист",
+  "switchToWave": "Включить мою волну",
+  "waveStationsFailed": "Станции не загрузились: {error}",
+  "@waveStationsFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "waveLikeAdded": "Добавлено в любимое",
+  "waveLikeRemoved": "Убрано из любимого",
+  "waveSettingsTitle": "Настройки волны",
+  "waveApply": "Применить",
+  "waveClose": "Закрыть",
+  "waveSavedNote": "Настройки волны сохранены",
+  "waveRejectedNote": "Яндекс не принял настройки — смотри лог",
+  "moodCalm": "спокойное",
+  "moodEven": "ровное",
+  "moodActive": "активное",
+  "energyLow": "низкая",
+  "energyMid": "средняя",
+  "energyHigh": "высокая",
+  "diversityMore": "побольше нового",
+  "diversityLess": "побольше знакомого",
+  "diversityUsual": "как обычно",
+  "langRu": "русское",
+  "langEn": "английское",
+  "langNonrank": "без приоритета",
+  "langAny": "любое",
+  "collectionTitle": "Коллекция",
+  "collectionLiked": "Любимое",
+  "collectionDisliked": "Нелюбимое",
+  "collectionPlaylists": "Плейлисты",
+  "collectionFiles": "Файлы",
+  "collectionRecent": "Недавние",
+  "collectionArtists": "Артисты",
+  "albumsTitle": "Альбомы",
+  "chartTitle": "Чарт",
+  "artistOpen": "К исполнителю",
+  "albumOpen": "К альбому",
+  "trackMenu": "Меню трека",
+  "menuLike": "Нравится",
+  "menuDislike": "Не нравится",
+  "menuKaraoke": "Караоке",
+  "menuPlayNext": "Играть следующим",
+  "menuAddQueue": "В очередь",
+  "menuDetails": "Сведения о треке",
+  "menuDetailsBody": "Источник: {source}\nКачество: {quality}\nФормат: {codec}",
+  "@menuDetailsBody": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      },
+      "quality": {
+        "type": "String"
+      },
+      "codec": {
+        "type": "String"
+      }
+    }
+  },
+  "chartOpen": "Чарт Яндекса",
+  "collectionAlsoIn": "Ещё в коллекции",
+  "listenedMinutes": "{count} мин",
+  "@listenedMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "listenedHours": "{count} ч",
+  "@listenedHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "artistPlays": "прослушиваний: {count}",
+  "@artistPlays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "collectionCount": "Всего: {count}",
+  "@collectionCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "collectionSort": "Сортировка",
+  "sortAdded": "Недавно добавленные",
+  "sortTitle": "По названию",
+  "sortArtist": "По исполнителю",
+  "sortDuration": "По длительности",
+  "collectionEmptyLiked": "Любимого пока нет.\nСтавьте сердечко в волне или в списке треков.",
+  "collectionEmptyDisliked": "Нелюбимых треков нет.",
+  "collectionEmptyPlaylists": "Плейлистов ещё нет — заберите их из Яндекса.",
+  "collectionEmptyFiles": "В папке Music нет аудиофайлов.",
+  "collectionEmptyRecent": "История прослушивания пуста.",
+  "collectionImportLikes": "Подтянуть лайки из Яндекса",
+  "collectionImportPlaylists": "Импортировать плейлисты из Яндекса",
+  "collectionImportedLikes": "Лайков в коллекции: {count}",
+  "@collectionImportedLikes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "collectionImportedPlaylists": "Плейлистов сохранено: {count}",
+  "@collectionImportedPlaylists": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "collectionImportFailed": "Яндекс не отдал коллекцию: {error}",
+  "@collectionImportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "collectionPlayAll": "Играть всё",
+  "collectionShuffleAll": "Перемешать",
+  "collectionLocalTag": "Локальный файл",
+  "agoNow": "только что",
+  "agoMinutes": "{count} мин назад",
+  "@agoMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agoHours": "{count} ч назад",
+  "@agoHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agoDays": "{count} дн назад",
+  "@agoDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "playerTitle": "Сейчас играет",
+  "playerBack": "Назад",
+  "playerQueue": "Очередь",
+  "playerRepeat": "Повтор",
+  "playerQueueEmpty": "Очередь пуста",
+  "playerSourceChip": "{source} · {quality}",
+  "@playerSourceChip": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      },
+      "quality": {
+        "type": "String"
+      }
+    }
+  },
+  "playerLocal": "Локальный файл",
+  "playerRadio": "Волна",
+  "playerSleep": "Таймер сна",
+  "playerSleepOff": "Выключен",
+  "playerSleepMinutes": "{count} мин",
+  "@playerSleepMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "playerSleepUntilEnd": "До конца трека",
+  "playerSleepNote": "Пауза по таймеру ставится после текущего трека.",
+  "playerLyrics": "Текст",
+  "playerLyricsMissing": "Текста пока нет",
+  "playerDownload": "Скачать",
+  "playerDownloadSoon": "Загрузка офлайн появится на этапе офлайна",
+  "playerSleepFired": "Таймер сна: пауза",
+  "searchHint": "Артист, трек или альбом",
+  "searchEmpty": "Начните вводить — ищем по всем подключённым источникам",
+  "searchNoResults": "Ничего не нашлось",
+  "searchResults": "Найдено: {count}",
+  "@searchResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchSourceLabel": "Источник: {source}",
+  "@searchSourceLabel": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "searchFailed": "Источник не ответил",
+  "searchPlayFromSearch": "Играть из поиска",
+  "settingsTitle": "Настройки",
+  "settingsSectionAppearance": "Оформление и язык",
+  "settingsSectionSound": "Звук и воспроизведение",
+  "settingsSectionKaraoke": "Караоке",
+  "settingsSectionStorage": "Хранилище и данные",
+  "settingsSectionAccount": "Аккаунт и сервисы",
+  "settingsSectionAbout": "О приложении",
+  "settingsOpenSection": "Открыть",
+  "lyricsSize": "Размер текста",
+  "lyricsSizeSmall": "Мелкий",
+  "lyricsSizeNormal": "Обычный",
+  "lyricsSizeLarge": "Крупный",
+  "lyricsDim": "Приглушать остальные строки",
+  "settingsAppearance": "Оформление",
+  "settingsTheme": "Тема",
+  "themeSystem": "Как в системе",
+  "themeLight": "Светлая",
+  "themeDark": "Тёмная",
+  "settingsPalette": "Палитра",
+  "paletteBrand": "Фирменная",
+  "paletteDynamic": "Material You",
+  "paletteMono": "Монохром",
+  "paletteDynamicNote": "Material You доступно на Android 12 и новее",
+  "settingsAccent": "Акцент",
+  "accentAcid": "Кислота",
+  "accentViolet": "Фиалка",
+  "accentCoral": "Коралл",
+  "accentTeal": "Мята",
+  "accentAmber": "Янтарь",
+  "accentIce": "Лёд",
+  "settingsContrast": "Контраст",
+  "contrastNormal": "Обычный",
+  "contrastHigh": "Высокий",
+  "settingsCorners": "Скругление",
+  "cornerSoft": "Мягкое",
+  "cornerRound": "Округлое",
+  "cornerPill": "Пилюля",
+  "settingsMotion": "Анимации",
+  "uiSection": "Интерфейс",
+  "compactUi": "Компактная панель",
+  "compactUiNote": "Нижняя навигация и мини-плеер ниже и плотнее.",
+  "showMiniPlayer": "Мини-плеер",
+  "showMiniPlayerNote": "Показывать полоску плеера над навигацией.",
+  "homeBackground": "Фон главной",
+  "bgCover": "Обложка",
+  "bgBlobs": "Пятна",
+  "bgBoth": "Обложка и пятна",
+  "settingsFade": "Плавное затухание",
+  "settingsFadeNote": "Громкость плавно поднимается при старте и опускается при паузе, перемотке и смене трека.",
+  "settingsReset": "Сбросить настройки",
+  "settingsResetDone": "Настройки вернулись к значениям по умолчанию",
+  "settingsLyricsSource": "Тексты: LRCLIB",
+  "settingsLyricsSourceNote": "Тайминги строк приходят из LRCLIB; пословной подсветки в источнике нет.",
+  "motionOff": "Выключены",
+  "motionFast": "Быстрые",
+  "motionNormal": "Обычные",
+  "motionSlow": "Плавные",
+  "settingsLauncherIcon": "Значок в лаунчере",
+  "launcherIconApplied": "Значок обновлён: лаунер может перезагрузиться",
+  "launcherIconFailed": "Сменить значок не вышло: {error}",
+  "@launcherIconFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsLanguage": "Язык",
+  "languageSystem": "Как в системе",
+  "settingsPlayback": "Воспроизведение",
+  "settingsQuality": "Качество потока",
+  "qualityAuto": "Авто (лучшее доступное)",
+  "qualityLow": "Экономное",
+  "qualityNormal": "Среднее",
+  "qualityHigh": "Высокое",
+  "qualityLossless": "Без потерь",
+  "settingsPriority": "Приоритет источников",
+  "settingsPriorityNote": "Если трек не игрится, плеер идёт к следующему по списку",
+  "roleStream": "воспроизводит",
+  "roleCatalog": "только каталог",
+  "roleAbsent": "не подключён",
+  "settingsFrame": "Частота кадров",
+  "frameSystem": "Как в системе",
+  "frame120": "120 Гц",
+  "frame90": "90 Гц",
+  "frame60": "60 Гц",
+  "settingsStorage": "Хранилище",
+  "settingsCache": "Кэш обложек",
+  "settingsCacheClear": "Очистить кэш",
+  "settingsCacheCleared": "Кэш обложек очищен",
+  "settingsData": "Данные",
+  "settingsRows": "Строк в базе: {count}",
+  "@settingsRows": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsSchema": "Схема БД: v{version}",
+  "@settingsSchema": {
+    "placeholders": {
+      "version": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsLogs": "Журнал событий",
+  "settingsAccount": "Аккаунт",
+  "settingsSignOut": "Выйти из Яндекса",
+  "accountPlus": "Подписка активна",
+  "accountFree": "Без подписки",
+  "settingsSignedOut": "Вышли из Яндекса",
+  "settingsAbout": "О приложении",
+  "settingsVersion": "Версия {version}",
+  "@settingsVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAboutNote": "Локальный плеер: Яндекс, SoundCloud, YouTube и свои файлы в одном интерфейсе.",
+  "aboutSources": "Источники",
+  "aboutSourcesNote": "Яндекс Музыка — каталог, поток и волна; локальные файлы из папки Music. Тексты: LRCLIB и lyrics.ovh.",
+  "authTitle": "Вход в Яндекс",
+  "authCodeHint": "Код подтверждения",
+  "authCopyCode": "Копировать код",
+  "authCopied": "Код скопирован",
+  "authOpenLink": "Перейти",
+  "authWaiting": "Ждём подтверждения в браузере…",
+  "authDone": "Вы вошли как {name}",
+  "@authDone": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "authFailed": "Вход не завершился: {error}",
+  "@authFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "authExpired": "Код истёк, начните вход заново",
+  "authNotSignedIn": "Аккаунт Яндекс не подключён",
+  "authNotBuilt": "Яндекс не собран в этом приложении",
+  "authRequestingCode": "Запрашиваем код…",
+  "authCodeIntro": "Подтвердите вход на странице Яндекса. Код уже подставлен в ссылку, осталось нажать «Разрешить».",
+  "authOpenPage": "Перейти на страницу Яндекса",
+  "authWaitingCode": "Ждём подтверждения. Код живёт ~5 минут.",
+  "authNotConfirmed": "Вход не подтверждён — нажми «Начать заново»",
+  "authBrowserFailed": "Браузер не открылся: {url}",
+  "@authBrowserFailed": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "authRetry": "Начать заново",
+  "authSignOut": "Выйти",
+  "authCodeCopied": "Код {code} скопирован",
+  "@authCodeCopied": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "issueHeadline": "Трек не игрится",
+  "issueNeedsLogin": "Нужен вход в источник",
+  "issueNeedsPlus": "Нужна подписка источника",
+  "issueGeo": "Трек недоступен в вашем регионе",
+  "issueUnavailable": "Трека нет в каталоге",
+  "issueNetwork": "Проблема с сетью",
+  "issueThrottled": "Источник ограничил частоту запросов",
+  "issueSignature": "Подпись потока не прошла",
+  "issueExhausted": "Все источники отказали",
+  "issueUnknown": "Неизвестная ошибка",
+  "toastQueueStarted": "Играет: {title}",
+  "@toastQueueStarted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dbError": "База не ответила: {error}",
+  "@dbError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
+}
