@@ -833,6 +833,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Yandex Music for catalog, streams and the wave; YouTube for search and streams; local files from the Music folder. Lyrics: LRCLIB, official Yandex text and lyrics.ovh.';
 
   @override
+  String get settingsAiFilterSource => 'AI filter: Slopless';
+
+  @override
+  String get settingsCensorSource => 'Uncensored versions: FckCensorData';
+
+  @override
   String get authTitle => 'Sign in to Yandex';
 
   @override

@@ -498,7 +498,7 @@ class _AboutPage extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.auto_awesome_outlined),
-              title: const Text('AI-фильтр: Slopless'),
+              title: Text(l.settingsAiFilterSource),
               subtitle: const Text('github.com/alexeyfv/slopless · GPL-3.0'),
               trailing: const Icon(Icons.open_in_new_rounded, size: 18),
               onTap: () => launchUrl(
@@ -508,7 +508,7 @@ class _AboutPage extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.explicit_outlined),
-              title: const Text('Версии без цензуры: FckCensorData'),
+              title: Text(l.settingsCensorSource),
               subtitle: const Text('github.com/Hazzz895/FckCensorData'),
               trailing: const Icon(Icons.open_in_new_rounded, size: 18),
               onTap: () => launchUrl(
@@ -522,7 +522,7 @@ class _AboutPage extends StatelessWidget {
     );
   }
 
-  static const String _version = '1.2.0';
+  static const String _version = '1.2.1';
 }
 
 /// Общая оболочка страницы раздела: крупный заголовок и кнопка назад.

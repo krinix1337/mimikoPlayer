@@ -424,6 +424,8 @@
   "settingsAboutNote": "Локальный плеер: Яндекс, YouTube и свои файлы в одном интерфейсе.",
   "aboutSources": "Источники",
   "aboutSourcesNote": "Яндекс Музыка — каталог, поток и волна; YouTube — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, официальный текст Яндекса и lyrics.ovh.",
+  "settingsAiFilterSource": "ИИ-фильтр: Slopless",
+  "settingsCensorSource": "Версии без цензуры: FckCensorData",
   "authTitle": "Вход в Яндекс",
   "authCodeHint": "Код подтверждения",
   "authCopyCode": "Копировать код",

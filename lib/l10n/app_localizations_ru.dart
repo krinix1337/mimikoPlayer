@@ -833,6 +833,12 @@ class AppLocalizationsRu extends AppLocalizations {
       'Яндекс Музыка — каталог, поток и волна; YouTube — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, официальный текст Яндекса и lyrics.ovh.';
 
   @override
+  String get settingsAiFilterSource => 'ИИ-фильтр: Slopless';
+
+  @override
+  String get settingsCensorSource => 'Версии без цензуры: FckCensorData';
+
+  @override
   String get authTitle => 'Вход в Яндекс';
 
   @override

@@ -1622,6 +1622,18 @@ abstract class AppLocalizations {
   /// **'Яндекс Музыка — каталог, поток и волна; YouTube — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, официальный текст Яндекса и lyrics.ovh.'**
   String get aboutSourcesNote;
 
+  /// No description provided for @settingsAiFilterSource.
+  ///
+  /// In ru, this message translates to:
+  /// **'ИИ-фильтр: Slopless'**
+  String get settingsAiFilterSource;
+
+  /// No description provided for @settingsCensorSource.
+  ///
+  /// In ru, this message translates to:
+  /// **'Версии без цензуры: FckCensorData'**
+  String get settingsCensorSource;
+
   /// No description provided for @authTitle.
   ///
   /// In ru, this message translates to:

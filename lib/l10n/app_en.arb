@@ -275,6 +275,8 @@
   "settingsAboutNote": "A local player: Yandex, YouTube and your own files behind one interface.",
   "aboutSources": "Sources",
   "aboutSourcesNote": "Yandex Music for catalog, streams and the wave; YouTube for search and streams; local files from the Music folder. Lyrics: LRCLIB, official Yandex text and lyrics.ovh.",
+  "settingsAiFilterSource": "AI filter: Slopless",
+  "settingsCensorSource": "Uncensored versions: FckCensorData",
   "authTitle": "Sign in to Yandex",
   "authCodeHint": "Confirmation code",
   "authCopyCode": "Copy code",
