@@ -94,6 +94,14 @@ final appRouterProvider = GoRouter(
               ),
             ),
             GoRoute(
+              path: 'downloaded',
+              parentNavigatorKey: _rootKey,
+              pageBuilder: (context, state) => _slideUp(
+                state,
+                const CollectionKindScreen(kind: CollectionKind.downloaded),
+              ),
+            ),
+            GoRoute(
               path: 'playlists',
               parentNavigatorKey: _rootKey,
               pageBuilder: (context, state) => _slideUp(state, const PlaylistsScreen()),
@@ -186,6 +194,10 @@ class AppShell extends ConsumerWidget {
     final prefs = ref.watch(prefsProvider);
     // Компактная панель — то же, что просил владелец: «чуть меньше».
     final compact = prefs.compactUi;
+    final withLabels = prefs.showNavLabels;
+    final barHeight = withLabels
+        ? (compact ? 60.0 : 72.0)
+        : (compact ? 52.0 : 60.0);
 
     return Scaffold(
       body: SafeArea(bottom: false, child: child),
@@ -213,8 +225,9 @@ class AppShell extends ConsumerWidget {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: _PillNavBar(
-                  height: compact ? 60 : 72,
+                  height: barHeight,
                   selected: index,
+                  showLabels: withLabels,
                   onSelected: (i) {
                     ref.read(shellTabProvider.notifier).select(i);
                     context.go(_tabs[i].path);
@@ -290,12 +303,14 @@ class _PillNavBar extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     required this.destinations,
+    this.showLabels = true,
   });
 
   final double height;
   final int selected;
   final ValueChanged<int> onSelected;
   final List<({IconData icon, String label})> destinations;
+  final bool showLabels;
 
   @override
   Widget build(BuildContext context) {
@@ -308,47 +323,52 @@ class _PillNavBar extends StatelessWidget {
         children: [
           for (var i = 0; i < destinations.length; i++)
             Expanded(
-              child: InkWell(
-                onTap: () => onSelected(i),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    AnimatedContainer(
-                      duration: motion.micro(220),
-                      curve: Curves.easeOutCubic,
-                      width: 56,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: i == selected
-                            ? scheme.primaryContainer
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(16),
+              child: Tooltip(
+                message: destinations[i].label,
+                child: InkWell(
+                  onTap: () => onSelected(i),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedContainer(
+                        duration: motion.micro(220),
+                        curve: Curves.easeOutCubic,
+                        width: 56,
+                        height: showLabels ? 32 : 36,
+                        decoration: BoxDecoration(
+                          color: i == selected
+                              ? scheme.primaryContainer
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Icon(
+                          destinations[i].icon,
+                          size: showLabels ? 22 : 24,
+                          color: i == selected
+                              ? scheme.onPrimaryContainer
+                              : scheme.onSurfaceVariant,
+                        ),
                       ),
-                      child: Icon(
-                        destinations[i].icon,
-                        size: 22,
-                        color: i == selected
-                            ? scheme.onPrimaryContainer
-                            : scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      destinations[i].label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        height: 1.1,
-                        fontWeight: i == selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: i == selected
-                            ? scheme.onSurface
-                            : scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+                      if (showLabels) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          destinations[i].label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            height: 1.1,
+                            fontWeight: i == selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: i == selected
+                                ? scheme.onSurface
+                                : scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ),

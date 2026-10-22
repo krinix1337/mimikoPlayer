@@ -58,7 +58,7 @@ class TrackCover extends StatelessWidget {
       return Image.memory(
         bytes,
         fit: BoxFit.cover,
-        cacheWidth: (size * 3).round(),
+        cacheWidth: _cacheWidth,
         gaplessPlayback: true,
         errorBuilder: (_, _, _) => _Fallback(scheme: scheme, size: size),
       );
@@ -69,7 +69,7 @@ class TrackCover extends StatelessWidget {
       return Image.file(
         File(path),
         fit: BoxFit.cover,
-        cacheWidth: (size * 3).round(),
+        cacheWidth: _cacheWidth,
         gaplessPlayback: true,
         errorBuilder: (_, _, _) => _Fallback(scheme: scheme, size: size),
       );
@@ -78,13 +78,19 @@ class TrackCover extends StatelessWidget {
     return CachedNetworkImage(
       imageUrl: value,
       fit: BoxFit.cover,
-      memCacheWidth: (size * 3).round(),
+      memCacheWidth: _cacheWidth,
       fadeInDuration: const Duration(milliseconds: 180),
       placeholder: (context, _) =>
           ColoredBox(color: scheme.surfaceContainerHighest),
       errorWidget: (context, _, _) => _Fallback(scheme: scheme, size: size),
     );
   }
+
+  /// У карточек плейлистов размер приходит `double.infinity`: размеры для
+  /// декодера и заглушки в этом случае брать неоткуда. Без этой проверки
+  /// картинка не декодировалась, и плитки оставались серыми квадратами.
+  int? get _cacheWidth =>
+      size.isFinite ? (size * 3).round().clamp(48, 1024) : null;
 }
 
 class _Fallback extends StatelessWidget {
@@ -98,7 +104,7 @@ class _Fallback extends StatelessWidget {
     color: scheme.surfaceContainerHighest,
     child: Icon(
       Icons.graphic_eq_rounded,
-      size: size * 0.5,
+      size: size.isFinite ? size * 0.5 : 40,
       color: scheme.onSurfaceVariant,
     ),
   );

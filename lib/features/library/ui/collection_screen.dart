@@ -25,6 +25,7 @@ class CollectionScreen extends ConsumerWidget {
     final files = ref.watch(collectionProvider(CollectionKind.files));
     final recent = ref.watch(collectionProvider(CollectionKind.recent));
     final disliked = ref.watch(collectionProvider(CollectionKind.disliked));
+    final downloaded = ref.watch(collectionProvider(CollectionKind.downloaded));
     final artists = ref.watch(topArtistsProvider);
     final auth = ref.watch(yandexAuthStateProvider).value;
     // Разворачиваем AsyncValue один раз здесь: замыкания кнопок живут дольше
@@ -99,6 +100,7 @@ class CollectionScreen extends ConsumerWidget {
                     files: files.value?.length,
                     recent: recent.value?.length,
                     disliked: disliked.value?.length,
+                    downloaded: downloaded.value?.length,
                   ),
                 ),
               ],
@@ -446,12 +448,15 @@ class _ArtistStrip extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (context, index) {
           final artist = artists[index];
+          // Карточка артиста сейчас есть только у Яндекса: id канала YouTube
+          // и суррогат `name:…` откроют пустую страницу.
+          final canOpen = RegExp(r'^\d+$').hasMatch(artist.remoteId);
           return SizedBox(
             width: 104,
             child: PressableScale(
-              onTap: artist.remoteId.isEmpty
-                  ? null
-                  : () => context.push(Routes.artistFor(artist.remoteId)),
+              onTap: canOpen
+                  ? () => context.push(Routes.artistFor(artist.remoteId))
+                  : null,
               child: Column(
               children: [
                 ClipOval(
@@ -501,12 +506,14 @@ class _AlsoInGrid extends StatelessWidget {
     required this.files,
     required this.recent,
     required this.disliked,
+    required this.downloaded,
   });
 
   final int? playlists;
   final int? files;
   final int? recent;
   final int? disliked;
+  final int? downloaded;
 
   @override
   Widget build(BuildContext context) {
@@ -529,6 +536,12 @@ class _AlsoInGrid extends StatelessWidget {
           count: recent,
           icon: Icons.history_rounded,
           route: Routes.collectionRecent,
+        ),
+        (
+          title: l.collectionDownloaded,
+          count: downloaded,
+          icon: Icons.offline_pin_rounded,
+          route: Routes.collectionDownloaded,
         ),
         (
           title: l.collectionDisliked,

@@ -5,6 +5,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../../app_services.dart';
 import '../../core/constants.dart';
+import '../../core/content/ai_filter.dart';
 import '../../core/db/daos/queue_dao.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/sources/source_dto.dart';
@@ -46,6 +47,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   Timer? _stallProbe;
   Timer? _sleepTimer;
   int _stallSeconds = 0;
+  bool _radioRefillInFlight = false;
 
   /// Таймер сна: пауза после текущего трека, когда время вышло.
   /// null — выключить. Ставится только на реальное воспроизведение,
@@ -463,6 +465,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     );
     _startStallProbe(playback);
     _scheduleSnapshot();
+    unawaited(_prefetchRadio());
   }
 
   Future<void> _load(
@@ -494,7 +497,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     if (id == null) {
       // Волна не заканчивается: добираем следующую пачку у ротора, иначе
       // после пяти треков очередь упиралась в конец и стартовала заново.
-      if (await _refillRadio()) {
+      if (await _refillRadio(moveToFirstNew: true)) {
         await _playCurrent();
         return;
       }
@@ -505,18 +508,38 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     await _playCurrent();
   }
 
+  /// Фоновая докачка волны, пока очередь ещё играет. Один запрос за раз,
+  /// только когда до конца осталось мало треков.
+  Future<void> _prefetchRadio() async {
+    if (_sourceHint?['kind'] != 'radio') return;
+    if (_queue.remainingAfterCurrent >= 3) return;
+    await _refillRadio(moveToFirstNew: false);
+  }
+
   /// Докачка очереди радио. Возвращает true, если появились новые треки.
-  Future<bool> _refillRadio() async {
+  Future<bool> _refillRadio({bool moveToFirstNew = false}) async {
     if (_sourceHint?['kind'] != 'radio') return false;
+    if (_radioRefillInFlight) return false;
     final source = _services.yandex;
     if (source == null) return false;
 
+    _radioRefillInFlight = true;
     final station = '${_sourceHint?['station'] ?? 'user:onyourwave'}';
     try {
-      final tracks = await source.station.wave(station: station);
+      final fetched = await source.station.waveMany(
+        station: station,
+        batches: 3,
+        target: 15,
+      );
+      final tracks = _services.hideAiTracks
+          ? [
+              for (final track in fetched)
+                if (!AiFilter.matches(track.title, track.artists)) track,
+            ]
+          : fetched;
       if (tracks.isEmpty) return false;
       final ids = await _services.db.tracksDao.ingestAll(tracks);
-      if (!_queue.appendBatch(ids)) {
+      if (!_queue.appendBatch(ids, moveToFirstNew: moveToFirstNew)) {
         // Ротор вернул то же самое — пробуем ещё раз на следующем треке.
         return false;
       }
@@ -527,10 +550,13 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         ),
       );
       _emitServiceState();
+      _saveSnapshotNow();
       return true;
     } on Object catch (error) {
       AppLogger.instance.warn('волна не докачалась: $error');
       return false;
+    } finally {
+      _radioRefillInFlight = false;
     }
   }
 

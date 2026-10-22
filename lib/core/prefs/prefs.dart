@@ -25,6 +25,9 @@ final class Prefs {
     this.homeBackground = HomeBackground.both,
     this.frameHz = 120,
     this.waveOnWifiOnly = false,
+    this.showNavLabels = true,
+    this.artworkShape = ArtworkShape.rounded,
+    this.hideAiTracks = false,
   });
 
   final ThemeMode themeMode;
@@ -58,6 +61,15 @@ final class Prefs {
   /// Чем залит фон главной: обложкой волны, цветными пятнами или обеими.
   final HomeBackground homeBackground;
 
+  /// Подписи в нижней навигации. Без них пилюля ниже и иконки крупнее.
+  final bool showNavLabels;
+
+  /// Форма большой обложки в плеере.
+  final ArtworkShape artworkShape;
+
+  /// Скрывать треки с явной пометкой ИИ в названии или исполнителе.
+  final bool hideAiTracks;
+
   Locale? get locale => localeCode == null ? null : Locale(localeCode!);
 
   /// Длительность перехода с учётом пользовательского масштаба анимаций.
@@ -90,6 +102,9 @@ final class Prefs {
     bool? compactUi,
     bool? showMiniPlayer,
     HomeBackground? homeBackground,
+    bool? showNavLabels,
+    ArtworkShape? artworkShape,
+    bool? hideAiTracks,
   }) => Prefs(
     themeMode: themeMode ?? this.themeMode,
     palette: palette ?? this.palette,
@@ -109,6 +124,9 @@ final class Prefs {
     compactUi: compactUi ?? this.compactUi,
     showMiniPlayer: showMiniPlayer ?? this.showMiniPlayer,
     homeBackground: homeBackground ?? this.homeBackground,
+    showNavLabels: showNavLabels ?? this.showNavLabels,
+    artworkShape: artworkShape ?? this.artworkShape,
+    hideAiTracks: hideAiTracks ?? this.hideAiTracks,
   );
 
   Map<String, Object?> toJson() => {
@@ -130,6 +148,9 @@ final class Prefs {
     'compact_ui': compactUi,
     'show_mini_player': showMiniPlayer,
     'home_background': homeBackground.name,
+    'show_nav_labels': showNavLabels,
+    'artwork_shape': artworkShape.name,
+    'hide_ai_tracks': hideAiTracks,
   };
 
   static Prefs fromJson(Map<String, Object?> json) {
@@ -184,6 +205,13 @@ final class Prefs {
       lyricsDimOthers: json['lyrics_dim'] != false,
       compactUi: json['compact_ui'] != false,
       showMiniPlayer: json['show_mini_player'] != false,
+      showNavLabels: json['show_nav_labels'] != false,
+      artworkShape: required(
+        'artwork_shape',
+        ArtworkShape.values,
+        ArtworkShape.rounded,
+      ),
+      hideAiTracks: json['hide_ai_tracks'] == true,
       homeBackground: required(
         'home_background',
         HomeBackground.values,
@@ -203,7 +231,10 @@ enum AccentColor {
   coral(0xFFFF6B5B),
   teal(0xFF22C7A9),
   amber(0xFFFFB03A),
-  ice(0xFF7FC8FF);
+  ice(0xFF7FC8FF),
+  sky(0xFF4F8BFF),
+  rose(0xFFFF5C9A),
+  leaf(0xFF52D273);
 
   const AccentColor(this.hex);
 
@@ -229,6 +260,9 @@ enum AnimationsSpeed { off, fast, normal, slow }
 /// Фон главной: обложка волны, цветные пятна или оба слоя.
 enum HomeBackground { cover, blobs, both }
 
+/// Форма обложки в полноэкранном плеере.
+enum ArtworkShape { rounded, soft, circle }
+
 /// Размер текста караоке: множитель к базовому размеру строки.
 enum LyricsSize {
   small(0.85),
@@ -248,7 +282,12 @@ enum LauncherIcon {
   mono('MimikoLauncherMono'),
   night('MimikoLauncherNight'),
   sunset('MimikoLauncherSunset'),
-  mint('MimikoLauncherMint');
+  mint('MimikoLauncherMint'),
+  violet('MimikoLauncherViolet'),
+  ice('MimikoLauncherIce'),
+  amber('MimikoLauncherAmber'),
+  forest('MimikoLauncherForest'),
+  crimson('MimikoLauncherCrimson');
 
   const LauncherIcon(this.component);
 

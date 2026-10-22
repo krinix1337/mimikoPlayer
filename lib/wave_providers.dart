@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_providers.dart';
+import 'core/content/ai_filter.dart';
 import 'core/sources/source_dto.dart';
 import 'sources/yandex/yandex_station.dart';
 
@@ -43,13 +44,19 @@ final waveTracksProvider = FutureProvider<List<WaveTrack>>((ref) async {
   final services = ref.watch(appServicesProvider);
 
   await source.warmUp();
-  final tracks = await source.station.wave(station: station);
-  final result = <WaveTrack>[];
-  for (final track in tracks) {
-    final ingested = await services.db.tracksDao.ingest(track);
-    result.add(WaveTrack(localTrackId: ingested.localTrackId, source: track));
-  }
-  return result;
+  final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+  final fetched = await source.station.waveMany(station: station);
+  final tracks = hideAi
+      ? [
+          for (final track in fetched)
+            if (!AiFilter.matches(track.title, track.artists)) track,
+        ]
+      : fetched;
+  final ids = await services.db.tracksDao.ingestAll(tracks);
+  return [
+    for (var i = 0; i < tracks.length; i++)
+      WaveTrack(localTrackId: ids[i], source: tracks[i]),
+  ];
 });
 
 final waveSettingsProvider = FutureProvider<WaveSettings?>((ref) async {

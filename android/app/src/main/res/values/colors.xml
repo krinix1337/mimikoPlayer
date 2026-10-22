@@ -7,4 +7,10 @@
     <color name="ic_launcher_night_background">#101A3A</color>
     <color name="ic_launcher_sunset_background">#FF6B5B</color>
     <color name="ic_launcher_mint_background">#22C7A9</color>
+
+    <color name="ic_launcher_violet_background">#6C5CE7</color>
+    <color name="ic_launcher_ice_background">#7FC8FF</color>
+    <color name="ic_launcher_amber_background">#FFB03A</color>
+    <color name="ic_launcher_forest_background">#2E6B52</color>
+    <color name="ic_launcher_crimson_background">#E5484D</color>
 </resources>

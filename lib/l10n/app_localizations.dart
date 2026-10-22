@@ -506,6 +506,18 @@ abstract class AppLocalizations {
   /// **'Недавние'**
   String get collectionRecent;
 
+  /// No description provided for @collectionDownloaded.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скачанное'**
+  String get collectionDownloaded;
+
+  /// No description provided for @collectionEmptyDownloaded.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скачанных треков нет.\nСкачайте трек из меню или с экрана плеера — он заиграет без сети.'**
+  String get collectionEmptyDownloaded;
+
   /// No description provided for @collectionArtists.
   ///
   /// In ru, this message translates to:
@@ -854,6 +866,42 @@ abstract class AppLocalizations {
   /// **'Загрузка офлайн появится на этапе офлайна'**
   String get playerDownloadSoon;
 
+  /// No description provided for @menuDownloaded.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить скачанное'**
+  String get menuDownloaded;
+
+  /// No description provided for @menuDownloading.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скачивается…'**
+  String get menuDownloading;
+
+  /// No description provided for @menuDownloadRetry.
+  ///
+  /// In ru, this message translates to:
+  /// **'Повторить скачивание'**
+  String get menuDownloadRetry;
+
+  /// No description provided for @downloadProgress.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скачивается: {percent}%'**
+  String downloadProgress(int percent);
+
+  /// No description provided for @downloadRemoved.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скачанное удалено'**
+  String get downloadRemoved;
+
+  /// No description provided for @downloadFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось скачать: {error}'**
+  String downloadFailed(String error);
+
   /// No description provided for @playerSleepFired.
   ///
   /// In ru, this message translates to:
@@ -1082,6 +1130,36 @@ abstract class AppLocalizations {
   /// **'Лёд'**
   String get accentIce;
 
+  /// No description provided for @accentSky.
+  ///
+  /// In ru, this message translates to:
+  /// **'Небо'**
+  String get accentSky;
+
+  /// No description provided for @accentRose.
+  ///
+  /// In ru, this message translates to:
+  /// **'Роза'**
+  String get accentRose;
+
+  /// No description provided for @accentLeaf.
+  ///
+  /// In ru, this message translates to:
+  /// **'Лист'**
+  String get accentLeaf;
+
+  /// No description provided for @launcherForest.
+  ///
+  /// In ru, this message translates to:
+  /// **'Лес'**
+  String get launcherForest;
+
+  /// No description provided for @launcherCrimson.
+  ///
+  /// In ru, this message translates to:
+  /// **'Багровый'**
+  String get launcherCrimson;
+
   /// No description provided for @settingsContrast.
   ///
   /// In ru, this message translates to:
@@ -1153,6 +1231,54 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Мини-плеер'**
   String get showMiniPlayer;
+
+  /// No description provided for @showNavLabels.
+  ///
+  /// In ru, this message translates to:
+  /// **'Подписи в навигации'**
+  String get showNavLabels;
+
+  /// No description provided for @showNavLabelsNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Без подписей панель ниже, а иконки крупнее.'**
+  String get showNavLabelsNote;
+
+  /// No description provided for @hideAi.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скрывать ИИ-треки'**
+  String get hideAi;
+
+  /// No description provided for @hideAiNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Убирает треки с явной пометкой ИИ в названии или исполнителе (AI, Suno, Udio, нейросеть). Официальной метки в API Яндекса пока нет.'**
+  String get hideAiNote;
+
+  /// No description provided for @artworkShape.
+  ///
+  /// In ru, this message translates to:
+  /// **'Обложка плеера'**
+  String get artworkShape;
+
+  /// No description provided for @artworkRounded.
+  ///
+  /// In ru, this message translates to:
+  /// **'Как в теме'**
+  String get artworkRounded;
+
+  /// No description provided for @artworkSoft.
+  ///
+  /// In ru, this message translates to:
+  /// **'Мягкая'**
+  String get artworkSoft;
+
+  /// No description provided for @artworkCircle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Круглая'**
+  String get artworkCircle;
 
   /// No description provided for @showMiniPlayerNote.
   ///
@@ -1469,7 +1595,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsAboutNote.
   ///
   /// In ru, this message translates to:
-  /// **'Локальный плеер: Яндекс, SoundCloud, YouTube и свои файлы в одном интерфейсе.'**
+  /// **'Локальный плеер: Яндекс, YouTube и свои файлы в одном интерфейсе.'**
   String get settingsAboutNote;
 
   /// No description provided for @aboutSources.
@@ -1481,7 +1607,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutSourcesNote.
   ///
   /// In ru, this message translates to:
-  /// **'Яндекс Музыка — каталог, поток и волна; локальные файлы из папки Music. Тексты: LRCLIB и lyrics.ovh.'**
+  /// **'Яндекс Музыка — каталог, поток и волна; YouTube — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB и lyrics.ovh.'**
   String get aboutSourcesNote;
 
   /// No description provided for @authTitle.

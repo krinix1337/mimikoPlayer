@@ -177,6 +177,11 @@ class MimikoActivity : AudioServiceActivity() {
             "MimikoLauncherNight",
             "MimikoLauncherSunset",
             "MimikoLauncherMint",
+            "MimikoLauncherViolet",
+            "MimikoLauncherIce",
+            "MimikoLauncherAmber",
+            "MimikoLauncherForest",
+            "MimikoLauncherCrimson",
         )
     }
 }

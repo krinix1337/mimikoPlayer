@@ -23,6 +23,7 @@ class HomeScreen extends ConsumerWidget {
     final l = AppLocalizations.of(context);
     final title = ref.watch(waveStationTitleProvider);
     final stationTitle = title.isEmpty ? l.waveTitle : title;
+    final station = ref.watch(stationProvider);
     final wave = ref.watch(waveTracksProvider);
     // select: без него весь экран перестраивался на каждый тик позиции.
     final radio = ref.watch(
@@ -74,20 +75,37 @@ class HomeScreen extends ConsumerWidget {
           SafeArea(
             child: Column(
               children: [
+                // Заголовок ниже кромки экрана и с крестиком возврата на
+                // «мою волну»: у выбранной станции крестик виден, у волны — нет.
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-                  child: Text(
-                    stationTitle,
-                    style: theme.textTheme.displayLarge,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
+                  padding: const EdgeInsets.fromLTRB(8, 20, 8, 0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        onPressed: () => showWaveSettingsSheet(context, ref),
+                        icon: const Icon(Icons.tune_rounded),
+                        tooltip: l.waveTune,
+                      ),
+                      Expanded(
+                        child: Text(
+                          stationTitle,
+                          style: theme.textTheme.displaySmall,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      if (station != WaveStationIds.myVibe)
+                        IconButton(
+                          tooltip: l.switchToWave,
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => _backToMyWave(ref),
+                        )
+                      else
+                        const SizedBox(width: 48),
+                    ],
                   ),
-                ),
-                IconButton(
-                  onPressed: () => showWaveSettingsSheet(context, ref),
-                  icon: const Icon(Icons.tune_rounded),
-                  tooltip: l.waveTune,
                 ),
                 const Spacer(),
                 _PlayButton(
@@ -108,6 +126,13 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+  Future<void> _backToMyWave(WidgetRef ref) async {
+    final wasRadio = ref.read(playerSnapshotProviderValue).isRadio;
+    ref.read(stationProvider.notifier).select(WaveStationIds.myVibe);
+    ref.invalidate(waveTracksProvider);
+    ref.invalidate(waveSettingsProvider);
+    if (wasRadio) await startWave(ref);
   }
 }
 
@@ -218,6 +243,7 @@ class _NowPlayingPill extends ConsumerWidget {
         next?.title ??
         (failed ? l.waveQueueFailed : l.waveNotStarted);
     final subtitle = current?.artist ?? next?.artists.join(', ');
+    final coverUrl = current?.coverUrl ?? next?.coverUrl;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -251,23 +277,15 @@ class _NowPlayingPill extends ConsumerWidget {
                   ),
                 ),
               ),
-              // Крестик переключает на «мою волну» — то же, что кнопка play,
-              // но без поиска последнего трека в очереди.
-              IconButton(
-                tooltip: l.switchToWave,
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.close_rounded, size: 18),
-                onPressed: () => startWave(ref),
-              ),
             ],
           ),
           Row(
             children: [
-              if (current != null)
+              if (coverUrl != null)
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
                   child: TrackCover(
-                    url: current.coverUrl,
+                    url: coverUrl,
                     size: 44,
                     radius: 10,
                   ),
@@ -360,7 +378,7 @@ class _StationStrip extends ConsumerWidget {
     final selected = ref.watch(stationProvider);
 
     return SizedBox(
-      height: 80,
+      height: 64,
       child: stations.when(
         loading: () =>
             const Center(child: CircularProgressIndicator(strokeWidth: 2)),
@@ -372,9 +390,9 @@ class _StationStrip extends ConsumerWidget {
         ),
         data: (list) => ListView.separated(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           itemCount: list.length + 1,
-          separatorBuilder: (context, _) => const SizedBox(width: 10),
+          separatorBuilder: (context, _) => const SizedBox(width: 8),
           itemBuilder: (context, index) {
             if (index == 0) {
               return _StationChip(
@@ -388,6 +406,7 @@ class _StationStrip extends ConsumerWidget {
             final station = list[index - 1];
             return _StationChip(
               title: station.title,
+              iconUrl: station.iconUrl,
               selected: selected == station.id,
               onTap: () => ref.read(stationProvider.notifier).select(station.id),
             );
@@ -403,9 +422,11 @@ class _StationChip extends StatelessWidget {
     required this.title,
     required this.selected,
     required this.onTap,
+    this.iconUrl,
   });
 
   final String title;
+  final String? iconUrl;
   final bool selected;
   final VoidCallback onTap;
 
@@ -414,34 +435,67 @@ class _StationChip extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final motion = Motion.of(context);
     return PressableScale(
-      minScale: 0.95,
+      minScale: 0.96,
       onTap: onTap,
       child: AnimatedContainer(
         duration: motion.micro(220),
-        curve: Curves.easeOutBack,
-        width: 120,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        curve: Curves.easeOutCubic,
+        height: 52,
+        constraints: const BoxConstraints(minWidth: 92, maxWidth: 168),
+        padding: const EdgeInsets.fromLTRB(6, 6, 12, 6),
         decoration: BoxDecoration(
           color: selected
               ? scheme.primaryContainer
               : scheme.surfaceContainer.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(
-            motion.prefs.corner.radius * 0.75,
+            motion.prefs.corner.radius * 0.8,
           ),
           border: selected
               ? Border.all(color: scheme.primary, width: 1.5)
               : null,
         ),
-        child: Text(
-          title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: selected ? scheme.onPrimaryContainer : scheme.onSurface,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: 36,
+                height: 36,
+                child: iconUrl == null
+                    ? DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [scheme.primary, scheme.tertiary],
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.auto_awesome_rounded,
+                          size: 18,
+                          color: scheme.onPrimary,
+                        ),
+                      )
+                    : TrackCover(url: iconUrl, size: 36, radius: 10),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  height: 1.15,
+                  color: selected
+                      ? scheme.onPrimaryContainer
+                      : scheme.onSurface,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

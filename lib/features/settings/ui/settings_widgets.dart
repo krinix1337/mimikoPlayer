@@ -271,6 +271,11 @@ class LauncherIconRow extends ConsumerWidget {
     LauncherIcon.night: 'assets/icon/variants/night.png',
     LauncherIcon.sunset: 'assets/icon/variants/sunset.png',
     LauncherIcon.mint: 'assets/icon/variants/mint.png',
+    LauncherIcon.violet: 'assets/icon/variants/violet.png',
+    LauncherIcon.ice: 'assets/icon/variants/ice.png',
+    LauncherIcon.amber: 'assets/icon/variants/amber.png',
+    LauncherIcon.forest: 'assets/icon/variants/forest.png',
+    LauncherIcon.crimson: 'assets/icon/variants/crimson.png',
   };
 
   @override
@@ -286,11 +291,16 @@ class LauncherIconRow extends ConsumerWidget {
       LauncherIcon.night => l.themeDark,
       LauncherIcon.sunset => l.accentCoral,
       LauncherIcon.mint => l.accentTeal,
+      LauncherIcon.violet => l.accentViolet,
+      LauncherIcon.ice => l.accentIce,
+      LauncherIcon.amber => l.accentAmber,
+      LauncherIcon.forest => l.launcherForest,
+      LauncherIcon.crimson => l.launcherCrimson,
     };
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      // Шесть значков в строку не влезают — лента по горизонтали.
+      // Одиннадцать значков в строку не влезают — лента по горизонтали.
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(

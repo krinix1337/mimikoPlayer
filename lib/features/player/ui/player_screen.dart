@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app_providers.dart';
+import '../../../core/prefs/prefs.dart';
 import '../../../core/sources/source_id.dart';
+import '../../../features/downloads/download_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../theme/app_motion.dart';
@@ -109,13 +111,13 @@ class _TopBar extends ConsumerWidget {
   }
 }
 
-class _Artwork extends StatelessWidget {
+class _Artwork extends ConsumerWidget {
   const _Artwork({required this.current});
 
   final NowPlaying current;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final motion = Motion.of(context);
 
@@ -130,7 +132,11 @@ class _Artwork extends StatelessWidget {
               child: TrackCover(
                 url: current.coverUrl,
                 size: 300,
-                radius: motion.prefs.corner.radius,
+                radius: switch (motion.prefs.artworkShape) {
+                  ArtworkShape.rounded => motion.prefs.corner.radius,
+                  ArtworkShape.soft => 10,
+                  ArtworkShape.circle => 150,
+                },
               ),
             ),
             const SizedBox(height: 28),
@@ -150,10 +156,83 @@ class _Artwork extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            const _SourceBadge(),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const _SourceBadge(),
+                const SizedBox(width: 4),
+                _DownloadButton(trackId: current.localTrackId),
+              ],
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Скачивание прямо с экрана плеера: в меню списка оно есть, но текущий
+/// трек туда ещё надо найти, а офлайн обычно нужен именно он.
+class _DownloadButton extends ConsumerWidget {
+  const _DownloadButton({required this.trackId});
+
+  final String trackId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final status = ref.watch(downloadStatusProvider(trackId));
+    final stored = ref.watch(isDownloadedProvider(trackId)).value ?? false;
+    final downloading = status?.phase == DownloadPhase.downloading;
+    final complete =
+        status?.phase == DownloadPhase.complete ||
+        (status?.phase == null && stored);
+
+    if (downloading) {
+      return Padding(
+        padding: const EdgeInsets.all(8),
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            value: status?.progress,
+            strokeWidth: 2.4,
+            color: scheme.primary,
+          ),
+        ),
+      );
+    }
+
+    return IconButton(
+      tooltip: complete ? l.menuDownloaded : l.playerDownload,
+      visualDensity: VisualDensity.compact,
+      iconSize: 22,
+      color: complete ? scheme.primary : scheme.onSurfaceVariant,
+      icon: Icon(
+        complete ? Icons.offline_pin_rounded : Icons.download_rounded,
+      ),
+      onPressed: () async {
+        final downloader = ref.read(downloadControllerProvider.notifier);
+        try {
+          if (complete) {
+            await downloader.remove(trackId);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(l.downloadRemoved)),
+              );
+            }
+          } else {
+            await downloader.start(trackId);
+          }
+        } on Object catch (error) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l.downloadFailed('$error'))),
+            );
+          }
+        }
+      },
     );
   }
 }

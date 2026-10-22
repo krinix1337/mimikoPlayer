@@ -8,30 +8,36 @@ void main() {
     const prefs = Prefs(
       themeMode: ThemeMode.light,
       palette: AppPalette.mono,
-      accent: AccentColor.teal,
       contrast: Contrast.high,
       corner: CornerRadius.pill,
       animations: AnimationsSpeed.slow,
       localeCode: 'en',
       collectionSort: CollectionSort.artist,
-      launcherIcon: LauncherIcon.night,
       quality: 'lossless',
       frameHz: 90,
+      showNavLabels: false,
+      artworkShape: ArtworkShape.circle,
+      hideAiTracks: true,
+      accent: AccentColor.rose,
+      launcherIcon: LauncherIcon.crimson,
     );
 
     final restored = Prefs.fromJson(prefs.toJson());
     expect(restored, isA<Prefs>());
     expect(restored.themeMode, ThemeMode.light);
     expect(restored.palette, AppPalette.mono);
-    expect(restored.accent, AccentColor.teal);
+    expect(restored.accent, AccentColor.rose);
     expect(restored.contrast, Contrast.high);
     expect(restored.corner, CornerRadius.pill);
     expect(restored.animations, AnimationsSpeed.slow);
     expect(restored.localeCode, 'en');
     expect(restored.collectionSort, CollectionSort.artist);
-    expect(restored.launcherIcon, LauncherIcon.night);
+    expect(restored.launcherIcon, LauncherIcon.crimson);
     expect(restored.quality, 'lossless');
     expect(restored.frameHz, 90);
+    expect(restored.showNavLabels, isFalse);
+    expect(restored.artworkShape, ArtworkShape.circle);
+    expect(restored.hideAiTracks, isTrue);
   });
 
   test('«как в системе» отличается от «не задано»', () {

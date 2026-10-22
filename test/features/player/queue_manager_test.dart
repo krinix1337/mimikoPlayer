@@ -85,5 +85,21 @@ void main() {
       q.append('t_0');
       expect(q.currentId, 't_0');
     });
+
+    test('фоновая докачка волны не переключает текущий трек', () {
+      final q = QueueManager()..setQueue(ids(5), startIndex: 4);
+      expect(q.currentId, 't_4');
+      expect(q.appendBatch(['t_5', 't_6', 't_4']), isTrue);
+      expect(q.currentId, 't_4');
+      expect(q.remainingAfterCurrent, 2);
+      expect(q.displayOrder, [for (var i = 0; i < 7; i++) 't_$i']);
+    });
+
+    test('докачка в конце очереди встаёт на первый новый трек', () {
+      final q = QueueManager()..setQueue(ids(2), startIndex: 1);
+      expect(q.remainingAfterCurrent, 0);
+      q.appendBatch(['t_2', 't_3'], moveToFirstNew: true);
+      expect(q.currentId, 't_2');
+    });
   });
 }

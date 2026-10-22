@@ -79,7 +79,7 @@ class LibraryDao {
       ..groupBy([_db.playlists.id])
       ..orderBy([OrderingTerm.desc(_db.playlists.updatedAt)]);
 
-    return [
+    final overviews = [
       for (final row in await query.get())
         PlaylistOverview(
           id: row.read(_db.playlists.id)!,
@@ -90,6 +90,56 @@ class LibraryDao {
           trackCount: row.read(_db.playlistTracks.localTrackId.count()) ?? 0,
         ),
     ];
+
+    // У пользовательских плейлистов Яндекса обложки часто нет: сервис
+    // собирает мозаику на клиенте. Показываем обложку первого трека, иначе
+    // целая лента выглядит серыми квадратами.
+    final missing = [
+      for (final overview in overviews)
+        if (overview.coverUrl == null) overview.id,
+    ];
+    if (missing.isEmpty) return overviews;
+
+    final links = await (_db.select(_db.playlistTracks)
+          ..where((t) => t.playlistId.isIn(missing))
+          ..orderBy([(t) => OrderingTerm.asc(t.position)]))
+        .get();
+    final firstTrack = <String, String>{};
+    for (final link in links) {
+      firstTrack.putIfAbsent(link.playlistId, () => link.localTrackId);
+    }
+    if (firstTrack.isEmpty) return overviews;
+
+    final tracks = {
+      for (final track in await _db.tracksDao.byIdList(firstTrack.values.toList()))
+        track.id: track.coverUrl,
+    };
+    return [
+      for (final overview in overviews)
+        if (overview.coverUrl == null && firstTrack[overview.id] != null)
+          PlaylistOverview(
+            id: overview.id,
+            title: overview.title,
+            kind: overview.kind,
+            source: overview.source,
+            coverUrl: tracks[firstTrack[overview.id]],
+            trackCount: overview.trackCount,
+          )
+        else
+          overview,
+    ];
+  }
+
+  /// Аватар из карточки артиста: у старых строк coverUrl пустой, потому что
+  /// первый ingest не читал обложку артиста из ответа каталога.
+  Future<void> setArtistCover(int artistId, String? url) async {
+    if (url == null || url.isEmpty) return;
+    await (_db.update(_db.artists)..where((t) => t.id.equals(artistId))).write(
+      ArtistsCompanion(
+        coverUrl: Value(url),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Список коллекции одним заходом: порядок задаёт раздел, а не SQLite.
@@ -106,6 +156,7 @@ class LibraryDao {
         limit: limit,
       ),
       CollectionKind.files => await _fromMappings(limit: limit),
+      CollectionKind.downloaded => await _fromDownloads(limit: limit),
       CollectionKind.recent => await _fromHistory(limit: limit),
     };
     if (ordered.isEmpty) return const [];
@@ -195,8 +246,18 @@ class LibraryDao {
     ];
   }
 
-  Future<List<(String, DateTime)>> _fromHistory({required int limit}) async {
-    final rows = await (_db.select(_db.history)
+  Future<List<(String, DateTime)>> _fromDownloads({required int limit}) async {
+    final rows = await (_db.select(_db.downloadedFiles)
+          ..where((t) => t.state.equals('complete'))
+          ..orderBy([(t) => OrderingTerm.desc(t.downloadedAt)])
+          ..limit(limit))
+        .get();
+    return [
+      for (final row in rows) (row.localTrackId, row.downloadedAt),
+    ];
+  }
+
+  Future<List<(String, DateTime)>> _fromHistory({required int limit}) async {    final rows = await (_db.select(_db.history)
           ..orderBy([(t) => OrderingTerm.desc(t.playedAt)])
           ..limit(limit * 3))
         .get();
@@ -289,12 +350,23 @@ class LibraryDao {
           ..addColumns([_db.playlistTracks.localTrackId.count()])
           ..where(_db.playlistTracks.playlistId.equals(id)))
         .getSingle();
+    var coverUrl = row.coverUrl;
+    if (coverUrl == null) {
+      final first = await (_db.select(_db.playlistTracks)
+            ..where((t) => t.playlistId.equals(id))
+            ..orderBy([(t) => OrderingTerm.asc(t.position)])
+            ..limit(1))
+          .getSingleOrNull();
+      if (first != null) {
+        coverUrl = (await _db.tracksDao.byId(first.localTrackId))?.coverUrl;
+      }
+    }
     return PlaylistOverview(
       id: row.id,
       title: row.title,
       kind: row.kind,
       source: row.source,
-      coverUrl: row.coverUrl,
+      coverUrl: coverUrl,
       trackCount: count.read(_db.playlistTracks.localTrackId.count()) ?? 0,
     );
   }
@@ -386,7 +458,7 @@ final class CollectionRow {
   final DateTime? markedAt;
 }
 
-enum CollectionKind { liked, disliked, files, recent }
+enum CollectionKind { liked, disliked, files, recent, downloaded }
 
 enum CollectionSort { added, title, artist, duration }
 

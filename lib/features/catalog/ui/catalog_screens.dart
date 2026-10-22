@@ -68,8 +68,7 @@ class ArtistScreen extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  background: _ArtistBackdrop(coverUrl: artist.coverUrl),
-                ),
+                  background: _ArtistBackdrop(coverUrl: artist.coverUrl),                ),
               ),
               SliverToBoxAdapter(
                 child: Padding(
@@ -166,6 +165,34 @@ class _ArtistBackdrop extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         BlurredCover(url: coverUrl, opacity: 0.6),
+        // Крупный чёткий аватар: раньше на карточке был только размытый фон,
+        // из-за чего фото артиста выглядело как цветное пятно.
+        if (coverUrl != null)
+          Positioned(
+            top: 34,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: scheme.surface.withValues(alpha: 0.55),
+                  border: Border.all(
+                    color: scheme.onSurface.withValues(alpha: 0.18),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: TrackCover(url: coverUrl, size: 132, radius: 66),
+              ),
+            ),
+          ),
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(

@@ -30,6 +30,7 @@ class CollectionKindScreen extends ConsumerWidget {
       CollectionKind.disliked => l.collectionDisliked,
       CollectionKind.files => l.collectionFiles,
       CollectionKind.recent => l.collectionRecent,
+      CollectionKind.downloaded => l.collectionDownloaded,
     };
 
     return Scaffold(
@@ -110,6 +111,7 @@ class CollectionKindScreen extends ConsumerWidget {
     CollectionKind.disliked => l.collectionEmptyDisliked,
     CollectionKind.files => l.collectionEmptyFiles,
     CollectionKind.recent => l.collectionEmptyRecent,
+    CollectionKind.downloaded => l.collectionEmptyDownloaded,
   };
 
   Future<void> _play(

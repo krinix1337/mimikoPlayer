@@ -26,6 +26,9 @@ class YandexDto {
         for (final artist in artists)
           if (artist['id'] != null) '${artist['id']}',
       ],
+      artistCovers: [
+        for (final artist in artists) coverFrom(artist['cover'], size: '400x400'),
+      ],
       album: album['title'] as String?,
       albumRemoteId: album['id'] == null ? null : '${album['id']}',
       duration: Duration(milliseconds: (json['durationMs'] as num?)?.toInt() ?? 0),
@@ -46,11 +49,23 @@ class YandexDto {
   ];
 
   /// `avatars.yandex.net/…/%%` → https-адрес с конкретным размером.
-  static String? coverUrl(Object? coverUri) {
+  static String? coverUrl(Object? coverUri, {String size = '400x400'}) {
     final raw = coverUri?.toString();
     if (raw == null || raw.isEmpty) return null;
-    final withSize = raw.replaceFirst('%%', '400x400');
+    final withSize = raw.replaceFirst('%%', size);
     return withSize.startsWith('http') ? withSize : 'https://$withSize';
+  }
+
+  /// Обложка из любого вида, в котором её отдаёт API: строка `coverUri`,
+  /// объект `cover.uri` или `ogImage`. У сломанной обложки в объекте живёт
+  /// `error` и URI нет — тогда честно возвращаем null, а UI берёт запасную.
+  static String? coverFrom(Object? cover, {String size = '400x400'}) {
+    if (cover is String) return coverUrl(cover, size: size);
+    if (cover is Map) {
+      final uri = cover['uri'];
+      if (uri is String && uri.isNotEmpty) return coverUrl(uri, size: size);
+    }
+    return null;
   }
 
   static List<Map<String, dynamic>> _maps(Object? value) => value is List

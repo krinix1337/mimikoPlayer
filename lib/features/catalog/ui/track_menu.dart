@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app_providers.dart';
+import '../../../core/sources/source_id.dart';
+import '../../../features/downloads/download_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../widgets/pressable.dart';
@@ -32,7 +34,21 @@ Future<void> showTrackMenu(
           final albumId = await services.db.tracksDao.albumRemoteIdOf(
             localTrackId,
           );
-          return (track, liked, artist, albumId);
+          final variants = await services.db.tracksDao.variantsOf(localTrackId);
+          final hasRemote = variants.any(
+            (v) => v.ref.source != SourceId.local,
+          );
+          final downloaded = await services.db.streamsDao.downloadedFilePath(
+            localTrackId,
+          );
+          return (
+            track,
+            liked,
+            artist,
+            albumId,
+            hasRemote,
+            downloaded != null,
+          );
         }(),
         builder: (context, snapshot) {
           final data = snapshot.data;
@@ -40,6 +56,8 @@ Future<void> showTrackMenu(
           final liked = data?.$2 ?? 0;
           final artist = data?.$3;
           final albumId = data?.$4;
+          final hasRemote = data?.$5 ?? false;
+          final wasDownloaded = data?.$6 ?? false;
 
           return SingleChildScrollView(
             child: Column(
@@ -140,6 +158,94 @@ Future<void> showTrackMenu(
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     controller.enqueue(localTrackId);
+                  },
+                ),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final status = ref.watch(
+                      downloadStatusProvider(localTrackId),
+                    );
+                    final downloading =
+                        status?.phase == DownloadPhase.downloading;
+                    final complete =
+                        status?.phase == DownloadPhase.complete ||
+                        (status == null && wasDownloaded);
+                    final percent = status?.progress == null
+                        ? null
+                        : (status!.progress! * 100).round();
+
+                    final label = switch (status?.phase) {
+                      DownloadPhase.downloading => percent == null
+                          ? l.menuDownloading
+                          : l.downloadProgress(percent),
+                      DownloadPhase.complete => l.menuDownloaded,
+                      DownloadPhase.failed => l.menuDownloadRetry,
+                      null => complete ? l.menuDownloaded : l.playerDownload,
+                    };
+                    final icon = downloading
+                        ? Icons.downloading_rounded
+                        : complete
+                        ? Icons.offline_pin_rounded
+                        : Icons.download_rounded;
+
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ListTile(
+                          enabled: hasRemote && !downloading,
+                          leading: Icon(icon),
+                          title: Text(label),
+                          subtitle: downloading
+                              ? LinearProgressIndicator(
+                                  value: status?.progress,
+                                  minHeight: 3,
+                                )
+                              : status?.phase == DownloadPhase.failed
+                              ? Text(
+                                  status?.error ?? '',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : null,
+                          onTap: !hasRemote
+                              ? null
+                              : () async {
+                                  final downloader = ref.read(
+                                    downloadControllerProvider.notifier,
+                                  );
+                                  if (complete) {
+                                    await downloader.remove(localTrackId);
+                                    if (sheetContext.mounted) {
+                                      Navigator.of(sheetContext).pop();
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(l.downloadRemoved),
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    try {
+                                      await downloader.start(localTrackId);
+                                    } on Object catch (error) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              l.downloadFailed('$error'),
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  }
+                                },
+                        ),
+                      ],
+                    );
                   },
                 ),
                 if (artist != null && artist.remoteId.isNotEmpty)

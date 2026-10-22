@@ -4,12 +4,20 @@ import 'package:phoneyandex/core/db/daos/library_dao.dart';
 import 'package:phoneyandex/core/db/database.dart';
 import 'package:phoneyandex/core/sources/source_dto.dart';
 import 'package:phoneyandex/core/sources/source_id.dart';
+import 'package:phoneyandex/core/sources/stream_target.dart';
 
-SourceTrack _track(String id, String title, String artist, int seconds) =>
+SourceTrack _track(
+  String id,
+  String title,
+  String artist,
+  int seconds, {
+  List<String?> artistCovers = const [],
+}) =>
     SourceTrack(
       ref: RemoteTrackRef(SourceId.yandex, id),
       title: title,
       artists: [artist],
+      artistCovers: artistCovers,
       duration: Duration(seconds: seconds),
       coverUrl: 'https://example/$id.jpg',
     );
@@ -108,5 +116,80 @@ void main() {
       (await dao.collectionRows(CollectionKind.disliked)).map((row) => row.localTrackId),
       [hated],
     );
+  });
+
+  test('обложка артиста сохраняется из ответа каталога', () async {
+    await db.tracksDao.ingest(
+      _track(
+        '9',
+        'С обложкой',
+        'Артист С Фото',
+        100,
+        artistCovers: const ['https://example/artist.jpg'],
+      ),
+    );
+    final artist = await db.select(db.artists).getSingle();
+    expect(artist.coverUrl, 'https://example/artist.jpg');
+  });
+
+  test('плейлист без собственной обложки берёт обложку первого трека', () async {
+    await dao.importPlaylist(
+      source: SourceId.yandex,
+      snapshot: PlaylistSnapshot(
+        remotePlaylistId: '77',
+        title: 'Без обложки',
+        tracks: [_track('10', 'Первый', 'Артист', 100)],
+      ),
+    );
+
+    final overview = await dao.playlistsOverview();
+    expect(overview.single.coverUrl, 'https://example/10.jpg');
+  });
+
+  test('скачанное попадает в отдельный раздел коллекции', () async {
+    final id = await seed('12', 'Офлайн', 'Артист', 100);
+    await db.streamsDao.markDownloaded(
+      localTrackId: id,
+      source: SourceId.yandex,
+      filePath: '/downloads/12.mp3',
+      quality: Quality.auto,
+      sizeBytes: 1024,
+      codec: 'mp3',
+    );
+
+    final rows = await dao.collectionRows(CollectionKind.downloaded);
+    expect(rows.single.localTrackId, id);
+    expect(rows.single.title, 'Офлайн');
+  });
+
+  test('повторная загрузка заменяет строку, а не падает на UNIQUE', () async {
+    final id = await seed('13', 'Повтор', 'Артист', 100);
+    await db.streamsDao.markDownloading(
+      localTrackId: id,
+      source: SourceId.yandex,
+      filePath: '/downloads/13.mp3',
+      quality: Quality.auto,
+    );
+    await db.streamsDao.markDownloaded(
+      localTrackId: id,
+      source: SourceId.yandex,
+      filePath: '/downloads/13.mp3',
+      quality: Quality.auto,
+      sizeBytes: 2048,
+      codec: 'mp3',
+    );
+    await db.streamsDao.markDownloaded(
+      localTrackId: id,
+      source: SourceId.yandex,
+      filePath: '/downloads/13.mp3',
+      quality: Quality.auto,
+      sizeBytes: 4096,
+      codec: 'mp3',
+    );
+
+    final rows = await db.select(db.downloadedFiles).get();
+    expect(rows, hasLength(1));
+    expect(rows.single.sizeBytes, 4096);
+    expect(rows.single.state, 'complete');
   });
 }

@@ -27,6 +27,73 @@ class StreamsDao implements ResolutionStore {
     return await File(row.filePath).exists() ? row.filePath : null;
   }
 
+  Future<void> markDownloading({
+    required String localTrackId,
+    required SourceId source,
+    required String filePath,
+    required Quality quality,
+  }) => _replaceDownload(
+    DownloadedFilesCompanion.insert(
+      localTrackId: localTrackId,
+      filePath: filePath,
+      source: source.wire,
+      quality: Value(quality.wire),
+      state: const Value('downloading'),
+    ),
+  );
+
+  Future<void> markDownloaded({
+    required String localTrackId,
+    required SourceId source,
+    required String filePath,
+    required Quality quality,
+    required int sizeBytes,
+    String? codec,
+  }) => _replaceDownload(
+    DownloadedFilesCompanion.insert(
+      localTrackId: localTrackId,
+      filePath: filePath,
+      source: source.wire,
+      quality: Value(quality.wire),
+      codec: Value(codec),
+      sizeBytes: Value(sizeBytes),
+      state: const Value('complete'),
+      errorText: const Value(null),
+      downloadedAt: Value(DateTime.now()),
+    ),
+  );
+
+  /// У `downloaded_files` уникален `local_track_id`, а PK — autoincrement.
+  /// Обычный `insertOnConflictUpdate` целится в PK и падал на повторной
+  /// загрузке с UNIQUE constraint; здесь заменяем строку явно.
+  Future<void> _replaceDownload(DownloadedFilesCompanion row) =>
+      _db.transaction(() async {
+        await (_db.delete(_db.downloadedFiles)
+              ..where((t) => t.localTrackId.equals(row.localTrackId.value)))
+            .go();
+        await _db.into(_db.downloadedFiles).insert(row);
+      });
+
+  Future<void> markDownloadFailed(String localTrackId, String error) =>
+      (_db.update(_db.downloadedFiles)
+            ..where((t) => t.localTrackId.equals(localTrackId)))
+          .write(
+            DownloadedFilesCompanion(
+              state: const Value('failed'),
+              errorText: Value(error),
+            ),
+          );
+
+  Future<void> removeDownload(String localTrackId) =>
+      (_db.delete(_db.downloadedFiles)
+            ..where((t) => t.localTrackId.equals(localTrackId)))
+          .go();
+
+  Future<int> downloadedBytes() async {
+    final rows = await _db.select(_db.downloadedFiles).get();
+    return rows.fold<int>(0, (sum, row) => sum + row.sizeBytes);
+  }
+
   @override
   Future<ResolvedPlayback?> cached(
     String localTrackId,

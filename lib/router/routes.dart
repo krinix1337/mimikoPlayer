@@ -25,6 +25,7 @@ class Routes {
   static const collectionDisliked = '/library/disliked';
   static const collectionFiles = '/library/files';
   static const collectionRecent = '/library/recent';
+  static const collectionDownloaded = '/library/downloaded';
   static const collectionPlaylists = '/library/playlists';
 
   /// `/library/playlists/yandex%3A123456` — id плейлиста внутри пути.

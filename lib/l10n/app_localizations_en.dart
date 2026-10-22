@@ -218,6 +218,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get collectionRecent => 'Recent';
 
   @override
+  String get collectionDownloaded => 'Downloaded';
+
+  @override
+  String get collectionEmptyDownloaded =>
+      'No downloaded tracks yet.\nDownload a track from its menu or the player — it will play offline.';
+
+  @override
   String get collectionArtists => 'Artists';
 
   @override
@@ -422,6 +429,28 @@ class AppLocalizationsEn extends AppLocalizations {
       'Offline downloads arrive with the offline stage';
 
   @override
+  String get menuDownloaded => 'Remove download';
+
+  @override
+  String get menuDownloading => 'Downloading…';
+
+  @override
+  String get menuDownloadRetry => 'Retry download';
+
+  @override
+  String downloadProgress(int percent) {
+    return 'Downloading: $percent%';
+  }
+
+  @override
+  String get downloadRemoved => 'Download removed';
+
+  @override
+  String downloadFailed(String error) {
+    return 'Download failed: $error';
+  }
+
+  @override
   String get playerSleepFired => 'Sleep timer: paused';
 
   @override
@@ -540,6 +569,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accentIce => 'Ice';
 
   @override
+  String get accentSky => 'Sky';
+
+  @override
+  String get accentRose => 'Rose';
+
+  @override
+  String get accentLeaf => 'Leaf';
+
+  @override
+  String get launcherForest => 'Forest';
+
+  @override
+  String get launcherCrimson => 'Crimson';
+
+  @override
   String get settingsContrast => 'Contrast';
 
   @override
@@ -575,6 +619,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get showMiniPlayer => 'Mini player';
+
+  @override
+  String get showNavLabels => 'Navigation labels';
+
+  @override
+  String get showNavLabelsNote =>
+      'Without labels the bar is lower and icons are larger.';
+
+  @override
+  String get hideAi => 'Hide AI tracks';
+
+  @override
+  String get hideAiNote =>
+      'Removes tracks with an explicit AI mark in the title or artist (AI, Suno, Udio, neural network). The Yandex API has no official label yet.';
+
+  @override
+  String get artworkShape => 'Player artwork';
+
+  @override
+  String get artworkRounded => 'Theme default';
+
+  @override
+  String get artworkSoft => 'Soft';
+
+  @override
+  String get artworkCircle => 'Circle';
 
   @override
   String get showMiniPlayerNote =>
@@ -746,14 +816,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAboutNote =>
-      'A local player: Yandex, SoundCloud, YouTube and your own files behind one interface.';
+      'A local player: Yandex, YouTube and your own files behind one interface.';
 
   @override
   String get aboutSources => 'Sources';
 
   @override
   String get aboutSourcesNote =>
-      'Yandex Music for catalog, streams and the wave; local files from the Music folder. Lyrics: LRCLIB and lyrics.ovh.';
+      'Yandex Music for catalog, streams and the wave; YouTube for search and streams; local files from the Music folder. Lyrics: LRCLIB and lyrics.ovh.';
 
   @override
   String get authTitle => 'Sign in to Yandex';

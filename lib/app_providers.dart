@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_services.dart';
+import 'core/content/ai_filter.dart';
 import 'core/db/daos/library_dao.dart';
 import 'core/db/database.dart';
 import 'core/logging/app_logger.dart';
@@ -135,6 +138,15 @@ class PrefsController extends Notifier<Prefs> {
   Future<void> setShowMiniPlayer(bool value) =>
       _write(state.copyWith(showMiniPlayer: value));
 
+  Future<void> setShowNavLabels(bool value) =>
+      _write(state.copyWith(showNavLabels: value));
+
+  Future<void> setArtworkShape(ArtworkShape value) =>
+      _write(state.copyWith(artworkShape: value));
+
+  Future<void> setHideAiTracks(bool value) =>
+      _write(state.copyWith(hideAiTracks: value));
+
   Future<void> setHomeBackground(HomeBackground value) =>
       _write(state.copyWith(homeBackground: value));
 
@@ -155,29 +167,62 @@ final trackTitleProvider = FutureProvider.family<String, String>((ref, id) async
 
 /// Поиск по всем подключённым источникам сразу. Источник без входа
 /// молча пропускается: просить логиниться — дело экрана входа.
+///
+/// Отдаём результаты по мере готовности, а не ждём самый медленный источник:
+/// иначе медленный YouTube держал пустой экран, хотя Яндекс уже ответил.
 final combinedSearchProvider =
-    FutureProvider.family<List<SourceSearchHit>, String>((ref, query) async {
-  final registry = ref.watch(appServicesProvider).registry;
-  final needle = query.trim();
-  if (needle.isEmpty) return const [];
+    StreamProvider.autoDispose.family<List<SourceSearchHit>, String>((ref, query) {
+      final registry = ref.watch(appServicesProvider).registry;
+      final needle = query.trim();
+      if (needle.isEmpty) return Stream.value(const <SourceSearchHit>[]);
+      final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
 
-  final hits = <SourceSearchHit>[];
-  for (final source in registry.all) {
-    if (!source.capabilities.canSearch) continue;
-    if (source.capabilities.requiresAuth && !source.auth.isReady) continue;
-    try {
-      final result = await source.search(needle, pageSize: 20);
-      hits.addAll([
-        for (final track in result.tracks)
-          SourceSearchHit(source.id, track),
-      ]);
-    } on Object {
-      // Один упавший источник не должен гасить весь поиск.
-      continue;
-    }
-  }
-  return hits;
-});
+      final sources = [
+        for (final source in registry.all)
+          if (source.capabilities.canSearch &&
+              (!source.capabilities.requiresAuth || source.auth.isReady))
+            source,
+      ];
+      if (sources.isEmpty) return Stream.value(const <SourceSearchHit>[]);
+
+      late final StreamController<List<SourceSearchHit>> controller;
+      final bySource = <SourceId, List<SourceSearchHit>>{};
+      var pending = sources.length;
+
+      List<SourceSearchHit> snapshot() => [
+        for (final source in sources) ...?bySource[source.id],
+      ];
+
+      void finish() {
+        pending--;
+        if (pending == 0 && !controller.isClosed) controller.close();
+      }
+
+      controller = StreamController<List<SourceSearchHit>>(
+        onListen: () {
+          for (final source in sources) {
+            source
+                .search(needle, pageSize: 20)
+                .timeout(const Duration(seconds: 10))
+                .then((result) {
+                  bySource[source.id] = [
+                    for (final track in result.tracks)
+                      if (!hideAi ||
+                          !AiFilter.matches(track.title, track.artists))
+                        SourceSearchHit(track.ref.source, track),
+                  ];
+                  if (!controller.isClosed) controller.add(snapshot());
+                })
+                .catchError((Object _) {
+                  // Один упавший источник не должен гасить весь поиск.
+                })
+                .whenComplete(finish);
+          }
+        },
+      );
+      ref.onDispose(controller.close);
+      return controller.stream;
+    });
 
 final yandexSourceProvider = Provider<YandexSource?>((ref) {
   final source = ref.watch(appServicesProvider).registry.byId(SourceId.yandex);
@@ -216,14 +261,55 @@ final collectionProvider =
         .family<List<CollectionRow>, CollectionKind>((ref, kind) async {
           final db = ref.watch(appServicesProvider).db;
           final sort = ref.watch(prefsProvider.select((p) => p.collectionSort));
-          return db.libraryDao.collectionRows(kind, sort: sort);
+          final hideAi = ref.watch(
+            prefsProvider.select((p) => p.hideAiTracks),
+          );
+          final rows = await db.libraryDao.collectionRows(kind, sort: sort);
+          if (!hideAi) return rows;
+          return [
+            for (final row in rows)
+              if (!AiFilter.matches(row.title, [row.artist])) row,
+          ];
         });
 
 /// Исполнители, которых чаще всего слушают: считается по истории.
+///
+/// Сначала отдаём то, что уже есть в базе, а аватары без обложек добираем
+/// из карточек Яндекса фоном: `topArtists` не должен ждать десяток запросов.
 final topArtistsProvider = FutureProvider<List<ArtistPlaycount>>((ref) async {
   final db = ref.watch(appServicesProvider).db;
-  return db.libraryDao.topArtists(limit: 12);
+  final artists = await db.libraryDao.topArtists(limit: 12);
+  final source = ref.watch(yandexSourceProvider);
+  final missing = [
+    for (final artist in artists)
+      if (artist.coverUrl == null && artist.remoteId.isNotEmpty) artist,
+  ].take(10).toList();
+  if (source != null && missing.isNotEmpty) {
+    unawaited(_backfillArtistCovers(ref, source, db, missing));
+  }
+  return artists;
 });
+
+Future<void> _backfillArtistCovers(
+  Ref ref,
+  YandexSource source,
+  AppDatabase db,
+  List<ArtistPlaycount> artists,
+) async {
+  var changed = false;
+  for (final artist in artists) {
+    try {
+      final brief = await source.artist(artist.remoteId);
+      if (brief?.coverUrl == null) continue;
+      await db.libraryDao.setArtistCover(artist.artistId, brief!.coverUrl);
+      changed = true;
+    } on Object {
+      // Сеть/токен недоступны — обложка догрузится при следующем открытии.
+      continue;
+    }
+  }
+  if (changed) ref.invalidateSelf();
+}
 
 /// Текст трека из LRCLIB. Пустой `Lyrics` — это «текста нет», а не ошибка:
 /// экран караоке показывает именно это, без виджета загрузки на полчаса.
@@ -246,7 +332,23 @@ final artistBriefProvider = FutureProvider.autoDispose
     .family<ArtistBrief?, String>((ref, artistId) async {
       final source = ref.watch(yandexSourceProvider);
       if (source == null) return null;
-      return source.artist(artistId);
+      final artist = await source.artist(artistId);
+      if (artist == null) return null;
+      final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+      if (!hideAi) return artist;
+      return ArtistBrief(
+        remoteId: artist.remoteId,
+        name: artist.name,
+        coverUrl: artist.coverUrl,
+        trackCount: artist.trackCount,
+        albumCount: artist.albumCount,
+        listeners: artist.listeners,
+        popular: [
+          for (final track in artist.popular)
+            if (!AiFilter.matches(track.title, track.artists)) track,
+        ],
+        albums: artist.albums,
+      );
     });
 
 /// Альбом целиком — треки приходят в порядке диска.
@@ -254,14 +356,35 @@ final albumProvider = FutureProvider.autoDispose
     .family<AlbumSnapshot?, String>((ref, albumId) async {
       final source = ref.watch(yandexSourceProvider);
       if (source == null) return null;
-      return source.album(albumId);
+      final album = await source.album(albumId);
+      if (album == null) return null;
+      final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+      if (!hideAi) return album;
+      return AlbumSnapshot(
+        remoteId: album.remoteId,
+        title: album.title,
+        coverUrl: album.coverUrl,
+        year: album.year,
+        artists: album.artists,
+        tracks: [
+          for (final track in album.tracks)
+            if (!AiFilter.matches(track.title, track.artists)) track,
+        ],
+      );
     });
 
 /// Чарт Яндекса: позиция и трек.
 final chartProvider = FutureProvider<List<ChartEntry>>((ref) async {
   final source = ref.watch(yandexSourceProvider);
   if (source == null) return const [];
-  return source.chart();
+  final entries = await source.chart();
+  AppLogger.instance.info('чарт: ${entries.length} треков');
+  final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+  if (!hideAi) return entries;
+  return [
+    for (final entry in entries)
+      if (!AiFilter.matches(entry.track.title, entry.track.artists)) entry,
+  ];
 });
 
 /// Фоновая синхронизация коллекции: раз в сутки, уже после первого кадра.
@@ -326,9 +449,16 @@ final playlistProvider =
           final db = ref.watch(appServicesProvider).db;
           final overview = await db.libraryDao.playlistById(id);
           if (overview == null) return null;
+          final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+          final rows = await db.libraryDao.playlistRows(id);
           return PlaylistDetail(
             overview: overview,
-            rows: await db.libraryDao.playlistRows(id),
+            rows: hideAi
+                ? [
+                    for (final row in rows)
+                      if (!AiFilter.matches(row.title, [row.artist])) row,
+                  ]
+                : rows,
           );
         });
 

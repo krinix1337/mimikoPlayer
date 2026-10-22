@@ -55,9 +55,17 @@ class QueueManager {
     if (_position < 0) _position = 0;
   }
 
-  /// Дописать пачку (подкачка волны) и встать на первый новый трек.
-  /// Уже стоящие в очереди id пропускаем — иначе волна крутит одно и то же.
-  bool appendBatch(List<String> localTrackIds) {
+  /// Сколько треков осталось после текущего.
+  int get remainingAfterCurrent =>
+      isEmpty ? 0 : (_order.length - _position - 1).clamp(0, _order.length);
+
+  /// Дописать пачку (подкачка волны). Уже стоящие в очереди id пропускаем —
+  /// иначе волна крутит одно и то же. [moveToFirstNew] нужен только когда
+  /// текущая очередь закончилась; при фоновой докачке позиция не меняется.
+  bool appendBatch(
+    List<String> localTrackIds, {
+    bool moveToFirstNew = false,
+  }) {
     final fresh = [
       for (final id in localTrackIds)
         if (!_items.contains(id)) id,
@@ -70,7 +78,9 @@ class QueueManager {
       ..._order,
       for (var i = 0; i < fresh.length; i++) firstBase + i,
     ];
-    _position = _order.length - fresh.length;
+    if (moveToFirstNew || _position < 0) {
+      _position = _order.length - fresh.length;
+    }
     return true;
   }
 

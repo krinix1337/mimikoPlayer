@@ -21,7 +21,7 @@
     <text x="1206" y="118" text-anchor="end" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="46" font-weight="800" letter-spacing="-1" fill="#D8F544" opacity="0.22">02</text>
     <text x="686" y="186" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="30" font-weight="700" fill="#F2F3F5">Коллекция</text>
     <text x="686" y="224" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="19.5" fill="#A9AFBB">Любимое, плейлисты, файлы и недавнее.</text>
-    <text x="686" y="251" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="19.5" fill="#A9AFBB">Синхронизация с Яндексом и даты лайков.</text>
+    <text x="686" y="251" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="19.5" fill="#A9AFBB">Скачанное, синхронизация и даты лайков.</text>
   </g>
   <g>
     <rect x="34" y="310" width="588" height="246" rx="28" fill="#15181F" stroke="#262C38"/>
@@ -32,7 +32,7 @@
     <text x="586" y="394" text-anchor="end" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="46" font-weight="800" letter-spacing="-1" fill="#D8F544" opacity="0.22">03</text>
     <text x="66" y="462" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="30" font-weight="700" fill="#F2F3F5">Плеер</text>
     <text x="66" y="500" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="19.5" fill="#A9AFBB">Фоновый сервис, экран блокировки, очередь.</text>
-    <text x="66" y="527" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="19.5" fill="#A9AFBB">Сон-таймер, плавное затухание, восстановление.</text>
+    <text x="66" y="527" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="19.5" fill="#A9AFBB">Сон-таймер, затухание, офлайн-файлы.</text>
   </g>
   <g>
     <rect x="654" y="310" width="588" height="246" rx="28" fill="#15181F" stroke="#262C38"/>
@@ -53,7 +53,7 @@
     </g>
     <text x="586" y="670" text-anchor="end" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="46" font-weight="800" letter-spacing="-1" fill="#D8F544" opacity="0.22">05</text>
     <text x="66" y="738" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="30" font-weight="700" fill="#F2F3F5">Источники</text>
-    <text x="66" y="776" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="19.5" fill="#A9AFBB">Яндекс, локальные файлы, LRCLIB → lyrics.ovh.</text>
+    <text x="66" y="776" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="19.5" fill="#A9AFBB">Яндекс, локальные файлы, YouTube, LRCLIB.</text>
     <text x="66" y="803" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="19.5" fill="#A9AFBB">Один интерфейс и откат при отказе источника.</text>
   </g>
   <g>
@@ -64,7 +64,7 @@
     </g>
     <text x="1206" y="670" text-anchor="end" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="46" font-weight="800" letter-spacing="-1" fill="#D8F544" opacity="0.22">06</text>
     <text x="686" y="738" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="30" font-weight="700" fill="#F2F3F5">Material 3</text>
-    <text x="686" y="776" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="19.5" fill="#A9AFBB">Шесть акцентов, Material You, контраст.</text>
-    <text x="686" y="803" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="19.5" fill="#A9AFBB">RU/EN, шесть иконок лаунчера, анимации.</text>
+    <text x="686" y="776" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="19.5" fill="#A9AFBB">Девять акцентов, Material You, контраст.</text>
+    <text x="686" y="803" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="19.5" fill="#A9AFBB">RU/EN, одиннадцать иконок лаунчера, анимации.</text>
   </g>
 </svg>

@@ -9,8 +9,8 @@
   <g font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif">
     <rect x="34" y="34" width="380" height="250" rx="28" fill="#14171D" stroke="#252B37"/>
     <text x="66" y="76" font-size="12" font-weight="600" letter-spacing="2.6" fill="#6B7280">ЦВЕТ</text>
-    <text x="66" y="116" font-size="25" font-weight="700" fill="#F2F3F5">Шесть акцентов</text>
-    <circle cx="80" cy="150" r="13" fill="#D8F544" stroke="#F2F3F5" stroke-opacity="0.14"/><circle cx="124" cy="150" r="13" fill="#6C5CE7" stroke="#F2F3F5" stroke-opacity="0.14"/><circle cx="168" cy="150" r="13" fill="#FF6B5B" stroke="#F2F3F5" stroke-opacity="0.14"/><circle cx="212" cy="150" r="13" fill="#22C7A9" stroke="#F2F3F5" stroke-opacity="0.14"/><circle cx="256" cy="150" r="13" fill="#FFB03A" stroke="#F2F3F5" stroke-opacity="0.14"/><circle cx="300" cy="150" r="13" fill="#7FC8FF" stroke="#F2F3F5" stroke-opacity="0.14"/>
+    <text x="66" y="116" font-size="25" font-weight="700" fill="#F2F3F5">Девять акцентов</text>
+    <circle cx="78" cy="150" r="11" fill="#D8F544" stroke="#F2F3F5" stroke-opacity="0.14"/><circle cx="114" cy="150" r="11" fill="#6C5CE7" stroke="#F2F3F5" stroke-opacity="0.14"/><circle cx="150" cy="150" r="11" fill="#FF6B5B" stroke="#F2F3F5" stroke-opacity="0.14"/><circle cx="186" cy="150" r="11" fill="#22C7A9" stroke="#F2F3F5" stroke-opacity="0.14"/><circle cx="222" cy="150" r="11" fill="#FFB03A" stroke="#F2F3F5" stroke-opacity="0.14"/><circle cx="258" cy="150" r="11" fill="#7FC8FF" stroke="#F2F3F5" stroke-opacity="0.14"/><circle cx="294" cy="150" r="11" fill="#4F8BFF" stroke="#F2F3F5" stroke-opacity="0.14"/><circle cx="330" cy="150" r="11" fill="#FF5C9A" stroke="#F2F3F5" stroke-opacity="0.14"/><circle cx="366" cy="150" r="11" fill="#52D273" stroke="#F2F3F5" stroke-opacity="0.14"/>
     <text x="66" y="192" font-size="15" fill="#A9AFBB">Фирменная палитра, Material You</text>
     <text x="66" y="216" font-size="15" fill="#A9AFBB">и монохром — на выбор.</text>
     <g fill="none" stroke="#252B37">

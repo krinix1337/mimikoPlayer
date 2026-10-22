@@ -7,6 +7,7 @@ import 'sources/local/local_source.dart';
 import 'sources/yandex/yandex_api.dart';
 import 'sources/yandex/yandex_auth.dart';
 import 'sources/yandex/yandex_source.dart';
+import 'sources/youtube/youtube_source.dart';
 
 /// Единая точка сборки зависимостей. Нужна потому, что audio_service после
 /// смерти процесса поднимает `main()` headless: состояние приходится
@@ -17,7 +18,7 @@ class AppServices {
     yandexApi = YandexApi();
     yandexAuth = YandexAuth(db.authDao, yandexApi!);
     yandex = YandexSource(api: yandexApi)..attachAuth(yandexAuth!);
-    registry = SourceRegistry([yandex!, LocalSource()]);
+    registry = SourceRegistry([yandex!, LocalSource(), YoutubeSource()]);
     resolver = StreamResolver(registry: registry, store: db.streamsDao);
   }
 
@@ -36,6 +37,9 @@ class AppServices {
   /// Плавное затухание громкости; читается из настроек вместе с качеством.
   bool fadeEnabled = true;
 
+  /// Фильтр явно помеченных ИИ-треков; нужен и фоновой докачке волны.
+  bool hideAiTracks = false;
+
   static AppServices? _instance;
 
   static AppServices ensure() => _instance ??= AppServices._();
@@ -45,6 +49,7 @@ class AppServices {
     final prefs = await loadPrefs(db);
     defaultQuality = Quality.fromWire(prefs.quality);
     fadeEnabled = prefs.fade;
+    hideAiTracks = prefs.hideAiTracks;
   }
 
   /// Восстановление аккаунта ходит в сеть, поэтому запускается уже после

@@ -5,7 +5,7 @@
   <img src="docs/hero-light.svg" width="100%" alt="mimikoPlayer — музыкальный плеер для Android на Material 3">
 </picture>
 
-<p><a href="https://flutter.dev"><img alt="Flutter 3.47" src="https://img.shields.io/badge/Flutter-3.47-02569B?style=flat-square&logo=flutter&logoColor=white"></a> <img alt="Dart 3.13" src="https://img.shields.io/badge/Dart-3.13-0175C2?style=flat-square&logo=dart&logoColor=white"> <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white"> <img alt="98 тестов" src="https://img.shields.io/badge/tests-98-22C7A9?style=flat-square"> <img alt="Лицензия MIT" src="https://img.shields.io/badge/license-MIT-D8F544?style=flat-square"></p>
+<p><a href="https://flutter.dev"><img alt="Flutter 3.47" src="https://img.shields.io/badge/Flutter-3.47-02569B?style=flat-square&logo=flutter&logoColor=white"></a> <img alt="Dart 3.13" src="https://img.shields.io/badge/Dart-3.13-0175C2?style=flat-square&logo=dart&logoColor=white"> <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white"> <img alt="109 тестов" src="https://img.shields.io/badge/tests-109-22C7A9?style=flat-square"> <img alt="Лицензия MIT" src="https://img.shields.io/badge/license-MIT-D8F544?style=flat-square"></p>
 
 **[Возможности](#возможности)** · **[Скриншоты](#скриншоты)** · **[Material 3](#material-3)** · **[Архитектура](#архитектура)** · **[Сборка](#сборка)**
 
@@ -13,7 +13,7 @@
 
 ## Что это
 
-mimikoPlayer — Android-плеер, который не заставляет выбирать между сервисами. Яндекс Музыка, локальные файлы и караоке живут в одном интерфейсе: один экран «сейчас играет», одна очередь и одна коллекция — независимо от того, откуда пришёл трек. Оформление собрано на токенах Material 3 Expressive, а на экране только настоящие данные.
+mimikoPlayer — Android-плеер, который не заставляет выбирать между сервисами. Яндекс Музыка, YouTube, локальные файлы и караоке живут в одном интерфейсе: один экран «сейчас играет», одна очередь и одна коллекция — независимо от того, откуда пришёл трек. Оформление собрано на токенах Material 3 Expressive, а на экране только настоящие данные.
 
 ## Возможности
 
@@ -61,11 +61,12 @@ mimikoPlayer — Android-плеер, который не заставляет в
 | Что | Варианты |
 |---|---|
 | Тема | светлая, тёмная, системная |
-| Палитра | фирменная, Material You, монохром · шесть акцентов |
+| Палитра | фирменная, Material You, монохром · девять акцентов |
 | Формы и движение | 12 / 20 / 28 dp, полная для кнопок и чипов, скорость анимаций |
 | Интерфейс | компактная панель, мини-плеер, фон главной, язык RU / EN |
-| Лаунчер | шесть значков на выбор |
+| Лаунчер | одиннадцать значков на выбор |
 | Караоке | размер текста и затемнение неактивных строк |
+| Контент | скрывать треки с явной пометкой ИИ в метаданных |
 
 Все настройки хранятся одним снимком в SQLite и переживают перезапуск.
 
@@ -75,7 +76,7 @@ mimikoPlayer — Android-плеер, который не заставляет в
 
 ```
 Яндекс Музыка ─┐
-               ├─▶ MusicSource ─▶ StreamResolver ─▶ PlaybackController ─▶ just_audio
+YouTube       ─┼─▶ MusicSource ─▶ StreamResolver ─▶ PlaybackController ─▶ just_audio
 Локальные файлы┘
 ```
 
@@ -90,7 +91,7 @@ lib/
 │   ├── prefs/       настройки одним снимком
 │   └── platform/    мост в Android: частота кадров, значки, теги
 ├── features/        волна, поиск, коллекция, плеер, каталог, караоке, настройки
-├── sources/         yandex, local, lyrics (LRCLIB → lyrics.ovh)
+├── sources/         yandex, youtube, local, lyrics (LRCLIB → lyrics.ovh)
 ├── l10n/            строки RU / EN
 └── theme/           токены M3: цвет, типографика, формы, движение
 ```
@@ -104,7 +105,7 @@ UI не знает про `audio_service` и ходит только через 
 | UI | Flutter 3.47, Material 3 Expressive, Riverpod 3.4, go_router 18.1 |
 | Звук | just_audio 0.10 (media3 / ExoPlayer), audio_service 0.18 |
 | Данные | drift 2.35 и SQLite: 15 таблиц, миграции |
-| Сеть | dio 5.11, Yandex Music API, LRCLIB |
+| Сеть | dio 5.11, Yandex Music API, LRCLIB, youtube_explode_dart 3.1 |
 | Локализация | `flutter gen-l10n`, русский по умолчанию, английский |
 
 ## Сборка
@@ -121,9 +122,9 @@ flutter build apk --release
 
 ## Статус
 
-Проверено на Xiaomi 2409FPCC4G (Android 16): вход, поиск, волна и станции, коллекция с полной синхронизацией лайков, плеер с фоном и уведомлением, караоке, локальные файлы, настройки. 98 тестов проходят, `flutter analyze` чист.
+Проверено на Xiaomi 2409FPCC4G (Android 16): вход, поиск, волна и станции (18 треков в стартовой очереди), коллекция с полной синхронизацией лайков, чарт на 100 позиций, офлайн-скачивание, загрузка обложек артистов и плейлистов, караоке, настройки. 109 тестов проходят, `flutter analyze` чист.
 
-Ограничения: текст песни доступен там, где его отдают публичные каталоги — Яндекс подписывает запрос, Genius требует токен. Частоту выше 60 Гц прошивка может не отдавать сторонним приложениям: приложение запрашивает 120 Гц, но показывает фактическую. В планах — офлайн-кеш и дополнительные источники.
+Ограничения: текст песни доступен там, где его отдают публичные каталоги — Яндекс подписывает запрос, Genius требует токен. Фильтр ИИ работает по явным пометкам в метаданных: официального поля в API Яндекса пока нет. YouTube-поток зависит от сети: часть VPN-выходов YouTube блокирует для player API, поиск при этом работает. Частоту выше 60 Гц прошивка может не отдавать сторонним приложениям: приложение запрашивает 120 Гц, но показывает фактическую. В планах — SoundCloud, каталоги Spotify/Deezer и редактор таймингов караоке.
 
 ## Лицензия
 

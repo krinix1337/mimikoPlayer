@@ -177,9 +177,9 @@ class YandexSource implements MusicSource {
           remotePlaylistId: '${playlist['kind']}',
           title: '${playlist['title'] ?? 'Без названия'}',
           trackCount: (playlist['trackCount'] as num?)?.toInt(),
-          coverUrl: YandexDto.coverUrl(
-            (playlist['cover'] as Map?)?['uri'] ?? playlist['coverUri'],
-          ),
+          coverUrl:
+              YandexDto.coverFrom(playlist['cover']) ??
+              YandexDto.coverUrl(playlist['coverUri']),
           isSystem: playlist['type'] != null && '${playlist['type']}' != 'user',
         ),
     ];
@@ -199,15 +199,21 @@ class YandexSource implements MusicSource {
     final first = fetched.isEmpty ? null : fetched.first;
     if (first == null) return null;
 
+    final tracks = YandexDto.tracks(first['tracks']);
+
     return PlaylistSnapshot(
       remotePlaylistId: remotePlaylistId,
       title: '${first['title'] ?? 'Плейлист'}',
       description: first['description']?.toString(),
-      coverUrl: YandexDto.coverUrl(
-        (first['cover'] as Map?)?['uri'] ?? first['coverUri'],
-      ),
+      // У пользовательских плейлистов обложки часто нет вовсе — Яндекс
+      // рисует мозаику на клиенте. Берём обложку первого трека: карточка
+      // перестаёт быть серым квадратом и после импорта не зависит от сети.
+      coverUrl:
+          YandexDto.coverFrom(first['cover']) ??
+          YandexDto.coverUrl(first['coverUri']) ??
+          (tracks.isEmpty ? null : tracks.first.coverUrl),
       total: (first['trackCount'] as num?)?.toInt(),
-      tracks: YandexDto.tracks(first['tracks']),
+      tracks: tracks,
     );
   }
 
@@ -226,9 +232,9 @@ class YandexSource implements MusicSource {
     return ArtistBrief(
       remoteId: artistId,
       name: '${artist['name'] ?? ''}',
-      coverUrl: YandexDto.coverUrl(
-        (artist['cover'] as Map?)?['uri'] ?? artist['ogImage'],
-      ),
+      coverUrl:
+          YandexDto.coverFrom(artist['cover'], size: '600x600') ??
+          YandexDto.coverUrl(artist['ogImage'], size: '600x600'),
       trackCount: counts is Map ? (counts['tracks'] as num?)?.toInt() : null,
       albumCount: counts is Map
           ? (counts['directAlbums'] as num?)?.toInt()
@@ -241,9 +247,9 @@ class YandexSource implements MusicSource {
             AlbumBrief(
               remoteId: '${item['id']}',
               title: '${item['title'] ?? ''}',
-              coverUrl: YandexDto.coverUrl(
-                (item['coverUri'] as String?) ?? (item['cover'] as Map?)?['uri'],
-              ),
+              coverUrl:
+                  YandexDto.coverFrom(item['cover']) ??
+                  YandexDto.coverUrl(item['coverUri']),
               year: (item['year'] as num?)?.toInt(),
               trackCount: (item['trackCount'] as num?)?.toInt(),
             ),
@@ -251,31 +257,34 @@ class YandexSource implements MusicSource {
     );
   }
 
-  /// Чарт Яндекса: позиция + трек. Я.Музыка отдаёт его блоком лендинга.
+  /// Чарт Яндекса: позиция + трек. Полный чарт (100 позиций) отдаёт
+  /// `/landing3/chart/russia`; блок `landing3?blocks=chart` — только топ-10.
   Future<List<ChartEntry>> chart() async {
-    final result = await _api.get('/landing3', {'blocks': 'chart'});
+    final result = await _api.get('/landing3/chart/russia');
     if (!result.isOk) return const [];
-    final blocks = (result.asMap?['blocks'] as List?) ?? const [];
+    return parseChart(result.asMap);
+  }
+
+  /// Разбор ответа чарта отдельно от сети: структура вложенная, и её проще
+  /// держать под тестом, чем ловить регрессию на живом аккаунте.
+  static List<ChartEntry> parseChart(Map<String, dynamic>? result) {
+    final chart = result?['chart'];
+    final items = chart is Map ? chart['tracks'] : null;
+    if (items is! List) return const [];
 
     final entries = <ChartEntry>[];
-    for (final block in blocks) {
-      if (block is! Map || block['type'] != 'chart') continue;
-      for (final entity in (block['entities'] as List? ?? const [])) {
-        if (entity is! Map) continue;
-        final data = entity['data'];
-        if (data is! Map) continue;
-        final track = data['track'];
-        if (track is! Map) continue;
-        final chart = data['chart'];
-        entries.add(
-          ChartEntry(
-            position: chart is Map
-                ? ((chart['position'] as num?)?.toInt() ?? entries.length + 1)
-                : entries.length + 1,
-            track: YandexDto.track(Map<String, dynamic>.from(track)),
+    for (final item in items) {
+      if (item is! Map || item['track'] is! Map) continue;
+      entries.add(
+        ChartEntry(
+          position:
+              ((item['chart'] as Map?)?['position'] as num?)?.toInt() ??
+              entries.length + 1,
+          track: YandexDto.track(
+            Map<String, dynamic>.from(item['track'] as Map),
           ),
-        );
-      }
+        ),
+      );
     }
     return entries;
   }
@@ -290,9 +299,9 @@ class YandexSource implements MusicSource {
     return AlbumSnapshot(
       remoteId: albumId,
       title: '${data['title'] ?? ''}',
-      coverUrl: YandexDto.coverUrl(
-        (data['coverUri'] as String?) ?? (data['cover'] as Map?)?['uri'],
-      ),
+      coverUrl:
+          YandexDto.coverFrom(data['cover'], size: '800x800') ??
+          YandexDto.coverUrl(data['coverUri'], size: '800x800'),
       year: (data['year'] as num?)?.toInt(),
       artists: [
         for (final item in (data['artists'] as List? ?? const []))

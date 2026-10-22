@@ -89,6 +89,7 @@ final class SourceTrack {
     required this.artists,
     required this.duration,
     this.artistIds = const [],
+    this.artistCovers = const [],
     this.album,
     this.albumRemoteId,
     this.coverUrl,
@@ -106,6 +107,10 @@ final class SourceTrack {
   /// В порядке значимости; [mainArtist] — первый, если список пуст.
   final List<String> artists;
   final List<String> artistIds;
+
+  /// Обложка каждого артиста в том же порядке, что [artists]; null — источник
+  /// её не отдал. Из неё заполняется аватар в коллекции без лишних запросов.
+  final List<String?> artistCovers;
   final String? album;
   final String? albumRemoteId;
   final Duration duration;

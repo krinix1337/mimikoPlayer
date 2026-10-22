@@ -218,6 +218,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get collectionRecent => 'Недавние';
 
   @override
+  String get collectionDownloaded => 'Скачанное';
+
+  @override
+  String get collectionEmptyDownloaded =>
+      'Скачанных треков нет.\nСкачайте трек из меню или с экрана плеера — он заиграет без сети.';
+
+  @override
   String get collectionArtists => 'Артисты';
 
   @override
@@ -421,6 +428,28 @@ class AppLocalizationsRu extends AppLocalizations {
   String get playerDownloadSoon => 'Загрузка офлайн появится на этапе офлайна';
 
   @override
+  String get menuDownloaded => 'Удалить скачанное';
+
+  @override
+  String get menuDownloading => 'Скачивается…';
+
+  @override
+  String get menuDownloadRetry => 'Повторить скачивание';
+
+  @override
+  String downloadProgress(int percent) {
+    return 'Скачивается: $percent%';
+  }
+
+  @override
+  String get downloadRemoved => 'Скачанное удалено';
+
+  @override
+  String downloadFailed(String error) {
+    return 'Не удалось скачать: $error';
+  }
+
+  @override
   String get playerSleepFired => 'Таймер сна: пауза';
 
   @override
@@ -541,6 +570,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String get accentIce => 'Лёд';
 
   @override
+  String get accentSky => 'Небо';
+
+  @override
+  String get accentRose => 'Роза';
+
+  @override
+  String get accentLeaf => 'Лист';
+
+  @override
+  String get launcherForest => 'Лес';
+
+  @override
+  String get launcherCrimson => 'Багровый';
+
+  @override
   String get settingsContrast => 'Контраст';
 
   @override
@@ -575,6 +619,31 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get showMiniPlayer => 'Мини-плеер';
+
+  @override
+  String get showNavLabels => 'Подписи в навигации';
+
+  @override
+  String get showNavLabelsNote => 'Без подписей панель ниже, а иконки крупнее.';
+
+  @override
+  String get hideAi => 'Скрывать ИИ-треки';
+
+  @override
+  String get hideAiNote =>
+      'Убирает треки с явной пометкой ИИ в названии или исполнителе (AI, Suno, Udio, нейросеть). Официальной метки в API Яндекса пока нет.';
+
+  @override
+  String get artworkShape => 'Обложка плеера';
+
+  @override
+  String get artworkRounded => 'Как в теме';
+
+  @override
+  String get artworkSoft => 'Мягкая';
+
+  @override
+  String get artworkCircle => 'Круглая';
 
   @override
   String get showMiniPlayerNote => 'Показывать полоску плеера над навигацией.';
@@ -747,14 +816,14 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get settingsAboutNote =>
-      'Локальный плеер: Яндекс, SoundCloud, YouTube и свои файлы в одном интерфейсе.';
+      'Локальный плеер: Яндекс, YouTube и свои файлы в одном интерфейсе.';
 
   @override
   String get aboutSources => 'Источники';
 
   @override
   String get aboutSourcesNote =>
-      'Яндекс Музыка — каталог, поток и волна; локальные файлы из папки Music. Тексты: LRCLIB и lyrics.ovh.';
+      'Яндекс Музыка — каталог, поток и волна; YouTube — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB и lyrics.ovh.';
 
   @override
   String get authTitle => 'Вход в Яндекс';

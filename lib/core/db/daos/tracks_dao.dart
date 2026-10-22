@@ -290,6 +290,9 @@ class TracksDao {
       final remoteArtistId = i < track.artistIds.length
           ? track.artistIds[i]
           : null;
+      final cover = i < track.artistCovers.length
+          ? track.artistCovers[i]
+          : null;
 
       final existing = await (_db.select(_db.artists)
             ..where((t) => t.nameNorm.equals(nameNorm))
@@ -302,10 +305,26 @@ class TracksDao {
         // источника падал на уникальном индексе artists_by_source.
         // Поэтому без id держим суррогат, а когда id наконец приходит —
         // дописываем его в ту же строку.
-        if (remoteArtistId != null && existing.remoteArtistId != remoteArtistId) {
+        final nextRemote = remoteArtistId != null &&
+                existing.remoteArtistId != remoteArtistId
+            ? remoteArtistId
+            : null;
+        final nextCover = existing.coverUrl == null && cover != null
+            ? cover
+            : null;
+        if (nextRemote != null || nextCover != null) {
           await (_db.update(_db.artists)
                 ..where((t) => t.id.equals(existing.id)))
-              .write(ArtistsCompanion(remoteArtistId: Value(remoteArtistId)));
+              .write(
+                ArtistsCompanion(
+                  remoteArtistId: nextRemote == null
+                      ? const Value.absent()
+                      : Value(nextRemote),
+                  coverUrl: nextCover == null
+                      ? const Value.absent()
+                      : Value(nextCover),
+                ),
+              );
         }
         ids.add(existing.id);
         continue;
@@ -315,7 +334,7 @@ class TracksDao {
         ArtistsCompanion.insert(
           name: name,
           nameNorm: nameNorm,
-          coverUrl: Value(null),
+          coverUrl: Value(cover),
           source: source.wire,
           remoteArtistId: remoteArtistId ?? 'name:$nameNorm',
           updatedAt: Value(DateTime.now()),

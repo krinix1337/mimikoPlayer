@@ -203,6 +203,17 @@ class _AppearancePage extends ConsumerWidget {
               },
               onPick: controller.setCorner,
             ),
+            ChoiceRow<ArtworkShape>(
+              label: l.artworkShape,
+              values: ArtworkShape.values,
+              current: prefs.artworkShape,
+              labelOf: (value) => switch (value) {
+                ArtworkShape.rounded => l.artworkRounded,
+                ArtworkShape.soft => l.artworkSoft,
+                ArtworkShape.circle => l.artworkCircle,
+              },
+              onPick: controller.setArtworkShape,
+            ),
             ChoiceRow<AnimationsSpeed>(
               label: l.settingsMotion,
               values: AnimationsSpeed.values,
@@ -232,6 +243,18 @@ class _AppearancePage extends ConsumerWidget {
               note: l.showMiniPlayerNote,
               onChanged: controller.setShowMiniPlayer,
             ),
+            SwitchRow(
+              label: l.showNavLabels,
+              value: prefs.showNavLabels,
+              note: l.showNavLabelsNote,
+              onChanged: controller.setShowNavLabels,
+            ),
+            SwitchRow(
+              label: l.hideAi,
+              value: prefs.hideAiTracks,
+              note: l.hideAiNote,
+              onChanged: controller.setHideAiTracks,
+            ),
             ChoiceRow<HomeBackground>(
               label: l.homeBackground,
               values: HomeBackground.values,
@@ -243,6 +266,9 @@ class _AppearancePage extends ConsumerWidget {
               },
               onPick: controller.setHomeBackground,
             ),
+            // Частота кадров относится к экрану, а не к звуку: раньше она
+            // лежала в разделе «Звук» и путала.
+            const FrameTile(),
           ],
         ),
         SettingsSection(title: l.settingsLanguage, children: const [LanguageRow()]),
@@ -289,7 +315,6 @@ class _SoundPage extends ConsumerWidget {
               note: l.settingsFadeNote,
               onChanged: controller.setFade,
             ),
-            const FrameTile(),
             const PriorityTile(),
           ],
         ),
@@ -466,7 +491,7 @@ class _AboutPage extends StatelessWidget {
     );
   }
 
-  static const String _version = '0.4.0';
+  static const String _version = '1.1.0';
 }
 
 /// Общая оболочка страницы раздела: крупный заголовок и кнопка назад.
@@ -509,6 +534,9 @@ extension on AccentColor {
     AccentColor.teal => l.accentTeal,
     AccentColor.amber => l.accentAmber,
     AccentColor.ice => l.accentIce,
+    AccentColor.sky => l.accentSky,
+    AccentColor.rose => l.accentRose,
+    AccentColor.leaf => l.accentLeaf,
   };
 }
 

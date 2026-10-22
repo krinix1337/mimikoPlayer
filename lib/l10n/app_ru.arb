@@ -82,6 +82,8 @@
   "collectionPlaylists": "Плейлисты",
   "collectionFiles": "Файлы",
   "collectionRecent": "Недавние",
+  "collectionDownloaded": "Скачанное",
+  "collectionEmptyDownloaded": "Скачанных треков нет.\nСкачайте трек из меню или с экрана плеера — он заиграет без сети.",
   "collectionArtists": "Артисты",
   "albumsTitle": "Альбомы",
   "chartTitle": "Чарт",
@@ -240,6 +242,26 @@
   "playerLyricsMissing": "Текста пока нет",
   "playerDownload": "Скачать",
   "playerDownloadSoon": "Загрузка офлайн появится на этапе офлайна",
+  "menuDownloaded": "Удалить скачанное",
+  "menuDownloading": "Скачивается…",
+  "menuDownloadRetry": "Повторить скачивание",
+  "downloadProgress": "Скачивается: {percent}%",
+  "@downloadProgress": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadRemoved": "Скачанное удалено",
+  "downloadFailed": "Не удалось скачать: {error}",
+  "@downloadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "playerSleepFired": "Таймер сна: пауза",
   "searchHint": "Артист, трек или альбом",
   "searchEmpty": "Начните вводить — ищем по всем подключённым источникам",
@@ -292,6 +314,11 @@
   "accentTeal": "Мята",
   "accentAmber": "Янтарь",
   "accentIce": "Лёд",
+  "accentSky": "Небо",
+  "accentRose": "Роза",
+  "accentLeaf": "Лист",
+  "launcherForest": "Лес",
+  "launcherCrimson": "Багровый",
   "settingsContrast": "Контраст",
   "contrastNormal": "Обычный",
   "contrastHigh": "Высокий",
@@ -304,6 +331,14 @@
   "compactUi": "Компактная панель",
   "compactUiNote": "Нижняя навигация и мини-плеер ниже и плотнее.",
   "showMiniPlayer": "Мини-плеер",
+  "showNavLabels": "Подписи в навигации",
+  "showNavLabelsNote": "Без подписей панель ниже, а иконки крупнее.",
+  "hideAi": "Скрывать ИИ-треки",
+  "hideAiNote": "Убирает треки с явной пометкой ИИ в названии или исполнителе (AI, Suno, Udio, нейросеть). Официальной метки в API Яндекса пока нет.",
+  "artworkShape": "Обложка плеера",
+  "artworkRounded": "Как в теме",
+  "artworkSoft": "Мягкая",
+  "artworkCircle": "Круглая",
   "showMiniPlayerNote": "Показывать полоску плеера над навигацией.",
   "homeBackground": "Фон главной",
   "bgCover": "Обложка",
@@ -384,9 +419,9 @@
       }
     }
   },
-  "settingsAboutNote": "Локальный плеер: Яндекс, SoundCloud, YouTube и свои файлы в одном интерфейсе.",
+  "settingsAboutNote": "Локальный плеер: Яндекс, YouTube и свои файлы в одном интерфейсе.",
   "aboutSources": "Источники",
-  "aboutSourcesNote": "Яндекс Музыка — каталог, поток и волна; локальные файлы из папки Music. Тексты: LRCLIB и lyrics.ovh.",
+  "aboutSourcesNote": "Яндекс Музыка — каталог, поток и волна; YouTube — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB и lyrics.ovh.",
   "authTitle": "Вход в Яндекс",
   "authCodeHint": "Код подтверждения",
   "authCopyCode": "Копировать код",

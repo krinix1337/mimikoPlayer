@@ -80,6 +80,29 @@ class YandexStation {
     ];
   }
 
+  /// Ротор отдаёт по пять треков за запрос. Чтобы очередь не выглядела как
+  /// «пять песен и всё», сразу забираем несколько пачек параллельно и
+  /// склеиваем без дублей. Дальше плеер докачивает буфер заранее.
+  Future<List<SourceTrack>> waveMany({
+    String station = defaultStation,
+    int batches = 4,
+    int target = 20,
+  }) async {
+    final parts = await Future.wait([
+      for (var i = 0; i < batches; i++) wave(station: station),
+    ]);
+    final seen = <String>{};
+    final tracks = <SourceTrack>[];
+    for (final batch in parts) {
+      for (final track in batch) {
+        if (!seen.add(track.ref.remoteId)) continue;
+        tracks.add(track);
+        if (tracks.length >= target) return tracks;
+      }
+    }
+    return tracks;
+  }
+
   /// Типы и тело совпадают с официальным клиентом: без этих отчётов волна
   /// перестаёт подстраиваться под пользователя.
   Future<YandexResponse> feedback({
