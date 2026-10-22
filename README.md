@@ -2,43 +2,27 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/hero-dark.svg">
-  <img src="docs/hero-light.svg" width="100%" alt="mimikoPlayer — музыкальный плеер для Android">
+  <img src="docs/hero-light.svg" width="100%" alt="mimikoPlayer — музыкальный плеер для Android на Material 3">
 </picture>
 
-**Музыкальный плеер для Android: Яндекс Музыка, своя волна, коллекция и караоке — в одном Material 3 интерфейсе.**
+<p><a href="https://flutter.dev"><img alt="Flutter 3.47" src="https://img.shields.io/badge/Flutter-3.47-02569B?style=flat-square&logo=flutter&logoColor=white"></a> <img alt="Dart 3.13" src="https://img.shields.io/badge/Dart-3.13-0175C2?style=flat-square&logo=dart&logoColor=white"> <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white"> <img alt="98 тестов" src="https://img.shields.io/badge/tests-98-22C7A9?style=flat-square"> <img alt="Лицензия MIT" src="https://img.shields.io/badge/license-MIT-D8F544?style=flat-square"></p>
 
-<p>
-  <a href="https://flutter.dev"><img alt="Flutter 3.47" src="https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white"></a>
-  <img alt="Dart 3.13" src="https://img.shields.io/badge/Dart-3.13-0175C2?logo=dart&logoColor=white">
-  <img alt="Android 8+" src="https://img.shields.io/badge/Android-8.0%E2%80%9317-3DDC84?logo=android&logoColor=white">
-  <img alt="Тесты" src="https://img.shields.io/badge/tests-98%20passing-22C7A9">
-  <img alt="Лицензия" src="https://img.shields.io/badge/license-MIT-D8F544">
-</p>
+**[Возможности](#возможности)** · **[Скриншоты](#скриншоты)** · **[Material 3](#material-3)** · **[Архитектура](#архитектура)** · **[Сборка](#сборка)**
 
 </div>
 
----
-
 ## Что это
 
-Локальный плеер, который не заставляет выбирать между сервисами: один интерфейс,
-один источник музыкального каталога и один экран «сейчас играет» — независимо от
-того, откуда трек пришёл.
+mimikoPlayer — Android-плеер, который не заставляет выбирать между сервисами. Яндекс Музыка, локальные файлы и караоке живут в одном интерфейсе: один экран «сейчас играет», одна очередь и одна коллекция — независимо от того, откуда пришёл трек. Оформление собрано на токенах Material 3 Expressive, а на экране только настоящие данные.
 
-- **Яндекс Музыка** — вход по OAuth device flow, поиск, «Моя волна» и станции
-  с настройками, любимое и плейлисты, карточки артиста и альбома, чарт.
-- **Коллекция** — вся музыка в одном месте: любимое (1028 треков на аккаунте
-  владельца), плейлисты, локальные файлы, недавние. Фоновая синхронизация
-  с Яндексом раз в сутки, реальные даты лайков.
-- **Плеер** — foreground-сервис `mediaPlayback`, уведомление и экран блокировки,
-  очередь, таймер сна, плавное затухание, восстановление после смерти процесса.
-- **Караоке** — построчный синхронный текст, крупная активная строка, маска
-  прогресса внутри неё, тап по строке — перемотка.
-- **Локальные файлы** — теги и встроенные обложки читаются нативно, файлы играют
-  на равных с каталогом.
-- **Оформление** — Material 3 Expressive: тема, палитра (фирменная, Material You,
-  монохром), шесть акцентов, контраст, скругления, скорость анимаций, RU/EN,
-  шесть значков лаунчера, компактная панель.
+## Возможности
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/features-dark.svg">
+  <img src="docs/features-light.svg" width="100%" alt="Шесть карточек возможностей: волна, коллекция, плеер, караоке, источники и Material 3">
+</picture>
+
+Плеер живёт в foreground-сервисе `mediaPlayback`: музыка не останавливается при свёрнутом приложении, управление доступно в уведомлении и на экране блокировки, очередь переживает смерть процесса. «Моя волна» догружает следующую партию треков сама и не повторяет уже сыгранное.
 
 ## Скриншоты
 
@@ -46,86 +30,105 @@
 
 <table>
   <tr>
-    <td width="33%"><img src="docs/screenshots/home.jpg" alt="Моя волна"></td>
-    <td width="33%"><img src="docs/screenshots/collection.jpg" alt="Коллекция"></td>
-    <td width="33%"><img src="docs/screenshots/player.jpg" alt="Плеер"></td>
+    <td width="50%" align="center"><img src="docs/screenshots/home.webp" width="64%" alt="Главный экран «Моя волна»"></td>
+    <td width="50%" align="center"><img src="docs/screenshots/player.webp" width="64%" alt="Полноэкранный плеер"></td>
   </tr>
   <tr>
-    <td align="center">Моя волна</td>
-    <td align="center">Коллекция: 1028 треков</td>
-    <td align="center">Сейчас играет</td>
+    <td align="center"><sub><b>Моя волна</b> — станции и текущий трек</sub></td>
+    <td align="center"><sub><b>Сейчас играет</b> — плеер без нижней панели</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/search.jpg" alt="Поиск"></td>
-    <td><img src="docs/screenshots/settings.jpg" alt="Настройки"></td>
-    <td align="center"><sub>Дальше: караоке, карточка артиста,<br>меню трека, чарт</sub></td>
+    <td width="50%" align="center"><img src="docs/screenshots/collection.webp" width="64%" alt="Коллекция: любимое, альбомы, артисты"></td>
+    <td width="50%" align="center"><img src="docs/screenshots/settings.webp" width="64%" alt="Настройки по разделам"></td>
   </tr>
   <tr>
-    <td align="center">Поиск по всем источникам</td>
-    <td align="center">Настройки по разделам</td>
-    <td></td>
+    <td align="center"><sub><b>Коллекция</b> — любимое, альбомы и артисты</sub></td>
+    <td align="center"><sub><b>Настройки</b> — разделы оформления и звука</sub></td>
   </tr>
 </table>
 
 </div>
 
+## Material 3
+
+Интерфейс собран из токенов, а не из разрозненных стилей: типографическая шкала, тональные поверхности, формы 12 / 20 / 28 dp и тайминги движения. Настройки меняют саму тему целиком, поэтому экраны остаются согласованными.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/tokens-dark.svg">
+  <img src="docs/tokens-light.svg" width="100%" alt="Токены Material 3: палитра, типографическая шкала, формы и тайминги движения">
+</picture>
+
+| Что | Варианты |
+|---|---|
+| Тема | светлая, тёмная, системная |
+| Палитра | фирменная, Material You, монохром · шесть акцентов |
+| Формы и движение | 12 / 20 / 28 dp, полная для кнопок и чипов, скорость анимаций |
+| Интерфейс | компактная панель, мини-плеер, фон главной, язык RU / EN |
+| Лаунчер | шесть значков на выбор |
+| Караоке | размер текста и затемнение неактивных строк |
+
+Все настройки хранятся одним снимком в SQLite и переживают перезапуск.
+
 ## Архитектура
 
-Каждый источник музыки — модуль за одним интерфейсом: поиск, метаданные, поток.
-Если трек не играет в одном источнике, цепочка идёт к следующему по приоритету.
+Каждый источник музыки — модуль за общим интерфейсом: поиск, метаданные, обложки и адрес потока. Если источник не может отдать трек, резолвер идёт к следующему по приоритету, а экраны вообще не знают, откуда пришла музыка.
+
+```
+Яндекс Музыка ─┐
+               ├─▶ MusicSource ─▶ StreamResolver ─▶ PlaybackController ─▶ just_audio
+Локальные файлы┘
+```
+
+Текст для караоке — отдельный каскад: LRCLIB (синхронный LRC) → lyrics.ovh (обычный текст). Построчный тайминг, маска прогресса и перемотка тапом работают там, где источник отдал синхронный текст.
 
 ```
 lib/
 ├── core/
-│   ├── sources/      MusicSource, DTO, типизированные отказы, StreamResolver
-│   ├── identity/     нормализация и сведение трека из разных каталогов
-│   ├── db/           15 таблиц drift, DAO, упорядоченные миграции
-│   ├── prefs/        настройки одним снимком
-│   └── platform/     мост в Android: частота кадров, значки, теги файлов
-├── features/         волна, поиск, коллекция, плеер, каталог, караоке, настройки
-├── sources/          yandex, local, lyrics (LRCLIB → lyrics.ovh)
-├── l10n/             строки RU/EN
-└── theme/            токены M3: цвет, типографика, формы, движение
+│   ├── sources/     MusicSource, DTO, типизированные отказы, StreamResolver
+│   ├── identity/    нормализация и сведение трека из разных каталогов
+│   ├── db/          15 таблиц drift, DAO, аддитивные миграции
+│   ├── prefs/       настройки одним снимком
+│   └── platform/    мост в Android: частота кадров, значки, теги
+├── features/        волна, поиск, коллекция, плеер, каталог, караоке, настройки
+├── sources/         yandex, local, lyrics (LRCLIB → lyrics.ovh)
+├── l10n/            строки RU / EN
+└── theme/           токены M3: цвет, типографика, формы, движение
 ```
 
-**Правила, которые держат код в форме:** UI не знает про `audio_service` и ходит
-только через `PlaybackController`; экраны не импортируют конкретные источники;
-миграции схемы только аддитивные; в интерфейсе нет выдуманных данных.
+UI не знает про `audio_service` и ходит только через `PlaybackController`. Экраны не импортируют конкретные источники, миграции схемы только аддитивные, а интерфейс не показывает выдуманных данных.
 
 ## Стек
 
 | Слой | Чем |
 |---|---|
-| UI | Flutter 3.47.7, Material 3 Expressive, Riverpod 3, go_router 18 |
-| Звук | just_audio 0.10.6 (media3/ExoPlayer), audio_service 0.18.19 |
-| Данные | drift 2.35.2 + SQLite, 15 таблиц, миграции |
-| Сеть | dio, Yandex Music API, LRCLIB |
-| Локализация | `flutter gen-l10n`, русский по умолчанию |
+| UI | Flutter 3.47, Material 3 Expressive, Riverpod 3.4, go_router 18.1 |
+| Звук | just_audio 0.10 (media3 / ExoPlayer), audio_service 0.18 |
+| Данные | drift 2.35 и SQLite: 15 таблиц, миграции |
+| Сеть | dio 5.11, Yandex Music API, LRCLIB |
+| Локализация | `flutter gen-l10n`, русский по умолчанию, английский |
 
 ## Сборка
 
 ```bash
 flutter pub get
-dart run build_runner build     # после правок схемы drift
-flutter gen-l10n                # после правки lib/l10n/*.arb
+dart run build_runner build --delete-conflicting-outputs
+flutter gen-l10n
 flutter analyze && flutter test
 flutter build apk --release
 ```
 
-Только Android: `compileSdk = targetSdk = 37` (`compileSdkMinor = 0`), `minSdk = 24`.
-Тесты фонового воспроизведения — на физическом устройстве: эмулятор на машине
-разработчика недоступен.
+Только Android: `compileSdk = targetSdk = 37`, `compileSdkMinor = 0`, `minSdk = 24`. Готовый APK — `build/app/outputs/flutter-apk/app-release.apk`. Фоновое воспроизведение проверяется на физическом устройстве.
 
 ## Статус
 
-Работает: вход, поиск, волна и станции, коллекция с полной синхронизацией,
-плеер с фоном и уведомлением, караоке, локальные файлы, настройки.
+Проверено на Xiaomi 2409FPCC4G (Android 16): вход, поиск, волна и станции, коллекция с полной синхронизацией лайков, плеер с фоном и уведомлением, караоке, локальные файлы, настройки. 98 тестов проходят, `flutter analyze` чист.
 
-Дальше: офлайн-скачивание, SoundCloud и YouTube как запасные источники,
-каталоги Spotify/Deezer, редактор таймингов караоке.
+Ограничения: текст песни доступен там, где его отдают публичные каталоги — Яндекс подписывает запрос, Genius требует токен. Частоту выше 60 Гц прошивка может не отдавать сторонним приложениям: приложение запрашивает 120 Гц, но показывает фактическую. В планах — офлайн-кеш и дополнительные источники.
 
 ## Лицензия
 
-MIT — см. [LICENSE](LICENSE). Проект не связан с Яндексом; «Яндекс Музыка» —
-товарный знак соответствующего правообладателя. Тексты песен приходят из
-публичных источников и отображаются по запросу пользователя.
+MIT — см. [LICENSE](LICENSE). Проект не связан с Яндексом; «Яндекс Музыка» — товарный знак соответствующего правообладателя. Тексты песен приходят из публичных источников и отображаются по запросу пользователя.
+
+<div align="center">
+<sub>mimikoPlayer · <a href="https://github.com/krinix1337">krinix1337</a> · сделано на Flutter</sub>
+</div>
