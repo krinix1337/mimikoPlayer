@@ -65,7 +65,9 @@ class TrackTile extends ConsumerWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: theme.textTheme.titleMedium?.copyWith(
-          color: isCurrent ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+          color: isCurrent
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurface,
           fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
         ),
       ),
@@ -80,10 +82,7 @@ class TrackTile extends ConsumerWidget {
           if (trailing != null)
             trailing!
           else if (showDuration && row.durationSec > 0)
-            Text(
-              _duration(row.durationSec),
-              style: theme.textTheme.bodyMedium,
-            ),
+            Text(_duration(row.durationSec), style: theme.textTheme.bodyMedium),
           IconButton(
             icon: const Icon(Icons.more_vert_rounded),
             tooltip: AppLocalizations.of(context).trackMenu,
@@ -98,11 +97,13 @@ class TrackTile extends ConsumerWidget {
     // Роутер захватываем до await: список перестраивается, и этот элемент
     // к моменту возврата уже может быть выключен.
     final router = GoRouter.of(context);
-    await ref.read(playbackControllerProvider).playQueue(
-      [for (final item in queue) item.localTrackId],
-      startIndex: index,
-      sourceHint: {'kind': kind},
-    );
+    await ref
+        .read(playbackControllerProvider)
+        .playQueue(
+          [for (final item in queue) item.localTrackId],
+          startIndex: index,
+          sourceHint: {'kind': kind},
+        );
     router.push(Routes.player);
   }
 
@@ -110,6 +111,7 @@ class TrackTile extends ConsumerWidget {
     final db = ref.read(appServicesProvider).db;
     final current = await db.libraryDao.likeState(row.localTrackId);
     await db.libraryDao.setLike(row.localTrackId, current == 1 ? 0 : 1);
+    await ref.read(playbackControllerProvider).refreshLikedState();
     ref.invalidate(collectionProvider);
   }
 

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_services.dart';
 import 'core/content/ai_filter.dart';
+import 'core/content/censor_base.dart';
 import 'core/db/daos/library_dao.dart';
 import 'core/db/database.dart';
 import 'core/logging/app_logger.dart';
@@ -22,10 +23,13 @@ import 'sources/local/local_source.dart';
 /// Сборка зависимостей и провайдеры состояния для UI. Плеер сюда попадает
 /// только как интерфейс [PlaybackController] — типы audio_service UI не видит.
 final playbackControllerProvider = Provider<PlaybackController>(
-  (ref) => throw StateError('playbackControllerProvider не переопределён в main'),
+  (ref) =>
+      throw StateError('playbackControllerProvider не переопределён в main'),
 );
 
-final appServicesProvider = Provider<AppServices>((ref) => AppServices.ensure());
+final appServicesProvider = Provider<AppServices>(
+  (ref) => AppServices.ensure(),
+);
 
 final playerSnapshotProvider = StreamProvider<PlayerSnapshot>(
   (ref) => ref.watch(playbackControllerProvider).snapshots,
@@ -95,15 +99,20 @@ class PrefsController extends Notifier<Prefs> {
     AppServices.ensure().applyPreferences();
   }
 
-  Future<void> setThemeMode(ThemeMode mode) => _write(state.copyWith(themeMode: mode));
+  Future<void> setThemeMode(ThemeMode mode) =>
+      _write(state.copyWith(themeMode: mode));
 
-  Future<void> setPalette(AppPalette palette) => _write(state.copyWith(palette: palette));
+  Future<void> setPalette(AppPalette palette) =>
+      _write(state.copyWith(palette: palette));
 
-  Future<void> setAccent(AccentColor accent) => _write(state.copyWith(accent: accent));
+  Future<void> setAccent(AccentColor accent) =>
+      _write(state.copyWith(accent: accent));
 
-  Future<void> setContrast(Contrast contrast) => _write(state.copyWith(contrast: contrast));
+  Future<void> setContrast(Contrast contrast) =>
+      _write(state.copyWith(contrast: contrast));
 
-  Future<void> setCorner(CornerRadius corner) => _write(state.copyWith(corner: corner));
+  Future<void> setCorner(CornerRadius corner) =>
+      _write(state.copyWith(corner: corner));
 
   Future<void> setMotion(AnimationsSpeed speed) =>
       _write(state.copyWith(animations: speed));
@@ -120,7 +129,8 @@ class PrefsController extends Notifier<Prefs> {
   Future<void> setLauncherIcon(LauncherIcon icon) =>
       _write(state.copyWith(launcherIcon: icon));
 
-  Future<void> setQuality(String quality) => _write(state.copyWith(quality: quality));
+  Future<void> setQuality(String quality) =>
+      _write(state.copyWith(quality: quality));
 
   Future<void> setFrameHz(double hz) => _write(state.copyWith(frameHz: hz));
 
@@ -144,8 +154,21 @@ class PrefsController extends Notifier<Prefs> {
   Future<void> setArtworkShape(ArtworkShape value) =>
       _write(state.copyWith(artworkShape: value));
 
-  Future<void> setHideAiTracks(bool value) =>
-      _write(state.copyWith(hideAiTracks: value));
+  Future<void> setHideAiTracks(bool value) async {
+    if (value) await AiFilter.instance.ensureLoaded(force: true);
+    await _write(state.copyWith(hideAiTracks: value));
+  }
+
+  Future<void> setCensorBypass(bool value) async {
+    CensorBase.instance.enabled = value;
+    final services = ref.read(appServicesProvider);
+    services.resolver.clearMemoryCache();
+    unawaited(services.db.streamsDao.clearResolutions());
+    if (value) {
+      unawaited(CensorBase.instance.ensureLoaded(force: true));
+    }
+    await _write(state.copyWith(censorBypass: value));
+  }
 
   Future<void> setHomeBackground(HomeBackground value) =>
       _write(state.copyWith(homeBackground: value));
@@ -156,11 +179,15 @@ class PrefsController extends Notifier<Prefs> {
       _write(state.copyWith(waveOnWifiOnly: value));
 }
 
-final prefsProvider = NotifierProvider<PrefsController, Prefs>(PrefsController.new);
-
+final prefsProvider = NotifierProvider<PrefsController, Prefs>(
+  PrefsController.new,
+);
 
 /// Заголовок трека по локальному id — для очередей и списков истории.
-final trackTitleProvider = FutureProvider.family<String, String>((ref, id) async {
+final trackTitleProvider = FutureProvider.family<String, String>((
+  ref,
+  id,
+) async {
   final track = await ref.watch(appServicesProvider).db.tracksDao.byId(id);
   return track?.title ?? id;
 });
@@ -170,8 +197,8 @@ final trackTitleProvider = FutureProvider.family<String, String>((ref, id) async
 ///
 /// Отдаём результаты по мере готовности, а не ждём самый медленный источник:
 /// иначе медленный YouTube держал пустой экран, хотя Яндекс уже ответил.
-final combinedSearchProvider =
-    StreamProvider.autoDispose.family<List<SourceSearchHit>, String>((ref, query) {
+final combinedSearchProvider = StreamProvider.autoDispose
+    .family<List<SourceSearchHit>, String>((ref, query) {
       final registry = ref.watch(appServicesProvider).registry;
       final needle = query.trim();
       if (needle.isEmpty) return Stream.value(const <SourceSearchHit>[]);
@@ -201,22 +228,24 @@ final combinedSearchProvider =
       controller = StreamController<List<SourceSearchHit>>(
         onListen: () {
           for (final source in sources) {
-            source
-                .search(needle, pageSize: 20)
-                .timeout(const Duration(seconds: 10))
-                .then((result) {
-                  bySource[source.id] = [
-                    for (final track in result.tracks)
-                      if (!hideAi ||
-                          !AiFilter.matches(track.title, track.artists))
-                        SourceSearchHit(track.ref.source, track),
-                  ];
-                  if (!controller.isClosed) controller.add(snapshot());
-                })
-                .catchError((Object _) {
-                  // Один упавший источник не должен гасить весь поиск.
-                })
-                .whenComplete(finish);
+            () async {
+              try {
+                if (hideAi) await AiFilter.instance.ensureLoaded();
+                final result = await source
+                    .search(needle, pageSize: 20)
+                    .timeout(const Duration(seconds: 10));
+                bySource[source.id] = [
+                  for (final track in result.tracks)
+                    if (!hideAi || !AiFilter.instance.isAiTrack(track))
+                      SourceSearchHit(track.ref.source, track),
+                ];
+                if (!controller.isClosed) controller.add(snapshot());
+              } on Object {
+                // Один упавший источник не должен гасить весь поиск.
+              } finally {
+                finish();
+              }
+            }();
           }
         },
       );
@@ -256,21 +285,24 @@ final class SourceSearchHit {
 
 /// Раздел коллекции: порядок стабильный, исполнитель и обложка достаются
 /// из тех же двух запросов — списки не дёргают базу на каждую строку.
-final collectionProvider =
-    FutureProvider.autoDispose
-        .family<List<CollectionRow>, CollectionKind>((ref, kind) async {
-          final db = ref.watch(appServicesProvider).db;
-          final sort = ref.watch(prefsProvider.select((p) => p.collectionSort));
-          final hideAi = ref.watch(
-            prefsProvider.select((p) => p.hideAiTracks),
-          );
-          final rows = await db.libraryDao.collectionRows(kind, sort: sort);
-          if (!hideAi) return rows;
-          return [
-            for (final row in rows)
-              if (!AiFilter.matches(row.title, [row.artist])) row,
-          ];
-        });
+final collectionProvider = FutureProvider.autoDispose
+    .family<List<CollectionRow>, CollectionKind>((ref, kind) async {
+      final db = ref.watch(appServicesProvider).db;
+      final sort = ref.watch(prefsProvider.select((p) => p.collectionSort));
+      final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+      final rows = await db.libraryDao.collectionRows(kind, sort: sort);
+      if (!hideAi) return rows;
+      await AiFilter.instance.ensureLoaded();
+      return [
+        for (final row in rows)
+          if (!AiFilter.instance.isAiRow(
+            row.title,
+            row.artist,
+            row.artistRemoteIds,
+          ))
+            row,
+      ];
+    });
 
 /// Исполнители, которых чаще всего слушают: считается по истории.
 ///
@@ -313,19 +345,36 @@ Future<void> _backfillArtistCovers(
 
 /// Текст трека из LRCLIB. Пустой `Lyrics` — это «текста нет», а не ошибка:
 /// экран караоке показывает именно это, без виджета загрузки на полчаса.
-final trackLyricsProvider = FutureProvider.autoDispose
-    .family<Lyrics, String>((ref, trackId) async {
-      final db = ref.watch(appServicesProvider).db;
-      final track = await db.tracksDao.byId(trackId);
-      if (track == null) return const Lyrics(lines: [], synced: false);
-      final artists = await db.tracksDao.artistNamesOf(trackId);
-      return LyricsService.shared.fetch(
-        title: track.title,
-        artist: artists.isEmpty ? '' : artists.first,
-        album: await db.tracksDao.albumTitleOf(trackId),
-        duration: Duration(seconds: track.durationSec),
-      );
-    });
+final trackLyricsProvider = FutureProvider.autoDispose.family<Lyrics, String>((
+  ref,
+  trackId,
+) async {
+  final db = ref.watch(appServicesProvider).db;
+  final track = await db.tracksDao.byId(trackId);
+  if (track == null) return const Lyrics(lines: [], synced: false);
+  final artists = await db.tracksDao.artistNamesOf(trackId);
+  final variants = await db.tracksDao.variantsOf(trackId);
+  SourceTrack? yandexVariant;
+  for (final variant in variants) {
+    if (variant.ref.source == SourceId.yandex) {
+      yandexVariant = variant;
+      break;
+    }
+  }
+  final yandex = ref.watch(appServicesProvider).yandex;
+  Future<Lyrics?> Function()? official;
+  if (yandexVariant != null && yandex != null) {
+    final remoteId = yandexVariant.ref.remoteId;
+    official = () => yandex.lyrics(remoteId);
+  }
+  return LyricsService.shared.fetch(
+    title: track.title,
+    artist: artists.isEmpty ? '' : artists.first,
+    album: await db.tracksDao.albumTitleOf(trackId),
+    duration: Duration(seconds: track.durationSec),
+    official: official,
+  );
+});
 
 /// Карточка исполнителя из Яндекса: фото, счётчики, популярные треки, альбомы.
 final artistBriefProvider = FutureProvider.autoDispose
@@ -336,6 +385,7 @@ final artistBriefProvider = FutureProvider.autoDispose
       if (artist == null) return null;
       final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
       if (!hideAi) return artist;
+      await AiFilter.instance.ensureLoaded();
       return ArtistBrief(
         remoteId: artist.remoteId,
         name: artist.name,
@@ -345,33 +395,35 @@ final artistBriefProvider = FutureProvider.autoDispose
         listeners: artist.listeners,
         popular: [
           for (final track in artist.popular)
-            if (!AiFilter.matches(track.title, track.artists)) track,
+            if (!AiFilter.instance.isAiTrack(track)) track,
         ],
         albums: artist.albums,
       );
     });
 
 /// Альбом целиком — треки приходят в порядке диска.
-final albumProvider = FutureProvider.autoDispose
-    .family<AlbumSnapshot?, String>((ref, albumId) async {
-      final source = ref.watch(yandexSourceProvider);
-      if (source == null) return null;
-      final album = await source.album(albumId);
-      if (album == null) return null;
-      final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
-      if (!hideAi) return album;
-      return AlbumSnapshot(
-        remoteId: album.remoteId,
-        title: album.title,
-        coverUrl: album.coverUrl,
-        year: album.year,
-        artists: album.artists,
-        tracks: [
-          for (final track in album.tracks)
-            if (!AiFilter.matches(track.title, track.artists)) track,
-        ],
-      );
-    });
+final albumProvider = FutureProvider.autoDispose.family<AlbumSnapshot?, String>(
+  (ref, albumId) async {
+    final source = ref.watch(yandexSourceProvider);
+    if (source == null) return null;
+    final album = await source.album(albumId);
+    if (album == null) return null;
+    final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+    if (!hideAi) return album;
+    await AiFilter.instance.ensureLoaded();
+    return AlbumSnapshot(
+      remoteId: album.remoteId,
+      title: album.title,
+      coverUrl: album.coverUrl,
+      year: album.year,
+      artists: album.artists,
+      tracks: [
+        for (final track in album.tracks)
+          if (!AiFilter.instance.isAiTrack(track)) track,
+      ],
+    );
+  },
+);
 
 /// Чарт Яндекса: позиция и трек.
 final chartProvider = FutureProvider<List<ChartEntry>>((ref) async {
@@ -381,9 +433,10 @@ final chartProvider = FutureProvider<List<ChartEntry>>((ref) async {
   AppLogger.instance.info('чарт: ${entries.length} треков');
   final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
   if (!hideAi) return entries;
+  await AiFilter.instance.ensureLoaded();
   return [
     for (final entry in entries)
-      if (!AiFilter.matches(entry.track.title, entry.track.artists)) entry,
+      if (!AiFilter.instance.isAiTrack(entry.track)) entry,
   ];
 });
 
@@ -409,8 +462,11 @@ final librarySyncProvider = FutureProvider<void>((ref) async {
   if (!source.auth.isReady) return;
 
   final lastRaw = await services.db.settingsDao.value(_likesSyncedKey);
-  final last = lastRaw == null ? null : DateTime.tryParse(lastRaw.replaceAll('"', ''));
-  if (last != null && DateTime.now().difference(last) < const Duration(hours: 24)) {
+  final last = lastRaw == null
+      ? null
+      : DateTime.tryParse(lastRaw.replaceAll('"', ''));
+  if (last != null &&
+      DateTime.now().difference(last) < const Duration(hours: 24)) {
     return;
   }
 
@@ -443,24 +499,29 @@ final playlistsProvider = FutureProvider<List<PlaylistOverview>>(
 );
 
 /// Плейлист по локальному id (`yandex:<kind>`): шапка и треки в порядке источника.
-final playlistProvider =
-    FutureProvider.autoDispose
-        .family<PlaylistDetail?, String>((ref, id) async {
-          final db = ref.watch(appServicesProvider).db;
-          final overview = await db.libraryDao.playlistById(id);
-          if (overview == null) return null;
-          final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
-          final rows = await db.libraryDao.playlistRows(id);
-          return PlaylistDetail(
-            overview: overview,
-            rows: hideAi
-                ? [
-                    for (final row in rows)
-                      if (!AiFilter.matches(row.title, [row.artist])) row,
-                  ]
-                : rows,
-          );
-        });
+final playlistProvider = FutureProvider.autoDispose
+    .family<PlaylistDetail?, String>((ref, id) async {
+      final db = ref.watch(appServicesProvider).db;
+      final overview = await db.libraryDao.playlistById(id);
+      if (overview == null) return null;
+      final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+      final rows = await db.libraryDao.playlistRows(id);
+      if (hideAi) await AiFilter.instance.ensureLoaded();
+      return PlaylistDetail(
+        overview: overview,
+        rows: hideAi
+            ? [
+                for (final row in rows)
+                  if (!AiFilter.instance.isAiRow(
+                    row.title,
+                    row.artist,
+                    row.artistRemoteIds,
+                  ))
+                    row,
+              ]
+            : rows,
+      );
+    });
 
 /// Импортирует лайки Яндекса в локальную базу. Аргументы явные, чтобы
 /// функцию могли вызвать и провайдер, и виджет.
@@ -543,7 +604,13 @@ String describeIssue(PlayerIssue issue) {
   final lines = [
     for (final failure in issue.failures)
       '${failure.source.wire}: ${failure.reason.name}'
-          '${failure.httpStatus == null ? '' : ' (${failure.httpStatus})'}',
+          '${failure.httpStatus == null ? '' : ' (${failure.httpStatus})'}'
+          '${failure.message == null || failure.message!.isEmpty ? '' : ' · ${_short(failure.message!)}'}',
   ];
   return '${issue.headline}\n${lines.join('\n')}';
+}
+
+String _short(String text) {
+  final first = text.split('\n').first.trim();
+  return first.length <= 140 ? first : '${first.substring(0, 140)}…';
 }

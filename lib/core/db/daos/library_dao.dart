@@ -23,61 +23,67 @@ class LibraryDao {
   }) async {
     final synced = remoteSource != null;
     if (state == 0) {
-      await (_db.delete(_db.likes)..where((t) => t.localTrackId.equals(localTrackId)))
-          .go();
+      await (_db.delete(
+        _db.likes,
+      )..where((t) => t.localTrackId.equals(localTrackId))).go();
       return;
     }
-    await _db.into(_db.likes).insertOnConflictUpdate(
-      LikesCompanion(
-        localTrackId: Value(localTrackId),
-        state: Value(state),
-        likedAt: likedAt != null
-            ? Value(likedAt)
-            : refreshTimestamp
-            ? Value(DateTime.now())
-            : const Value.absent(),
-        syncedToRemote: Value(synced),
-        remoteSource: remoteSource == null
-            ? const Value.absent()
-            : Value(remoteSource.wire),
-      ),
-    );
+    await _db
+        .into(_db.likes)
+        .insertOnConflictUpdate(
+          LikesCompanion(
+            localTrackId: Value(localTrackId),
+            state: Value(state),
+            likedAt: likedAt != null
+                ? Value(likedAt)
+                : refreshTimestamp
+                ? Value(DateTime.now())
+                : const Value.absent(),
+            syncedToRemote: Value(synced),
+            remoteSource: remoteSource == null
+                ? const Value.absent()
+                : Value(remoteSource.wire),
+          ),
+        );
   }
 
   /// 1 любимое, -1 нелюбимое, 0 ничего.
   Future<int> likeState(String localTrackId) async {
-    final row = await (_db.select(_db.likes)
-          ..where((t) => t.localTrackId.equals(localTrackId))
-          ..limit(1))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.likes)
+              ..where((t) => t.localTrackId.equals(localTrackId))
+              ..limit(1))
+            .getSingleOrNull();
     return row?.state ?? 0;
   }
 
   Future<List<String>> likedTrackIds() async {
-    final rows = await (_db.select(_db.likes)
-          ..where((t) => t.state.equals(1))
-          ..orderBy([(t) => OrderingTerm.desc(t.likedAt)]))
-        .get();
+    final rows =
+        await (_db.select(_db.likes)
+              ..where((t) => t.state.equals(1))
+              ..orderBy([(t) => OrderingTerm.desc(t.likedAt)]))
+            .get();
     return [for (final row in rows) row.localTrackId];
   }
 
   Future<List<PlaylistOverview>> playlistsOverview() async {
-    final query = _db.selectOnly(_db.playlists).join([
-      leftOuterJoin(
-        _db.playlistTracks,
-        _db.playlistTracks.playlistId.equalsExp(_db.playlists.id),
-      ),
-    ])
-      ..addColumns([
-        _db.playlists.id,
-        _db.playlists.title,
-        _db.playlists.coverUrl,
-        _db.playlists.kind,
-        _db.playlists.source,
-        _db.playlistTracks.localTrackId.count(),
-      ])
-      ..groupBy([_db.playlists.id])
-      ..orderBy([OrderingTerm.desc(_db.playlists.updatedAt)]);
+    final query =
+        _db.selectOnly(_db.playlists).join([
+            leftOuterJoin(
+              _db.playlistTracks,
+              _db.playlistTracks.playlistId.equalsExp(_db.playlists.id),
+            ),
+          ])
+          ..addColumns([
+            _db.playlists.id,
+            _db.playlists.title,
+            _db.playlists.coverUrl,
+            _db.playlists.kind,
+            _db.playlists.source,
+            _db.playlistTracks.localTrackId.count(),
+          ])
+          ..groupBy([_db.playlists.id])
+          ..orderBy([OrderingTerm.desc(_db.playlists.updatedAt)]);
 
     final overviews = [
       for (final row in await query.get())
@@ -100,10 +106,11 @@ class LibraryDao {
     ];
     if (missing.isEmpty) return overviews;
 
-    final links = await (_db.select(_db.playlistTracks)
-          ..where((t) => t.playlistId.isIn(missing))
-          ..orderBy([(t) => OrderingTerm.asc(t.position)]))
-        .get();
+    final links =
+        await (_db.select(_db.playlistTracks)
+              ..where((t) => t.playlistId.isIn(missing))
+              ..orderBy([(t) => OrderingTerm.asc(t.position)]))
+            .get();
     final firstTrack = <String, String>{};
     for (final link in links) {
       firstTrack.putIfAbsent(link.playlistId, () => link.localTrackId);
@@ -111,7 +118,9 @@ class LibraryDao {
     if (firstTrack.isEmpty) return overviews;
 
     final tracks = {
-      for (final track in await _db.tracksDao.byIdList(firstTrack.values.toList()))
+      for (final track in await _db.tracksDao.byIdList(
+        firstTrack.values.toList(),
+      ))
         track.id: track.coverUrl,
     };
     return [
@@ -135,10 +144,7 @@ class LibraryDao {
   Future<void> setArtistCover(int artistId, String? url) async {
     if (url == null || url.isEmpty) return;
     await (_db.update(_db.artists)..where((t) => t.id.equals(artistId))).write(
-      ArtistsCompanion(
-        coverUrl: Value(url),
-        updatedAt: Value(DateTime.now()),
-      ),
+      ArtistsCompanion(coverUrl: Value(url), updatedAt: Value(DateTime.now())),
     );
   }
 
@@ -166,6 +172,7 @@ class LibraryDao {
       for (final track in await _db.tracksDao.byIdList(ids)) track.id: track,
     };
     final artists = await mainArtistNames(ids);
+    final artistRemoteIds = await artistRemoteIdsForTracks(ids);
 
     final rows = <CollectionRow>[
       for (final (id, markedAt) in ordered)
@@ -174,6 +181,7 @@ class LibraryDao {
             localTrackId: id,
             title: track.title,
             artist: artists[id] ?? '',
+            artistRemoteIds: artistRemoteIds[id] ?? const [],
             coverUrl: track.coverUrl,
             durationSec: track.durationSec,
             markedAt: markedAt,
@@ -200,15 +208,16 @@ class LibraryDao {
   /// Главный исполнитель для пачки треков — один запрос вместо N.
   Future<Map<String, String>> mainArtistNames(List<String> trackIds) async {
     if (trackIds.isEmpty) return const {};
-    final query = _db.selectOnly(_db.trackArtists).join([
-      innerJoin(
-        _db.artists,
-        _db.artists.id.equalsExp(_db.trackArtists.artistId),
-      ),
-    ])
-      ..addColumns([_db.trackArtists.trackId, _db.artists.name])
-      ..where(_db.trackArtists.trackId.isIn(trackIds))
-      ..orderBy([OrderingTerm.asc(_db.trackArtists.position)]);
+    final query =
+        _db.selectOnly(_db.trackArtists).join([
+            innerJoin(
+              _db.artists,
+              _db.artists.id.equalsExp(_db.trackArtists.artistId),
+            ),
+          ])
+          ..addColumns([_db.trackArtists.trackId, _db.artists.name])
+          ..where(_db.trackArtists.trackId.isIn(trackIds))
+          ..orderBy([OrderingTerm.asc(_db.trackArtists.position)]);
 
     final result = <String, String>{};
     for (final row in await query.get()) {
@@ -219,48 +228,70 @@ class LibraryDao {
     return result;
   }
 
+  /// Удалённые id всех артистов трека — для AI-фильтра по списку Slopless.
+  Future<Map<String, List<String>>> artistRemoteIdsForTracks(
+    List<String> trackIds,
+  ) async {
+    if (trackIds.isEmpty) return const {};
+    final query =
+        _db.selectOnly(_db.trackArtists).join([
+            innerJoin(
+              _db.artists,
+              _db.artists.id.equalsExp(_db.trackArtists.artistId),
+            ),
+          ])
+          ..addColumns([_db.trackArtists.trackId, _db.artists.remoteArtistId])
+          ..where(_db.trackArtists.trackId.isIn(trackIds));
+
+    final result = <String, List<String>>{};
+    for (final row in await query.get()) {
+      final trackId = row.read(_db.trackArtists.trackId);
+      final remoteId = row.read(_db.artists.remoteArtistId);
+      if (trackId == null || remoteId == null || remoteId.isEmpty) continue;
+      result.putIfAbsent(trackId, () => []).add(remoteId);
+    }
+    return result;
+  }
+
   Future<List<(String, DateTime)>> _fromLikes({
     required int state,
     required int limit,
   }) async {
-    final rows = await (_db.select(_db.likes)
-          ..where((t) => t.state.equals(state))
-          ..orderBy([(t) => OrderingTerm.desc(t.likedAt)])
-          ..limit(limit))
-        .get();
-    return [
-      for (final row in rows)
-        (row.localTrackId, row.likedAt),
-    ];
+    final rows =
+        await (_db.select(_db.likes)
+              ..where((t) => t.state.equals(state))
+              ..orderBy([(t) => OrderingTerm.desc(t.likedAt)])
+              ..limit(limit))
+            .get();
+    return [for (final row in rows) (row.localTrackId, row.likedAt)];
   }
 
   Future<List<(String, DateTime)>> _fromMappings({required int limit}) async {
-    final rows = await (_db.select(_db.remoteIdMappings)
-          ..where((t) => t.source.equals(SourceId.local.wire))
-          ..orderBy([(t) => OrderingTerm.desc(t.firstSeenAt)])
-          ..limit(limit))
-        .get();
-    return [
-      for (final row in rows)
-        (row.localTrackId, row.firstSeenAt),
-    ];
+    final rows =
+        await (_db.select(_db.remoteIdMappings)
+              ..where((t) => t.source.equals(SourceId.local.wire))
+              ..orderBy([(t) => OrderingTerm.desc(t.firstSeenAt)])
+              ..limit(limit))
+            .get();
+    return [for (final row in rows) (row.localTrackId, row.firstSeenAt)];
   }
 
   Future<List<(String, DateTime)>> _fromDownloads({required int limit}) async {
-    final rows = await (_db.select(_db.downloadedFiles)
-          ..where((t) => t.state.equals('complete'))
-          ..orderBy([(t) => OrderingTerm.desc(t.downloadedAt)])
-          ..limit(limit))
-        .get();
-    return [
-      for (final row in rows) (row.localTrackId, row.downloadedAt),
-    ];
+    final rows =
+        await (_db.select(_db.downloadedFiles)
+              ..where((t) => t.state.equals('complete'))
+              ..orderBy([(t) => OrderingTerm.desc(t.downloadedAt)])
+              ..limit(limit))
+            .get();
+    return [for (final row in rows) (row.localTrackId, row.downloadedAt)];
   }
 
-  Future<List<(String, DateTime)>> _fromHistory({required int limit}) async {    final rows = await (_db.select(_db.history)
-          ..orderBy([(t) => OrderingTerm.desc(t.playedAt)])
-          ..limit(limit * 3))
-        .get();
+  Future<List<(String, DateTime)>> _fromHistory({required int limit}) async {
+    final rows =
+        await (_db.select(_db.history)
+              ..orderBy([(t) => OrderingTerm.desc(t.playedAt)])
+              ..limit(limit * 3))
+            .get();
     final seen = <String>{};
     final result = <(String, DateTime)>[];
     for (final row in rows) {
@@ -278,24 +309,28 @@ class LibraryDao {
   Future<List<ArtistPlaycount>> topArtists({int limit = 12}) async {
     final plays = _db.history.id.count();
     final seconds = _db.history.playedMs.sum();
-    final query = _db.selectOnly(_db.artists).join([
-      innerJoin(
-        _db.trackArtists,
-        _db.trackArtists.artistId.equalsExp(_db.artists.id),
-      ),
-      innerJoin(_db.history, _db.history.localTrackId.equalsExp(_db.trackArtists.trackId)),
-    ])
-      ..addColumns([
-        _db.artists.id,
-        _db.artists.name,
-        _db.artists.coverUrl,
-        _db.artists.remoteArtistId,
-        plays,
-        seconds,
-      ])
-      ..groupBy([_db.artists.id])
-      ..orderBy([OrderingTerm.desc(plays)])
-      ..limit(limit);
+    final query =
+        _db.selectOnly(_db.artists).join([
+            innerJoin(
+              _db.trackArtists,
+              _db.trackArtists.artistId.equalsExp(_db.artists.id),
+            ),
+            innerJoin(
+              _db.history,
+              _db.history.localTrackId.equalsExp(_db.trackArtists.trackId),
+            ),
+          ])
+          ..addColumns([
+            _db.artists.id,
+            _db.artists.name,
+            _db.artists.coverUrl,
+            _db.artists.remoteArtistId,
+            plays,
+            seconds,
+          ])
+          ..groupBy([_db.artists.id])
+          ..orderBy([OrderingTerm.desc(plays)])
+          ..limit(limit);
 
     return [
       for (final row in await query.get())
@@ -313,10 +348,11 @@ class LibraryDao {
   /// Треки плейлиста в том порядке, в каком их положил источник:
   /// `position` пишется при импорте и не зависит от даты добавления.
   Future<List<CollectionRow>> playlistRows(String playlistId) async {
-    final links = await (_db.select(_db.playlistTracks)
-          ..where((t) => t.playlistId.equals(playlistId))
-          ..orderBy([(t) => OrderingTerm.asc(t.position)]))
-        .get();
+    final links =
+        await (_db.select(_db.playlistTracks)
+              ..where((t) => t.playlistId.equals(playlistId))
+              ..orderBy([(t) => OrderingTerm.asc(t.position)]))
+            .get();
     if (links.isEmpty) return const [];
 
     final ids = [for (final link in links) link.localTrackId];
@@ -324,6 +360,7 @@ class LibraryDao {
       for (final track in await _db.tracksDao.byIdList(ids)) track.id: track,
     };
     final artists = await mainArtistNames(ids);
+    final artistRemoteIds = await artistRemoteIdsForTracks(ids);
 
     return [
       for (final link in links)
@@ -332,6 +369,7 @@ class LibraryDao {
             localTrackId: track.id,
             title: track.title,
             artist: artists[track.id] ?? '',
+            artistRemoteIds: artistRemoteIds[track.id] ?? const [],
             coverUrl: track.coverUrl,
             durationSec: track.durationSec,
             markedAt: link.addedAt,
@@ -341,22 +379,25 @@ class LibraryDao {
   }
 
   Future<PlaylistOverview?> playlistById(String id) async {
-    final row = await (_db.select(_db.playlists)
-          ..where((t) => t.id.equals(id))
-          ..limit(1))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.playlists)
+              ..where((t) => t.id.equals(id))
+              ..limit(1))
+            .getSingleOrNull();
     if (row == null) return null;
-    final count = await (_db.selectOnly(_db.playlistTracks)
-          ..addColumns([_db.playlistTracks.localTrackId.count()])
-          ..where(_db.playlistTracks.playlistId.equals(id)))
-        .getSingle();
+    final count =
+        await (_db.selectOnly(_db.playlistTracks)
+              ..addColumns([_db.playlistTracks.localTrackId.count()])
+              ..where(_db.playlistTracks.playlistId.equals(id)))
+            .getSingle();
     var coverUrl = row.coverUrl;
     if (coverUrl == null) {
-      final first = await (_db.select(_db.playlistTracks)
-            ..where((t) => t.playlistId.equals(id))
-            ..orderBy([(t) => OrderingTerm.asc(t.position)])
-            ..limit(1))
-          .getSingleOrNull();
+      final first =
+          await (_db.select(_db.playlistTracks)
+                ..where((t) => t.playlistId.equals(id))
+                ..orderBy([(t) => OrderingTerm.asc(t.position)])
+                ..limit(1))
+              .getSingleOrNull();
       if (first != null) {
         coverUrl = (await _db.tracksDao.byId(first.localTrackId))?.coverUrl;
       }
@@ -380,26 +421,28 @@ class LibraryDao {
     final id = '${source.wire}:${snapshot.remotePlaylistId}';
     final now = DateTime.now();
 
-    await _db.into(_db.playlists).insertOnConflictUpdate(
-      PlaylistsCompanion.insert(
-        id: id,
-        source: Value(source.wire),
-        remotePlaylistId: Value(snapshot.remotePlaylistId),
-        title: snapshot.title,
-        description: Value(snapshot.description),
-        coverUrl: Value(snapshot.coverUrl),
-        kind: const Value('imported'),
-        totalTracks: Value(snapshot.total ?? snapshot.tracks.length),
-        canEdit: const Value(false),
-        lastSyncedAt: Value(now),
-        createdAt: Value(now),
-        updatedAt: Value(now),
-      ),
-    );
+    await _db
+        .into(_db.playlists)
+        .insertOnConflictUpdate(
+          PlaylistsCompanion.insert(
+            id: id,
+            source: Value(source.wire),
+            remotePlaylistId: Value(snapshot.remotePlaylistId),
+            title: snapshot.title,
+            description: Value(snapshot.description),
+            coverUrl: Value(snapshot.coverUrl),
+            kind: const Value('imported'),
+            totalTracks: Value(snapshot.total ?? snapshot.tracks.length),
+            canEdit: const Value(false),
+            lastSyncedAt: Value(now),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
 
-    await (_db.delete(_db.playlistTracks)
-          ..where((t) => t.playlistId.equals(id)))
-        .go();
+    await (_db.delete(
+      _db.playlistTracks,
+    )..where((t) => t.playlistId.equals(id))).go();
 
     // В плейлисте Яндекса один и тот же трек может встречаться дважды:
     // первичный ключ (playlist_id, local_track_id) второй раз не пустит,
@@ -445,11 +488,15 @@ final class CollectionRow {
     required this.source,
     this.coverUrl,
     this.markedAt,
+    this.artistRemoteIds = const [],
   });
 
   final String localTrackId;
   final String title;
   final String artist;
+
+  /// id артистов в их источниках: по ним AI-фильтр сверяется со списком.
+  final List<String> artistRemoteIds;
   final int durationSec;
   final SourceId source;
   final String? coverUrl;

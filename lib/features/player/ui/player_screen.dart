@@ -41,7 +41,10 @@ class PlayerScreen extends ConsumerWidget {
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _TopBar(isRadio: snapshot.$2, trackId: current.localTrackId),
+                      _TopBar(
+                        isRadio: snapshot.$2,
+                        trackId: current.localTrackId,
+                      ),
                       Expanded(child: _Artwork(current: current)),
                       const _IssueStrip(),
                       const _Progress(),
@@ -209,27 +212,24 @@ class _DownloadButton extends ConsumerWidget {
       visualDensity: VisualDensity.compact,
       iconSize: 22,
       color: complete ? scheme.primary : scheme.onSurfaceVariant,
-      icon: Icon(
-        complete ? Icons.offline_pin_rounded : Icons.download_rounded,
-      ),
+      icon: Icon(complete ? Icons.offline_pin_rounded : Icons.download_rounded),
       onPressed: () async {
         final downloader = ref.read(downloadControllerProvider.notifier);
         try {
           if (complete) {
             await downloader.remove(trackId);
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l.downloadRemoved)),
-              );
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text(l.downloadRemoved)));
             }
           } else {
             await downloader.start(trackId);
           }
         } on Object catch (error) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l.downloadFailed('$error'))),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(l.downloadFailed('$error'))));
           }
         }
       },
@@ -251,12 +251,11 @@ class _ProgressState extends ConsumerState<_Progress> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(
-      playerSnapshotProviderValue.select(
-        (s) => (s.position, s.duration),
-      ),
+      playerSnapshotProviderValue.select((s) => (s.position, s.duration)),
     );
     final total = state.$2.inMilliseconds;
-    final value = _drag ??
+    final value =
+        _drag ??
         (total == 0 ? 0.0 : (state.$1.inMilliseconds / total).clamp(0.0, 1.0));
 
     return Padding(
@@ -265,15 +264,13 @@ class _ProgressState extends ConsumerState<_Progress> {
         children: [
           Slider(
             value: value.clamp(0.0, 1.0),
-            onChanged: total == 0
-                ? null
-                : (v) => setState(() => _drag = v),
+            onChanged: total == 0 ? null : (v) => setState(() => _drag = v),
             onChangeEnd: total == 0
                 ? null
                 : (v) {
-                    ref.read(playbackControllerProvider).seek(
-                      Duration(milliseconds: (v * total).round()),
-                    );
+                    ref
+                        .read(playbackControllerProvider)
+                        .seek(Duration(milliseconds: (v * total).round()));
                     setState(() => _drag = null);
                   },
           ),
@@ -282,9 +279,13 @@ class _ProgressState extends ConsumerState<_Progress> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(_drag == null ? _format(state.$1) : _format(
-                  Duration(milliseconds: (_drag! * total).round()),
-                )),
+                Text(
+                  _drag == null
+                      ? _format(state.$1)
+                      : _format(
+                          Duration(milliseconds: (_drag! * total).round()),
+                        ),
+                ),
                 Text(total == 0 ? '—' : _format(state.$2)),
               ],
             ),
@@ -300,9 +301,7 @@ class _IssueStrip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final issue = ref.watch(
-      playerSnapshotProviderValue.select((s) => s.issue),
-    );
+    final issue = ref.watch(playerSnapshotProviderValue.select((s) => s.issue));
     if (issue == null) return const SizedBox.shrink();
     return _IssueBanner(issue: issue);
   }
@@ -323,9 +322,7 @@ class _Controls extends ConsumerWidget {
     final repeat = ref.watch(
       playerSnapshotProviderValue.select((s) => s.repeat),
     );
-    final liked = ref.watch(
-      playerSnapshotProviderValue.select((s) => s.liked),
-    );
+    final liked = ref.watch(playerSnapshotProviderValue.select((s) => s.liked));
     final busy = ref.watch(
       playerSnapshotProviderValue.select((s) => s.buffering && !s.playing),
     );
@@ -371,7 +368,9 @@ class _Controls extends ConsumerWidget {
           ),
           _ControlButton(
             active: liked,
-            icon: liked ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
+            icon: liked
+                ? Icons.favorite_rounded
+                : Icons.favorite_outline_rounded,
             tooltip: liked ? l.commonUnlike : l.commonLike,
             onPressed: () => _toggleLike(context, ref, liked),
           ),
@@ -395,10 +394,13 @@ class _Controls extends ConsumerWidget {
       next,
       remoteSource: next == 1 ? SourceId.yandex : null,
     );
+    await ref.read(playbackControllerProvider).refreshLikedState();
     ref.invalidate(collectionProvider);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(next == 1 ? l.waveLikeAdded : l.waveLikeRemoved)),
+        SnackBar(
+          content: Text(next == 1 ? l.waveLikeAdded : l.waveLikeRemoved),
+        ),
       );
     }
   }
@@ -519,7 +521,10 @@ class _EmptyPlayer extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(l.playerQueueEmpty, style: Theme.of(context).textTheme.bodyLarge),
+          Text(
+            l.playerQueueEmpty,
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
           const SizedBox(height: 16),
           FilledButton.tonal(
             onPressed: () => Navigator.of(context).maybePop(),

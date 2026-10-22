@@ -9,7 +9,8 @@ import '../../core/sources/source_id.dart';
 /// причине, а не по исключениям.
 class YandexApi {
   YandexApi({String? token, Dio? dio})
-    : _dio = dio ??
+    : _dio =
+          dio ??
           Dio(
             BaseOptions(
               baseUrl: AppConfig.yandexApiBase,
@@ -49,6 +50,11 @@ class YandexApi {
     }
   }
 
+  /// Текст песни в открытом supplement-ответе Яндекса. В отличие от
+  /// `/tracks/{id}/lyrics`, этому эндпоинту не нужна подпись timeStamp+sign.
+  Future<YandexResponse> supplement(String trackId) =>
+      get('/tracks/$trackId/supplement');
+
   Future<YandexResponse> post(
     String path, {
     Map<String, dynamic>? query,
@@ -63,9 +69,7 @@ class YandexApi {
         options: Options(
           headers: {
             ..._headers,
-            if (form) ...{
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
+            if (form) ...{'Content-Type': 'application/x-www-form-urlencoded'},
           },
         ),
       );
@@ -83,9 +87,11 @@ class YandexApi {
         options: Options(headers: _headers, responseType: ResponseType.plain),
       );
       if (response.statusCode == 200) {
-        return YandexResponse.ok(response.data is String
-            ? response.data
-            : (response.data?.toString() ?? ''));
+        return YandexResponse.ok(
+          response.data is String
+              ? response.data
+              : (response.data?.toString() ?? ''),
+        );
       }
       return YandexResponse.failure(
         SourceFailure(

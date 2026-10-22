@@ -1253,7 +1253,7 @@ abstract class AppLocalizations {
   /// No description provided for @hideAiNote.
   ///
   /// In ru, this message translates to:
-  /// **'Убирает треки с явной пометкой ИИ в названии или исполнителе (AI, Suno, Udio, нейросеть). Официальной метки в API Яндекса пока нет.'**
+  /// **'Список ИИ-исполнителей — Slopless (GitHub), плюс явные пометки в названии и исполнителе. Список скачивается по сети; официальной метки в API Яндекса пока нет.'**
   String get hideAiNote;
 
   /// No description provided for @artworkShape.
@@ -1322,6 +1322,18 @@ abstract class AppLocalizations {
   /// **'Громкость плавно поднимается при старте и опускается при паузе, перемотке и смене трека.'**
   String get settingsFadeNote;
 
+  /// No description provided for @censorBypass.
+  ///
+  /// In ru, this message translates to:
+  /// **'Версия без цензуры'**
+  String get censorBypass;
+
+  /// No description provided for @censorBypassNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Подменять треки из базы FckCensorData (GitHub) на незацензуренную версию. База загружается по сети; если файла нет, играет версия Яндекса.'**
+  String get censorBypassNote;
+
   /// No description provided for @settingsReset.
   ///
   /// In ru, this message translates to:
@@ -1337,7 +1349,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLyricsSource.
   ///
   /// In ru, this message translates to:
-  /// **'Тексты: LRCLIB'**
+  /// **'Тексты: LRCLIB + Яндекс'**
   String get settingsLyricsSource;
 
   /// No description provided for @settingsLyricsSourceNote.
@@ -1607,7 +1619,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutSourcesNote.
   ///
   /// In ru, this message translates to:
-  /// **'Яндекс Музыка — каталог, поток и волна; YouTube — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB и lyrics.ovh.'**
+  /// **'Яндекс Музыка — каталог, поток и волна; YouTube — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, официальный текст Яндекса и lyrics.ovh.'**
   String get aboutSourcesNote;
 
   /// No description provided for @authTitle.

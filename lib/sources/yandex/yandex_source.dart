@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import '../../core/content/censor_base.dart';
 import '../../core/sources/music_source.dart';
 import '../../core/sources/source_dto.dart';
 import '../../core/sources/source_errors.dart';
 import '../../core/sources/source_id.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/sources/stream_target.dart';
+import '../lyrics/lrclib.dart';
 import 'yandex_api.dart';
 import 'yandex_auth.dart';
 import 'yandex_dto.dart';
@@ -58,7 +60,8 @@ class YandexSource implements MusicSource {
 
   /// Экран входа работает через источник, а не через auth напрямую: источник
   /// знает, что авторизация у него обязательна.
-  Future<DeviceLogin> requestDeviceLogin() async => _requireAuth().startDeviceLogin();
+  Future<DeviceLogin> requestDeviceLogin() async =>
+      _requireAuth().startDeviceLogin();
 
   Future<bool> completeDeviceLogin(DeviceLogin login) =>
       _requireAuth().completeDeviceLogin(login);
@@ -95,7 +98,9 @@ class YandexSource implements MusicSource {
       tracks: tracks,
       page: page,
       total: total,
-      hasMore: total == null ? tracks.length >= pageSize : (page + 1) * pageSize < total,
+      hasMore: total == null
+          ? tracks.length >= pageSize
+          : (page + 1) * pageSize < total,
     );
   }
 
@@ -115,7 +120,7 @@ class YandexSource implements MusicSource {
     return YandexDto.tracks(result.data);
   }
 
-/// Лайки аккаунта: эндпоинт отдаёт только пары id/albumId, поэтому
+  /// Лайки аккаунта: эндпоинт отдаёт только пары id/albumId, поэтому
   /// метаданные добираются через [getTracksByIds].
   ///
   /// `limit: null` — сколько отдал Я.Музыка: страница `/likes/tracks`
@@ -195,7 +200,9 @@ class YandexSource implements MusicSource {
     });
     if (!result.isOk) return null;
 
-    final fetched = result.asList.where((item) => item['kind'].toString() == remotePlaylistId);
+    final fetched = result.asList.where(
+      (item) => item['kind'].toString() == remotePlaylistId,
+    );
     final first = fetched.isEmpty ? null : fetched.first;
     if (first == null) return null;
 
@@ -289,6 +296,32 @@ class YandexSource implements MusicSource {
     return entries;
   }
 
+  /// Обычный текст из supplement-ответа (без таймкодов).
+  Future<Lyrics?> lyrics(String trackId) async {
+    if (!_hasAuth) return null;
+    final result = await _api.supplement(trackId);
+    if (!result.isOk) return null;
+    final parsed = parseSupplement(result.data);
+    if (parsed != null) {
+      AppLogger.instance.info('текст: yandex supplement $trackId');
+    }
+    return parsed;
+  }
+
+  static Lyrics? parseSupplement(Object? data) {
+    if (data is! Map) return null;
+    final lyrics = data['lyrics'];
+    final text = switch (lyrics) {
+      Map() =>
+        (lyrics['fullLyrics'] ?? lyrics['lyrics'] ?? lyrics['text'])
+            ?.toString(),
+      String() => lyrics,
+      _ => null,
+    };
+    if (text == null || text.trim().isEmpty) return null;
+    return Lyrics.fromPlain(text);
+  }
+
   /// Альбом целиком: метаданные и треки в порядке диска.
   Future<AlbumSnapshot?> album(String albumId) async {
     final result = await _api.get('/albums/$albumId/with-tracks');
@@ -307,12 +340,14 @@ class YandexSource implements MusicSource {
         for (final item in (data['artists'] as List? ?? const []))
           if (item is Map) '${item['name'] ?? ''}',
       ],
-      tracks: YandexDto.tracks(data['volumes'] is List
-          ? [
-              for (final volume in data['volumes'] as List)
-                if (volume is List) ...volume,
-            ]
-          : data['tracks']),
+      tracks: YandexDto.tracks(
+        data['volumes'] is List
+            ? [
+                for (final volume in data['volumes'] as List)
+                  if (volume is List) ...volume,
+              ]
+            : data['tracks'],
+      ),
     );
   }
 
@@ -335,6 +370,28 @@ class YandexSource implements MusicSource {
         ),
       );
     }
+
+    // База FckCensorData: незацензуренная версия важнее того, что отдаёт
+    // Яндекс, и не требует его токена. Проверка ссылки кэшируется.
+    if (CensorBase.instance.enabled) {
+      final replacement = await CensorBase.instance.replacementFor(
+        track.ref.remoteId,
+      );
+      if (replacement != null) {
+        return StreamReady(
+          target: StreamUrl(
+            url: Uri.parse(replacement),
+            expiresAt: DateTime.now().add(const Duration(days: 3650)),
+            cacheKey: track.ref.remoteId,
+          ),
+          source: id,
+          quality: preferred,
+          codec: 'mp3',
+          ttlHint: const Duration(days: 3650),
+        );
+      }
+    }
+
     if (!_hasAuth) {
       return StreamFailed(
         SourceFailure(source: id, reason: SourceFailReason.authRequired),
@@ -346,9 +403,9 @@ class YandexSource implements MusicSource {
 
     // 403 с пометкой not-allowed у Я.Музыки означает «нужен Плюс», а не «нет
     // доступа к аккаунту».
-    if (result case StreamFailed(
-      :final failure,
-    ) when failure.reason == SourceFailReason.geoBlocked && failure.message != null) {
+    if (result case StreamFailed(:final failure)
+        when failure.reason == SourceFailReason.geoBlocked &&
+            failure.message != null) {
       if (failure.message!.contains('not-allowed')) {
         return StreamFailed(
           SourceFailure(

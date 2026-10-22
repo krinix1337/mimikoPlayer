@@ -16,4 +16,12 @@ void main() {
     expect(AiFilter.matches('Песня', ['Король и Шут']), isFalse);
     expect(AiFilter.matches('Sunday', ['Sundays']), isFalse);
   });
+
+  test('список Slopless разбирается в набор id', () {
+    final ids = AiFilter.instance.parse(
+      '{"timestamp":"2026-10-22","artists":[544,"123",42.0,null]}',
+    );
+    expect(ids, containsAll([544, 123, 42]));
+    expect(ids.length, 3);
+  });
 }

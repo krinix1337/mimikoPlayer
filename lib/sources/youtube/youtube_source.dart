@@ -57,10 +57,8 @@ class YoutubeSource implements MusicSource {
   SourceId get id => SourceId.youtube;
 
   @override
-  SourceCapabilities get capabilities => const SourceCapabilities(
-    canSearch: true,
-    canStream: true,
-  );
+  SourceCapabilities get capabilities =>
+      const SourceCapabilities(canSearch: true, canStream: true);
 
   @override
   AuthState get auth => const AuthAnonymous();
@@ -244,11 +242,14 @@ class YoutubeSource implements MusicSource {
       );
     } on Object catch (error) {
       AppLogger.instance.warn('youtube stream не получен: $error');
+      final message = error is yt.VideoUnplayableException
+          ? 'YouTube не отдаёт поток в этой сети (VPN?)'
+          : 'YouTube: $error';
       return StreamFailed(
         SourceFailure(
           source: id,
           reason: SourceFailReason.remoteError,
-          message: '$error',
+          message: message,
         ),
       );
     }

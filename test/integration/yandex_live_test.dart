@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:phoneyandex/core/sources/cross_source.dart';
 import 'package:phoneyandex/core/sources/source_dto.dart';
 import 'package:phoneyandex/core/sources/source_id.dart';
 import 'package:phoneyandex/core/sources/stream_target.dart';
@@ -17,7 +18,9 @@ import 'package:phoneyandex/sources/yandex/yandex_source.dart';
 final _tokenFile = File('C:/project/musor/yandex_token.txt');
 
 void main() {
-  final token = _tokenFile.existsSync() ? _tokenFile.readAsStringSync().trim() : '';
+  final token = _tokenFile.existsSync()
+      ? _tokenFile.readAsStringSync().trim()
+      : '';
   if (token.isEmpty) {
     markTestSkipped('нет токена: сначала probe login');
     return;
@@ -58,9 +61,12 @@ void main() {
     final ready = result as StreamReady;
     expect(ready.source, SourceId.yandex);
     final url = (ready.target as StreamUrl).url;
-    stderr.writeln('поток: ${url.host} битрейт=${ready.bitrateKbps} codec=${ready.codec}');
+    stderr.writeln(
+      'поток: ${url.host} битрейт=${ready.bitrateKbps} codec=${ready.codec}',
+    );
 
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 15);
     final request = await client.openUrl('GET', url)
       ..headers.set(HttpHeaders.rangeHeader, 'bytes=0-8191');
     final response = await request.close();
@@ -113,5 +119,25 @@ void main() {
 
     expect(tracks, hasLength(refs.length));
     expect(jsonEncode(tracks.first.raw!.keys.toList()), isNotEmpty);
+  });
+
+  test('фолбэк с YouTube-названия находит и отдаёт трек Яндекса', () async {
+    // Ровно тот запрос, который строит плеер, когда YouTube не отдал поток.
+    final query = crossSourceQuery('Joji - Gimme Love (Official Video)', const [
+      '88rising',
+    ]);
+    expect(query, 'joji gimme love');
+
+    final found = await source.search(query, pageSize: 10);
+    final match = pickCrossSourceMatch(
+      found.tracks,
+      title: 'Joji - Gimme Love (Official Video)',
+      artists: const ['88rising'],
+      duration: const Duration(seconds: 202),
+    );
+    expect(match, isNotNull, reason: 'в Яндексе не нашлось той же песни');
+
+    final result = await source.resolveStream(match!);
+    expect(result, isA<StreamReady>(), reason: '$result');
   });
 }

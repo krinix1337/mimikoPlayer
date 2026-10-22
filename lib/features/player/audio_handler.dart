@@ -8,6 +8,7 @@ import '../../core/constants.dart';
 import '../../core/content/ai_filter.dart';
 import '../../core/db/daos/queue_dao.dart';
 import '../../core/logging/app_logger.dart';
+import '../../core/sources/cross_source.dart';
 import '../../core/sources/source_dto.dart';
 import '../../core/sources/source_errors.dart';
 import '../../core/sources/source_id.dart';
@@ -48,6 +49,8 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   Timer? _sleepTimer;
   int _stallSeconds = 0;
   bool _radioRefillInFlight = false;
+  final Map<String, SourceTrack> _crossSourceMatches = {};
+  final Set<String> _crossSourceSearched = {};
 
   /// Таймер сна: пауза после текущего трека, когда время вышло.
   /// null — выключить. Ставится только на реальное воспроизведение,
@@ -139,6 +142,16 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   }
 
   @override
+  Future<void> refreshLikedState() async {
+    final localTrackId = _queue.currentId;
+    if (localTrackId == null) return;
+    final liked = await _services.db.libraryDao.likeState(localTrackId) == 1;
+    if (_snapshot.liked != liked) {
+      _publish(_snapshot.copyWith(liked: liked));
+    }
+  }
+
+  @override
   Future<void> skipNext() async {
     await _reportCurrent(PlaybackEventType.skip);
     final id = _queue.advance();
@@ -181,7 +194,10 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   Future<void> setShuffle(PlaybackShuffle value) async {
     _queue.setShuffle(value);
     _publish(
-      _snapshot.copyWith(queue: _queue.displayOrder, index: _queue.displayPosition),
+      _snapshot.copyWith(
+        queue: _queue.displayOrder,
+        index: _queue.displayPosition,
+      ),
     );
     _emitServiceState();
     _scheduleSnapshot();
@@ -282,9 +298,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   Future<void> removeQueueItemAt(int index) async {
     final order = _queue.displayOrder;
     if (index < 0 || index >= order.length) return;
-    await removeQueueItem(
-      MediaItem(id: order[index], title: order[index]),
-    );
+    await removeQueueItem(MediaItem(id: order[index], title: order[index]));
   }
 
   @override
@@ -309,7 +323,8 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       _publish(
         _snapshot.copyWith(
           playing: state.playing,
-          buffering: state.processingState == ProcessingState.loading ||
+          buffering:
+              state.processingState == ProcessingState.loading ||
               state.processingState == ProcessingState.buffering,
         ),
       );
@@ -334,16 +349,13 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       null,
       onError: (Object error, StackTrace _) {
         _publishIssue(
-          PlayerIssue(
-            [
-              SourceFailure(
-                source: _snapshot.usedSource ?? SourceId.local,
-                reason: SourceFailReason.network,
-                message: '$error',
-              ),
-            ],
-            needsUserAction: false,
-          ),
+          PlayerIssue([
+            SourceFailure(
+              source: _snapshot.usedSource ?? SourceId.local,
+              reason: SourceFailReason.network,
+              message: '$error',
+            ),
+          ], needsUserAction: false),
         );
         unawaited(_revalidate(resume: _snapshot.playing));
       },
@@ -382,6 +394,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     final artists = await db.tracksDao.artistNamesOf(localTrackId);
     final title = track?.title ?? localTrackId;
     final artist = artists.isEmpty ? 'Локальный файл' : artists.join(', ');
+    final liked = await db.libraryDao.likeState(localTrackId) == 1;
 
     mediaItem.add(
       MediaItem(
@@ -406,6 +419,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         index: _queue.currentBaseIndex,
         resolving: true,
         duration: Duration(seconds: track?.durationSec ?? 0),
+        liked: liked,
         clearIssue: true,
       ),
     );
@@ -417,7 +431,17 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       quality: _services.defaultQuality,
     );
 
-    final playback = result.playback;
+    var playback = result.playback;
+    if (playback == null &&
+        variants.any((variant) => variant.ref.source == SourceId.youtube)) {
+      playback = await _crossSourcePlayback(
+        localTrackId,
+        title: title,
+        artists: artists,
+        duration: Duration(seconds: track?.durationSec ?? 0),
+      );
+    }
+
     if (playback == null) {
       _consecutiveFailures++;
       AppLogger.instance.warn(
@@ -531,10 +555,14 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         batches: 3,
         target: 15,
       );
+      if (_services.hideAiTracks) {
+        // Волна может стартовать раньше, чем фоновая загрузка списка.
+        await AiFilter.instance.ensureLoaded();
+      }
       final tracks = _services.hideAiTracks
           ? [
               for (final track in fetched)
-                if (!AiFilter.matches(track.title, track.artists)) track,
+                if (!AiFilter.instance.isAiTrack(track)) track,
             ]
           : fetched;
       if (tracks.isEmpty) return false;
@@ -589,8 +617,12 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     Duration played,
   ) async {
     final source = _services.registry.byId(usedSource);
-    final variant = variants.where((v) => v.ref.source == usedSource).firstOrNull;
-    if (source == null || variant == null || !source.capabilities.canReportPlay) {
+    final variant = variants
+        .where((v) => v.ref.source == usedSource)
+        .firstOrNull;
+    if (source == null ||
+        variant == null ||
+        !source.capabilities.canReportPlay) {
       return;
     }
     try {
@@ -602,6 +634,65 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
 
   /// Watchdog буфера: на Android 17 аудио-API отказывают молча, поэтому
   /// «тихо и бафферится» считаем симптомом протухшей подписи и перевалидируем.
+  /// Если YouTube не отдаёт поток в этой сети, ищем ту же песню в Яндексе.
+  /// Сравнение строгое: название + исполнитель + близкая длительность.
+  Future<ResolvedPlayback?> _crossSourcePlayback(
+    String localTrackId, {
+    required String title,
+    required List<String> artists,
+    required Duration duration,
+  }) async {
+    final yandex = _services.yandex;
+    if (yandex == null || !yandex.auth.isReady) return null;
+    var match = _crossSourceMatches[localTrackId];
+    if (match == null) {
+      if (_crossSourceSearched.contains(localTrackId)) return null;
+      try {
+        final found = await yandex.search(
+          crossSourceQuery(title, artists),
+          pageSize: 10,
+        );
+        match = pickCrossSourceMatch(
+          found.tracks,
+          title: title,
+          artists: artists,
+          duration: duration,
+        );
+      } on Object catch (error) {
+        // Сетевую ошибку не запоминаем: при следующем треке можно повторить.
+        AppLogger.instance.warn('youtube fallback: поиск не удался: $error');
+        return null;
+      }
+      if (match == null) {
+        _crossSourceSearched.add(localTrackId);
+        AppLogger.instance.info('youtube fallback: в Яндексе не нашлось');
+        return null;
+      }
+      _crossSourceMatches[localTrackId] = match;
+    }
+    try {
+      final ready = await yandex.resolveStream(
+        match,
+        preferred: _services.defaultQuality,
+      );
+      if (ready is StreamReady) {
+        AppLogger.instance.info(
+          'youtube недоступен: играю yandex ${match.ref.remoteId}',
+        );
+        return ResolvedPlayback(
+          localTrackId: localTrackId,
+          usedSource: SourceId.yandex,
+          quality: ready.quality,
+          target: ready.target,
+          expiresAt: DateTime.now().add(ready.ttlHint ?? defaultStreamTtl),
+        );
+      }
+    } on Object catch (error) {
+      AppLogger.instance.warn('youtube fallback: поток не получен: $error');
+    }
+    return null;
+  }
+
   void _startStallProbe(ResolvedPlayback playback) {
     _stallProbe?.cancel();
     _stallSeconds = 0;
@@ -650,10 +741,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     if (position > Duration.zero) await _player.seek(position);
     if (resume) unawaited(_player.play());
     _publish(
-      _snapshot.copyWith(
-        usedSource: fresh.usedSource,
-        quality: fresh.quality,
-      ),
+      _snapshot.copyWith(usedSource: fresh.usedSource, quality: fresh.quality),
     );
   }
 
@@ -680,7 +768,10 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     _sourceHint = QueueDao.hintOf(row);
     _pendingSeek = Duration(milliseconds: row.positionMs);
     _publish(
-      _snapshot.copyWith(queue: _queue.displayOrder, index: _queue.displayPosition),
+      _snapshot.copyWith(
+        queue: _queue.displayOrder,
+        index: _queue.displayPosition,
+      ),
     );
     return true;
   }
@@ -724,9 +815,10 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
           true => AudioProcessingState.idle,
           false => switch (_snapshot.buffering) {
             true => AudioProcessingState.buffering,
-            false => _snapshot.current == null
-                ? AudioProcessingState.idle
-                : AudioProcessingState.ready,
+            false =>
+              _snapshot.current == null
+                  ? AudioProcessingState.idle
+                  : AudioProcessingState.ready,
           },
         },
         playing: playing,
@@ -772,8 +864,8 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
 
   static AudioServiceShuffleMode _shuffleToService(PlaybackShuffle value) =>
       value == PlaybackShuffle.shuffled
-          ? AudioServiceShuffleMode.all
-          : AudioServiceShuffleMode.none;
+      ? AudioServiceShuffleMode.all
+      : AudioServiceShuffleMode.none;
 
   static PlaybackRepeat _repeatFromService(AudioServiceRepeatMode mode) =>
       switch (mode) {
@@ -784,14 +876,11 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
 
   static PlaybackShuffle _shuffleFromService(AudioServiceShuffleMode mode) =>
       mode == AudioServiceShuffleMode.all
-          ? PlaybackShuffle.shuffled
-          : PlaybackShuffle.ordered;
+      ? PlaybackShuffle.shuffled
+      : PlaybackShuffle.ordered;
 
   static String _repeatToWire(PlaybackRepeat value) => value.name;
 
-  static PlaybackRepeat _repeatFromWire(String value) =>
-      PlaybackRepeat.values.firstWhere(
-        (e) => e.name == value,
-        orElse: () => PlaybackRepeat.none,
-      );
+  static PlaybackRepeat _repeatFromWire(String value) => PlaybackRepeat.values
+      .firstWhere((e) => e.name == value, orElse: () => PlaybackRepeat.none);
 }

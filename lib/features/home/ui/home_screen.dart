@@ -108,10 +108,7 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
                 const Spacer(),
-                _PlayButton(
-                  busy: wave.isLoading,
-                  onPlay: () => startWave(ref),
-                ),
+                _PlayButton(busy: wave.isLoading, onPlay: () => startWave(ref)),
                 const SizedBox(height: 16),
                 _NowPlayingPill(
                   wave: wave.value ?? const [],
@@ -127,6 +124,7 @@ class HomeScreen extends ConsumerWidget {
       ),
     );
   }
+
   Future<void> _backToMyWave(WidgetRef ref) async {
     final wasRadio = ref.read(playerSnapshotProviderValue).isRadio;
     ref.read(stationProvider.notifier).select(WaveStationIds.myVibe);
@@ -163,8 +161,8 @@ class _PlayButton extends ConsumerWidget {
           onTap: busy
               ? null
               : () => playing
-              ? ref.read(playbackControllerProvider).togglePlay()
-              : onPlay(),
+                    ? ref.read(playbackControllerProvider).togglePlay()
+                    : onPlay(),
           child: AnimatedContainer(
             duration: motion.morph,
             curve: Curves.easeOutBack,
@@ -284,11 +282,7 @@ class _NowPlayingPill extends ConsumerWidget {
               if (coverUrl != null)
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
-                  child: TrackCover(
-                    url: coverUrl,
-                    size: 44,
-                    radius: 10,
-                  ),
+                  child: TrackCover(url: coverUrl, size: 44, radius: 10),
                 ),
               Expanded(
                 child: Column(
@@ -359,10 +353,13 @@ class _NowPlayingPill extends ConsumerWidget {
       next,
       remoteSource: next == 1 ? SourceId.yandex : null,
     );
+    await ref.read(playbackControllerProvider).refreshLikedState();
     ref.invalidate(collectionProvider);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(next == 1 ? l.waveLikeAdded : l.waveLikeRemoved)),
+        SnackBar(
+          content: Text(next == 1 ? l.waveLikeAdded : l.waveLikeRemoved),
+        ),
       );
     }
   }
@@ -408,7 +405,8 @@ class _StationStrip extends ConsumerWidget {
               title: station.title,
               iconUrl: station.iconUrl,
               selected: selected == station.id,
-              onTap: () => ref.read(stationProvider.notifier).select(station.id),
+              onTap: () =>
+                  ref.read(stationProvider.notifier).select(station.id),
             );
           },
         ),
@@ -447,9 +445,7 @@ class _StationChip extends StatelessWidget {
           color: selected
               ? scheme.primaryContainer
               : scheme.surfaceContainer.withValues(alpha: 0.6),
-          borderRadius: BorderRadius.circular(
-            motion.prefs.corner.radius * 0.8,
-          ),
+          borderRadius: BorderRadius.circular(motion.prefs.corner.radius * 0.8),
           border: selected
               ? Border.all(color: scheme.primary, width: 1.5)
               : null,
@@ -561,7 +557,9 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
                 // Настройки у каждой станции свои — перечитываем черновик.
                 setState(() => _draft = null);
                 ref.read(waveSettingsProvider.future).then((loaded) {
-                  if (mounted) setState(() => _draft = loaded ?? const WaveSettings());
+                  if (mounted) {
+                    setState(() => _draft = loaded ?? const WaveSettings());
+                  }
                 });
               },
             ),
@@ -640,8 +638,10 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
                     (draft.mood ?? 2) == preset.mood &&
                     (draft.energy ?? 2) == preset.energy,
                 onSelected: (_) => setState(
-                  () => _draft = draft
-                      .copyWith(mood: preset.mood, energy: preset.energy),
+                  () => _draft = draft.copyWith(
+                    mood: preset.mood,
+                    energy: preset.energy,
+                  ),
                 ),
               ),
           ],
@@ -734,7 +734,8 @@ class _StationPicker extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    final stations = ref.watch(waveStationsProvider).value ?? const <WaveStation>[];
+    final stations =
+        ref.watch(waveStationsProvider).value ?? const <WaveStation>[];
     return Wrap(
       spacing: 8,
       runSpacing: 6,

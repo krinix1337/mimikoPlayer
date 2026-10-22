@@ -18,6 +18,7 @@ void main() {
       showNavLabels: false,
       artworkShape: ArtworkShape.circle,
       hideAiTracks: true,
+      censorBypass: false,
       accent: AccentColor.rose,
       launcherIcon: LauncherIcon.crimson,
     );
@@ -38,6 +39,8 @@ void main() {
     expect(restored.showNavLabels, isFalse);
     expect(restored.artworkShape, ArtworkShape.circle);
     expect(restored.hideAiTracks, isTrue);
+    expect(restored.censorBypass, isFalse);
+    expect(const Prefs().censorBypass, isTrue);
   });
 
   test('«как в системе» отличается от «не задано»', () {
@@ -64,9 +67,15 @@ void main() {
   test('анимации «выключены» дают нулевую длительность', () {
     const off = Prefs(animations: AnimationsSpeed.off);
     expect(off.scaleMs(320), Duration.zero);
-    expect(const Prefs().scaleMs(320) < const Prefs(animations: AnimationsSpeed.slow).scaleMs(320), isTrue);
-    expect(const Prefs(animations: AnimationsSpeed.fast).scaleMs(400),
-        const Duration(milliseconds: 200));
+    expect(
+      const Prefs().scaleMs(320) <
+          const Prefs(animations: AnimationsSpeed.slow).scaleMs(320),
+      isTrue,
+    );
+    expect(
+      const Prefs(animations: AnimationsSpeed.fast).scaleMs(400),
+      const Duration(milliseconds: 200),
+    );
   });
 
   test('сортировка коллекции берётся из настроек', () {

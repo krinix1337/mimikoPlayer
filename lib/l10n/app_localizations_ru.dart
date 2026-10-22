@@ -631,7 +631,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get hideAiNote =>
-      'Убирает треки с явной пометкой ИИ в названии или исполнителе (AI, Suno, Udio, нейросеть). Официальной метки в API Яндекса пока нет.';
+      'Список ИИ-исполнителей — Slopless (GitHub), плюс явные пометки в названии и исполнителе. Список скачивается по сети; официальной метки в API Яндекса пока нет.';
 
   @override
   String get artworkShape => 'Обложка плеера';
@@ -668,6 +668,13 @@ class AppLocalizationsRu extends AppLocalizations {
       'Громкость плавно поднимается при старте и опускается при паузе, перемотке и смене трека.';
 
   @override
+  String get censorBypass => 'Версия без цензуры';
+
+  @override
+  String get censorBypassNote =>
+      'Подменять треки из базы FckCensorData (GitHub) на незацензуренную версию. База загружается по сети; если файла нет, играет версия Яндекса.';
+
+  @override
   String get settingsReset => 'Сбросить настройки';
 
   @override
@@ -675,7 +682,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Настройки вернулись к значениям по умолчанию';
 
   @override
-  String get settingsLyricsSource => 'Тексты: LRCLIB';
+  String get settingsLyricsSource => 'Тексты: LRCLIB + Яндекс';
 
   @override
   String get settingsLyricsSourceNote =>
@@ -823,7 +830,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get aboutSourcesNote =>
-      'Яндекс Музыка — каталог, поток и волна; YouTube — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB и lyrics.ovh.';
+      'Яндекс Музыка — каталог, поток и волна; YouTube — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, официальный текст Яндекса и lyrics.ovh.';
 
   @override
   String get authTitle => 'Вход в Яндекс';

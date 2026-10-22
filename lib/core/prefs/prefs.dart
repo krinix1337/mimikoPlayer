@@ -28,6 +28,7 @@ final class Prefs {
     this.showNavLabels = true,
     this.artworkShape = ArtworkShape.rounded,
     this.hideAiTracks = false,
+    this.censorBypass = true,
   });
 
   final ThemeMode themeMode;
@@ -70,6 +71,9 @@ final class Prefs {
   /// Скрывать треки с явной пометкой ИИ в названии или исполнителе.
   final bool hideAiTracks;
 
+  /// Подменять зацензуренные треки версией из открытой базы.
+  final bool censorBypass;
+
   Locale? get locale => localeCode == null ? null : Locale(localeCode!);
 
   /// Длительность перехода с учётом пользовательского масштаба анимаций.
@@ -105,6 +109,7 @@ final class Prefs {
     bool? showNavLabels,
     ArtworkShape? artworkShape,
     bool? hideAiTracks,
+    bool? censorBypass,
   }) => Prefs(
     themeMode: themeMode ?? this.themeMode,
     palette: palette ?? this.palette,
@@ -127,6 +132,7 @@ final class Prefs {
     showNavLabels: showNavLabels ?? this.showNavLabels,
     artworkShape: artworkShape ?? this.artworkShape,
     hideAiTracks: hideAiTracks ?? this.hideAiTracks,
+    censorBypass: censorBypass ?? this.censorBypass,
   );
 
   Map<String, Object?> toJson() => {
@@ -151,6 +157,7 @@ final class Prefs {
     'show_nav_labels': showNavLabels,
     'artwork_shape': artworkShape.name,
     'hide_ai_tracks': hideAiTracks,
+    'censor_bypass': censorBypass,
   };
 
   static Prefs fromJson(Map<String, Object?> json) {
@@ -197,11 +204,7 @@ final class Prefs {
           ? (json['frame_hz']! as num).toDouble()
           : 120,
       waveOnWifiOnly: json['wave_on_wifi_only'] == true,
-      lyricsSize: required(
-        'lyrics_size',
-        LyricsSize.values,
-        LyricsSize.normal,
-      ),
+      lyricsSize: required('lyrics_size', LyricsSize.values, LyricsSize.normal),
       lyricsDimOthers: json['lyrics_dim'] != false,
       compactUi: json['compact_ui'] != false,
       showMiniPlayer: json['show_mini_player'] != false,
@@ -212,6 +215,7 @@ final class Prefs {
         ArtworkShape.rounded,
       ),
       hideAiTracks: json['hide_ai_tracks'] == true,
+      censorBypass: json['censor_bypass'] != false,
       homeBackground: required(
         'home_background',
         HomeBackground.values,

@@ -35,20 +35,11 @@ Future<void> showTrackMenu(
             localTrackId,
           );
           final variants = await services.db.tracksDao.variantsOf(localTrackId);
-          final hasRemote = variants.any(
-            (v) => v.ref.source != SourceId.local,
-          );
+          final hasRemote = variants.any((v) => v.ref.source != SourceId.local);
           final downloaded = await services.db.streamsDao.downloadedFilePath(
             localTrackId,
           );
-          return (
-            track,
-            liked,
-            artist,
-            albumId,
-            hasRemote,
-            downloaded != null,
-          );
+          return (track, liked, artist, albumId, hasRemote, downloaded != null);
         }(),
         builder: (context, snapshot) {
           final data = snapshot.data;
@@ -111,6 +102,7 @@ Future<void> showTrackMenu(
                             localTrackId,
                             liked == 1 ? 0 : 1,
                           );
+                          await controller.refreshLikedState();
                           ref.invalidate(collectionProvider);
                           if (sheetContext.mounted) {
                             Navigator.of(sheetContext).pop();
@@ -134,6 +126,7 @@ Future<void> showTrackMenu(
                             localTrackId,
                             liked == -1 ? 0 : -1,
                           );
+                          await controller.refreshLikedState();
                           ref.invalidate(collectionProvider);
                           if (sheetContext.mounted) {
                             Navigator.of(sheetContext).pop();
@@ -175,9 +168,10 @@ Future<void> showTrackMenu(
                         : (status!.progress! * 100).round();
 
                     final label = switch (status?.phase) {
-                      DownloadPhase.downloading => percent == null
-                          ? l.menuDownloading
-                          : l.downloadProgress(percent),
+                      DownloadPhase.downloading =>
+                        percent == null
+                            ? l.menuDownloading
+                            : l.downloadProgress(percent),
                       DownloadPhase.complete => l.menuDownloaded,
                       DownloadPhase.failed => l.menuDownloadRetry,
                       null => complete ? l.menuDownloaded : l.playerDownload,
@@ -217,28 +211,26 @@ Future<void> showTrackMenu(
                                     await downloader.remove(localTrackId);
                                     if (sheetContext.mounted) {
                                       Navigator.of(sheetContext).pop();
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(l.downloadRemoved),
-                                        ),
-                                      );
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                            SnackBar(
+                                              content: Text(l.downloadRemoved),
+                                            ),
+                                          );
                                     }
                                   } else {
                                     try {
                                       await downloader.start(localTrackId);
                                     } on Object catch (error) {
                                       if (context.mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              l.downloadFailed('$error'),
-                                            ),
-                                          ),
-                                        );
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  l.downloadFailed('$error'),
+                                                ),
+                                              ),
+                                            );
                                       }
                                     }
                                   }

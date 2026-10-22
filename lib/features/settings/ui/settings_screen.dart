@@ -108,9 +108,9 @@ class _CategoryTile extends StatelessWidget {
     title: Text(title),
     subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
     trailing: const Icon(Icons.chevron_right_rounded),
-    onTap: () => Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (context) => page),
-    ),
+    onTap: () =>
+        Navigator.of(context)
+            .push(MaterialPageRoute<void>(builder: (context) => page)),
   );
 }
 
@@ -136,7 +136,10 @@ class _AppearancePage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l.settingsTheme, style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    l.settingsTheme,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 10),
                   SegmentedButton<ThemeMode>(
                     segments: [
@@ -271,7 +274,10 @@ class _AppearancePage extends ConsumerWidget {
             const FrameTile(),
           ],
         ),
-        SettingsSection(title: l.settingsLanguage, children: const [LanguageRow()]),
+        SettingsSection(
+          title: l.settingsLanguage,
+          children: const [LanguageRow()],
+        ),
         SettingsSection(
           title: l.settingsLauncherIcon,
           children: const [LauncherIconRow()],
@@ -314,6 +320,12 @@ class _SoundPage extends ConsumerWidget {
               value: prefs.fade,
               note: l.settingsFadeNote,
               onChanged: controller.setFade,
+            ),
+            SwitchRow(
+              label: l.censorBypass,
+              value: prefs.censorBypass,
+              note: l.censorBypassNote,
+              onChanged: controller.setCensorBypass,
             ),
             const PriorityTile(),
           ],
@@ -420,9 +432,8 @@ class _StoragePage extends ConsumerWidget {
     if (confirmed != true) return;
     await ref.read(prefsProvider.notifier).reset();
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.settingsResetDone)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l.settingsResetDone)));
     }
   }
 }
@@ -485,13 +496,33 @@ class _AboutPage extends StatelessWidget {
               title: Text(l.settingsLyricsSource),
               subtitle: Text(l.settingsLyricsSourceNote),
             ),
+            ListTile(
+              leading: const Icon(Icons.auto_awesome_outlined),
+              title: const Text('AI-фильтр: Slopless'),
+              subtitle: const Text('github.com/alexeyfv/slopless · GPL-3.0'),
+              trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+              onTap: () => launchUrl(
+                Uri.parse('https://github.com/alexeyfv/slopless'),
+                mode: LaunchMode.externalApplication,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.explicit_outlined),
+              title: const Text('Версии без цензуры: FckCensorData'),
+              subtitle: const Text('github.com/Hazzz895/FckCensorData'),
+              trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+              onTap: () => launchUrl(
+                Uri.parse('https://github.com/Hazzz895/FckCensorData'),
+                mode: LaunchMode.externalApplication,
+              ),
+            ),
           ],
         ),
       ],
     );
   }
 
-  static const String _version = '1.1.0';
+  static const String _version = '1.2.0';
 }
 
 /// Общая оболочка страницы раздела: крупный заголовок и кнопка назад.

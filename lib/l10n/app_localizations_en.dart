@@ -632,7 +632,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hideAiNote =>
-      'Removes tracks with an explicit AI mark in the title or artist (AI, Suno, Udio, neural network). The Yandex API has no official label yet.';
+      'Uses the Slopless artist list (GitHub) plus explicit AI marks in titles and artists. The list is downloaded over the network; the Yandex API has no official label.';
 
   @override
   String get artworkShape => 'Player artwork';
@@ -670,13 +670,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Volume ramps up on start and down on pause, seek and track change.';
 
   @override
+  String get censorBypass => 'Uncensored version';
+
+  @override
+  String get censorBypassNote =>
+      'Replace tracks from the FckCensorData base (GitHub) with their uncensored version. The base is downloaded over the network; if a file is missing, the Yandex version plays.';
+
+  @override
   String get settingsReset => 'Reset settings';
 
   @override
   String get settingsResetDone => 'Settings are back to defaults';
 
   @override
-  String get settingsLyricsSource => 'Lyrics source: LRCLIB';
+  String get settingsLyricsSource => 'Lyrics source: LRCLIB + Yandex';
 
   @override
   String get settingsLyricsSourceNote =>
@@ -823,7 +830,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutSourcesNote =>
-      'Yandex Music for catalog, streams and the wave; YouTube for search and streams; local files from the Music folder. Lyrics: LRCLIB and lyrics.ovh.';
+      'Yandex Music for catalog, streams and the wave; YouTube for search and streams; local files from the Music folder. Lyrics: LRCLIB, official Yandex text and lyrics.ovh.';
 
   @override
   String get authTitle => 'Sign in to Yandex';

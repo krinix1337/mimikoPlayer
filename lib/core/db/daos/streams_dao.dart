@@ -18,11 +18,12 @@ class StreamsDao implements ResolutionStore {
 
   @override
   Future<String?> downloadedFilePath(String localTrackId) async {
-    final row = await (_db.select(_db.downloadedFiles)
-          ..where((t) => t.localTrackId.equals(localTrackId))
-          ..where((t) => t.state.equals('complete'))
-          ..limit(1))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.downloadedFiles)
+              ..where((t) => t.localTrackId.equals(localTrackId))
+              ..where((t) => t.state.equals('complete'))
+              ..limit(1))
+            .getSingleOrNull();
     if (row == null) return null;
     return await File(row.filePath).exists() ? row.filePath : null;
   }
@@ -68,26 +69,25 @@ class StreamsDao implements ResolutionStore {
   /// загрузке с UNIQUE constraint; здесь заменяем строку явно.
   Future<void> _replaceDownload(DownloadedFilesCompanion row) =>
       _db.transaction(() async {
-        await (_db.delete(_db.downloadedFiles)
-              ..where((t) => t.localTrackId.equals(row.localTrackId.value)))
-            .go();
+        await (_db.delete(
+          _db.downloadedFiles,
+        )..where((t) => t.localTrackId.equals(row.localTrackId.value))).go();
         await _db.into(_db.downloadedFiles).insert(row);
       });
 
   Future<void> markDownloadFailed(String localTrackId, String error) =>
-      (_db.update(_db.downloadedFiles)
-            ..where((t) => t.localTrackId.equals(localTrackId)))
-          .write(
-            DownloadedFilesCompanion(
-              state: const Value('failed'),
-              errorText: Value(error),
-            ),
-          );
+      (_db.update(
+        _db.downloadedFiles,
+      )..where((t) => t.localTrackId.equals(localTrackId))).write(
+        DownloadedFilesCompanion(
+          state: const Value('failed'),
+          errorText: Value(error),
+        ),
+      );
 
-  Future<void> removeDownload(String localTrackId) =>
-      (_db.delete(_db.downloadedFiles)
-            ..where((t) => t.localTrackId.equals(localTrackId)))
-          .go();
+  Future<void> removeDownload(String localTrackId) => (_db.delete(
+    _db.downloadedFiles,
+  )..where((t) => t.localTrackId.equals(localTrackId))).go();
 
   Future<int> downloadedBytes() async {
     final rows = await _db.select(_db.downloadedFiles).get();
@@ -100,12 +100,13 @@ class StreamsDao implements ResolutionStore {
     SourceId source,
     Quality quality,
   ) async {
-    final row = await (_db.select(_db.streamResolutions)
-          ..where((t) => t.localTrackId.equals(localTrackId))
-          ..where((t) => t.source.equals(source.wire))
-          ..where((t) => t.quality.equals(quality.wire))
-          ..limit(1))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.streamResolutions)
+              ..where((t) => t.localTrackId.equals(localTrackId))
+              ..where((t) => t.source.equals(source.wire))
+              ..where((t) => t.quality.equals(quality.wire))
+              ..limit(1))
+            .getSingleOrNull();
     if (row == null) return null;
 
     final target = row.targetKind == 'file'
@@ -130,43 +131,49 @@ class StreamsDao implements ResolutionStore {
   @override
   Future<void> put(ResolvedPlayback playback) {
     final target = playback.target;
-    return _db.into(_db.streamResolutions).insertOnConflictUpdate(
-      StreamResolutionsCompanion.insert(
-        localTrackId: playback.localTrackId,
-        source: playback.usedSource.wire,
-        quality: playback.quality.wire,
-        url: target is StreamUrl ? target.url.toString() : '',
-        headersJson: Value(
-          jsonEncode(target is StreamUrl ? target.headers : const {}),
-        ),
-        targetKind: Value(target is StreamFile ? 'file' : 'url'),
-        filePath: Value(target is StreamFile ? target.path : null),
-        expiresAt: playback.expiresAt,
-      ),
-    );
+    return _db
+        .into(_db.streamResolutions)
+        .insertOnConflictUpdate(
+          StreamResolutionsCompanion.insert(
+            localTrackId: playback.localTrackId,
+            source: playback.usedSource.wire,
+            quality: playback.quality.wire,
+            url: target is StreamUrl ? target.url.toString() : '',
+            headersJson: Value(
+              jsonEncode(target is StreamUrl ? target.headers : const {}),
+            ),
+            targetKind: Value(target is StreamFile ? 'file' : 'url'),
+            filePath: Value(target is StreamFile ? target.path : null),
+            expiresAt: playback.expiresAt,
+          ),
+        );
   }
 
   @override
   Future<void> invalidate(String localTrackId, SourceId source) =>
-      (_db.delete(_db.streamResolutions)
-            ..where(
-              (t) =>
-                  t.localTrackId.equals(localTrackId) &
-                  t.source.equals(source.wire),
-            ))
+      (_db.delete(_db.streamResolutions)..where(
+            (t) =>
+                t.localTrackId.equals(localTrackId) &
+                t.source.equals(source.wire),
+          ))
           .go();
+
+  /// После смены режима цензуры старые подписанные ссылки не должны
+  /// перекрывать новый выбор.
+  Future<void> clearResolutions() => _db.delete(_db.streamResolutions).go();
 
   @override
   Future<SourceFailReason?> activeFailure(
     String localTrackId,
     SourceId source,
   ) async {
-    final row = await (_db.select(_db.trackFailures)
-          ..where((t) => t.localTrackId.equals(localTrackId))
-          ..where((t) => t.source.equals(source.wire))
-          ..where((t) => t.expiresAt.isBiggerThanValue(DateTime.now()))
-          ..limit(1))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.trackFailures)
+              ..where((t) => t.localTrackId.equals(localTrackId))
+              ..where((t) => t.source.equals(source.wire))
+              ..where((t) => t.expiresAt.isBiggerThanValue(DateTime.now()))
+              ..limit(1))
+            .getSingleOrNull();
     if (row == null) return null;
     return SourceFailReason.values.firstWhere(
       (e) => e.name == row.reason,
@@ -180,37 +187,36 @@ class StreamsDao implements ResolutionStore {
     if (ttl == Duration.zero) {
       // Причину вроде signatureRejected кэшировать нельзя: после починки ключа
       // трек должен сразу снова пробоваться.
-      await (_db.delete(_db.trackFailures)
-            ..where(
-              (t) =>
-                  t.localTrackId.equals(localTrackId) &
-                  t.source.equals(failure.source.wire),
-            ))
+      await (_db.delete(_db.trackFailures)..where(
+            (t) =>
+                t.localTrackId.equals(localTrackId) &
+                t.source.equals(failure.source.wire),
+          ))
           .go();
       return;
     }
     final now = DateTime.now();
-    await _db.into(_db.trackFailures).insertOnConflictUpdate(
-      TrackFailuresCompanion.insert(
-        localTrackId: localTrackId,
-        source: failure.source.wire,
-        reason: failure.reason.name,
-        httpStatus: Value(failure.httpStatus),
-        note: Value(failure.message),
-        firstFailedAt: Value(now),
-        lastFailedAt: Value(now),
-        expiresAt: now.add(ttl),
-      ),
-    );
+    await _db
+        .into(_db.trackFailures)
+        .insertOnConflictUpdate(
+          TrackFailuresCompanion.insert(
+            localTrackId: localTrackId,
+            source: failure.source.wire,
+            reason: failure.reason.name,
+            httpStatus: Value(failure.httpStatus),
+            note: Value(failure.message),
+            firstFailedAt: Value(now),
+            lastFailedAt: Value(now),
+            expiresAt: now.add(ttl),
+          ),
+        );
   }
 
   static Map<String, String> _decodeHeaders(String json) {
     try {
       final decoded = jsonDecode(json);
       if (decoded is Map) {
-        return {
-          for (final e in decoded.entries) '${e.key}': '${e.value}',
-        };
+        return {for (final e in decoded.entries) '${e.key}': '${e.value}'};
       }
     } on FormatException {
       // Побитый JSON = нет заголовков, а не падение плеера.

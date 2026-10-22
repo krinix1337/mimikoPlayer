@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'core/db/database.dart';
+import 'core/content/ai_filter.dart';
+import 'core/content/censor_base.dart';
 import 'core/prefs/prefs_store.dart';
 import 'core/sources/registry.dart';
 import 'core/sources/stream_resolver.dart';
@@ -50,6 +54,22 @@ class AppServices {
     defaultQuality = Quality.fromWire(prefs.quality);
     fadeEnabled = prefs.fade;
     hideAiTracks = prefs.hideAiTracks;
+    CensorBase.instance.enabled = prefs.censorBypass;
+    if (hideAiTracks) {
+      // Список большой и ходит в сеть; грузим после первого кадра.
+      unawaited(AiFilter.instance.ensureLoaded());
+    }
+    if (prefs.censorBypass) {
+      // Один раз после обновления сбрасываем старые ссылки: в них мог быть
+      // заголовок, из-за которого just_audio шёл через запрещённый локальный
+      // HTTP-прокси.
+      final marker = await db.settingsDao.value('censor_cache_v2');
+      if (marker == null) {
+        await db.streamsDao.clearResolutions();
+        await db.settingsDao.setValue('censor_cache_v2', '1');
+      }
+      unawaited(CensorBase.instance.ensureLoaded());
+    }
   }
 
   /// Восстановление аккаунта ходит в сеть, поэтому запускается уже после

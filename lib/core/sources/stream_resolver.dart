@@ -219,8 +219,10 @@ final class StreamResolver {
   }
 
   ResolvedPlayback _pin(String localTrackId, StreamReady ready) {
-    final shortest = [ready.ttlHint ?? streamTtlMax, defaultStreamTtl]
-        .reduce((a, b) => a.compareTo(b) < 0 ? a : b);
+    final shortest = [
+      ready.ttlHint ?? streamTtlMax,
+      defaultStreamTtl,
+    ].reduce((a, b) => a.compareTo(b) < 0 ? a : b);
     final ttl = shortest.compareTo(streamTtlMax) > 0 ? streamTtlMax : shortest;
 
     return ResolvedPlayback(
@@ -239,16 +241,20 @@ final class StreamResolver {
     }
   }
 
+  /// Сброс памяти при смене режима цензуры: иначе закэшированная ссылка
+  /// продолжит играть после переключателя.
+  void clearMemoryCache() {
+    _lru.clear();
+    _inFlight.clear();
+  }
+
   /// Только резолв, без аудио-I/O: вызывается на старте трека N для N+1.
   Future<void> prefetch({
     required String localTrackId,
     required List<SourceTrack> variants,
     Quality quality = Quality.auto,
-  }) => resolve(
-    localTrackId: localTrackId,
-    variants: variants,
-    quality: quality,
-  );
+  }) =>
+      resolve(localTrackId: localTrackId, variants: variants, quality: quality);
 
   /// Self-heal: 401/403 от хранилища означает протухшую подпись — сбрасываем
   /// кэш и в следующий раз подписываем заново.

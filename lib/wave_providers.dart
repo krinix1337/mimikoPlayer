@@ -23,15 +23,17 @@ class StationController extends Notifier<String> {
   void select(String station) => state = station;
 }
 
-final stationProvider =
-    NotifierProvider<StationController, String>(StationController.new);
+final stationProvider = NotifierProvider<StationController, String>(
+  StationController.new,
+);
 
 /// Название выбранной станции. Пустая строка — это «моя волна»: подпись
 /// берётся из локализации, потому что у станции нет собственного имени.
 final waveStationTitleProvider = Provider<String>((ref) {
   final id = ref.watch(stationProvider);
   if (id == WaveStationIds.myVibe) return '';
-  final stations = ref.watch(waveStationsProvider).value ?? const <WaveStation>[];
+  final stations =
+      ref.watch(waveStationsProvider).value ?? const <WaveStation>[];
   return stations.where((s) => s.id == id).firstOrNull?.title ?? id;
 });
 
@@ -45,11 +47,12 @@ final waveTracksProvider = FutureProvider<List<WaveTrack>>((ref) async {
 
   await source.warmUp();
   final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+  if (hideAi) await AiFilter.instance.ensureLoaded();
   final fetched = await source.station.waveMany(station: station);
   final tracks = hideAi
       ? [
           for (final track in fetched)
-            if (!AiFilter.matches(track.title, track.artists)) track,
+            if (!AiFilter.instance.isAiTrack(track)) track,
         ]
       : fetched;
   final ids = await services.db.tracksDao.ingestAll(tracks);
@@ -72,13 +75,12 @@ final waveSettingsProvider = FutureProvider<WaveSettings?>((ref) async {
 Future<bool> startWave(WidgetRef ref) async {
   final tracks = await ref.read(waveTracksProvider.future);
   if (tracks.isEmpty) return false;
-  await ref.read(playbackControllerProvider).playQueue(
-    [for (final track in tracks) track.localTrackId],
-    sourceHint: {
-      'kind': 'radio',
-      'station': ref.read(stationProvider),
-    },
-  );
+  await ref
+      .read(playbackControllerProvider)
+      .playQueue(
+        [for (final track in tracks) track.localTrackId],
+        sourceHint: {'kind': 'radio', 'station': ref.read(stationProvider)},
+      );
   return true;
 }
 

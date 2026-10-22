@@ -38,4 +38,7 @@ abstract interface class PlaybackController {
 
   /// Поставить трек сразу после текущего.
   Future<void> playNext(String localTrackId);
+
+  /// Перечитать «любимое» текущего трека после изменения из UI.
+  Future<void> refreshLikedState();
 }
