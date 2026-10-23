@@ -25,7 +25,8 @@ class FakeSource implements MusicSource {
   Quality? lastPreferred;
 
   @override
-  SourceCapabilities get capabilities => const SourceCapabilities(canStream: true, canSearch: true);
+  SourceCapabilities get capabilities =>
+      const SourceCapabilities(canStream: true, canSearch: true);
 
   @override
   AuthState get auth => AuthReady(
@@ -42,25 +43,37 @@ class FakeSource implements MusicSource {
   Future<void> warmUp() async => warmUpCalls++;
 
   @override
-  Future<StreamResult> resolveStream(SourceTrack track, {Quality preferred = Quality.auto}) async {
+  Future<StreamResult> resolveStream(
+    SourceTrack track, {
+    Quality preferred = Quality.auto,
+  }) async {
     resolveCalls++;
     lastPreferred = preferred;
     if (failures.isNotEmpty) {
       return StreamFailed(failures.removeAt(0));
     }
     return result ??
-        const StreamFailed(SourceFailure(source: SourceId.local, reason: SourceFailReason.notInCatalog));
+        const StreamFailed(
+          SourceFailure(
+            source: SourceId.local,
+            reason: SourceFailReason.notInCatalog,
+          ),
+        );
   }
 
   @override
-  Future<SearchResult> search(String query, {int page = 0, int pageSize = 50}) async =>
-      const SearchResult(tracks: [], page: 0);
+  Future<SearchResult> search(
+    String query, {
+    int page = 0,
+    int pageSize = 50,
+  }) async => const SearchResult(tracks: [], page: 0);
 
   @override
   Future<SourceTrack?> getTrack(RemoteTrackRef ref) async => null;
 
   @override
-  Future<List<SourceTrack>> getTracksByIds(List<RemoteTrackRef> refs) async => const [];
+  Future<List<SourceTrack>> getTracksByIds(List<RemoteTrackRef> refs) async =>
+      const [];
 
   @override
   Future<PlaylistSnapshot?> getPlaylist(String remotePlaylistId) async => null;
@@ -83,19 +96,29 @@ class FakeStore implements ResolutionStore {
   final List<String> invalidations = [];
   int putCalls = 0;
 
-  String _key(String track, String source, String quality) => '$track|$source|$quality';
+  String _key(String track, String source, String quality) =>
+      '$track|$source|$quality';
 
   @override
-  Future<String?> downloadedFilePath(String localTrackId) async => downloadedPath;
+  Future<String?> downloadedFilePath(String localTrackId) async =>
+      downloadedPath;
 
   @override
-  Future<ResolvedPlayback?> cached(String localTrackId, SourceId source, Quality quality) async =>
-      cache[_key(localTrackId, source.wire, quality.wire)];
+  Future<ResolvedPlayback?> cached(
+    String localTrackId,
+    SourceId source,
+    Quality quality,
+  ) async => cache[_key(localTrackId, source.wire, quality.wire)];
 
   @override
   Future<void> put(ResolvedPlayback playback) async {
     putCalls++;
-    cache[_key(playback.localTrackId, playback.usedSource.wire, playback.quality.wire)] = playback;
+    cache[_key(
+          playback.localTrackId,
+          playback.usedSource.wire,
+          playback.quality.wire,
+        )] =
+        playback;
   }
 
   @override
@@ -105,8 +128,10 @@ class FakeStore implements ResolutionStore {
   }
 
   @override
-  Future<SourceFailReason?> activeFailure(String localTrackId, SourceId source) async =>
-      failures['$localTrackId|${source.wire}'];
+  Future<SourceFailReason?> activeFailure(
+    String localTrackId,
+    SourceId source,
+  ) async => failures['$localTrackId|${source.wire}'];
 
   @override
   Future<void> noteFailure(String localTrackId, SourceFailure failure) async {
@@ -179,7 +204,10 @@ void main() {
 
   test('недоступный трек в первом источнике уводит во второй', () async {
     yandex.failures = [
-      const SourceFailure(source: SourceId.yandex, reason: SourceFailReason.unavailable),
+      const SourceFailure(
+        source: SourceId.yandex,
+        reason: SourceFailReason.unavailable,
+      ),
     ];
     youtube.result = readyUrl(SourceId.youtube);
 
@@ -190,23 +218,32 @@ void main() {
     expect(youtube.resolveCalls, 1);
   });
 
-  test('просроченный токен останавливает цепочку, второй источник не трогается', () async {
-    yandex.failures = [
-      const SourceFailure(source: SourceId.yandex, reason: SourceFailReason.authExpired),
-    ];
-    youtube.result = readyUrl(SourceId.youtube);
+  test(
+    'просроченный токен останавливает цепочку, второй источник не трогается',
+    () async {
+      yandex.failures = [
+        const SourceFailure(
+          source: SourceId.yandex,
+          reason: SourceFailReason.authExpired,
+        ),
+      ];
+      youtube.result = readyUrl(SourceId.youtube);
 
-    final result = await run();
+      final result = await run();
 
-    expect(result.isOk, isFalse);
-    expect(result.needsUserAction, isTrue);
-    expect(result.exhausted, isFalse);
-    expect(youtube.resolveCalls, 0);
-  });
+      expect(result.isOk, isFalse);
+      expect(result.needsUserAction, isTrue);
+      expect(result.exhausted, isFalse);
+      expect(youtube.resolveCalls, 0);
+    },
+  );
 
   test('needsPlus не останавливает цепочку, но требует действия', () async {
     yandex.failures = [
-      const SourceFailure(source: SourceId.yandex, reason: SourceFailReason.needsPlus),
+      const SourceFailure(
+        source: SourceId.yandex,
+        reason: SourceFailReason.needsPlus,
+      ),
     ];
     youtube.result = readyUrl(SourceId.youtube);
 
@@ -215,16 +252,19 @@ void main() {
     expect(result.playback?.usedSource, SourceId.youtube);
   });
 
-  test('второй успешный вызов берётся из кэша без обращения к источнику', () async {
-    yandex.result = readyUrl(SourceId.yandex);
+  test(
+    'второй успешный вызов берётся из кэша без обращения к источнику',
+    () async {
+      yandex.result = readyUrl(SourceId.yandex);
 
-    final first = await run();
-    final second = await run();
+      final first = await run();
+      final second = await run();
 
-    expect(first.playback?.fromCache, isFalse);
-    expect(second.playback?.fromCache, isTrue);
-    expect(yandex.resolveCalls, 1);
-  });
+      expect(first.playback?.fromCache, isFalse);
+      expect(second.playback?.fromCache, isTrue);
+      expect(yandex.resolveCalls, 1);
+    },
+  );
 
   test('протухший кэш переписывается, а не отдаётся', () async {
     yandex.result = readyUrl(SourceId.yandex, secondsToLive: 60);
@@ -249,7 +289,10 @@ void main() {
 
   test('отказ с нулевым TTL в негативный кэш не попадает', () async {
     yandex.failures = [
-      const SourceFailure(source: SourceId.yandex, reason: SourceFailReason.signatureRejected),
+      const SourceFailure(
+        source: SourceId.yandex,
+        reason: SourceFailReason.signatureRejected,
+      ),
     ];
     youtube.result = readyUrl(SourceId.youtube);
 
@@ -261,17 +304,26 @@ void main() {
 
   test('все отказали — exhausted и список причин', () async {
     yandex.failures = [
-      const SourceFailure(source: SourceId.yandex, reason: SourceFailReason.unavailable),
+      const SourceFailure(
+        source: SourceId.yandex,
+        reason: SourceFailReason.unavailable,
+      ),
     ];
     youtube.failures = [
-      const SourceFailure(source: SourceId.youtube, reason: SourceFailReason.geoBlocked),
+      const SourceFailure(
+        source: SourceId.youtube,
+        reason: SourceFailReason.geoBlocked,
+      ),
     ];
 
     final result = await run();
 
     expect(result.isOk, isFalse);
     expect(result.exhausted, isTrue);
-    expect(result.failures.map((f) => f.source), [SourceId.yandex, SourceId.youtube]);
+    expect(result.failures.map((f) => f.source), [
+      SourceId.yandex,
+      SourceId.youtube,
+    ]);
   });
 
   test('bypassCache сбрасывает хранилище и требует новой подписи', () async {

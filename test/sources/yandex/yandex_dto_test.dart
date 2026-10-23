@@ -14,7 +14,8 @@ const realTrackJson = {
   'availableForPremiumUsers': true,
   'explicit': false,
   'lyricsAvailable': true,
-  'coverUri': 'avatars.yandex.net/get-music-content/117546/c8c68f43.a.5901220-1/%%',
+  'coverUri':
+      'avatars.yandex.net/get-music-content/117546/c8c68f43.a.5901220-1/%%',
   'artists': [
     {'id': 79215, 'name': 'Queen'},
   ],
@@ -22,7 +23,8 @@ const realTrackJson = {
     {
       'id': 5901220,
       'title': 'Greatest Hits',
-      'coverUri': 'avatars.yandex.net/get-music-content/117546/c8c68f43.a.5901220-1/%%',
+      'coverUri':
+          'avatars.yandex.net/get-music-content/117546/c8c68f43.a.5901220-1/%%',
       'year': 2018,
     },
   ],

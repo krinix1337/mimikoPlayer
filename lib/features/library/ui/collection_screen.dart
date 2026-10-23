@@ -8,7 +8,6 @@ import '../../../core/prefs/prefs.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../theme/app_motion.dart';
-import '../../../wave_providers.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/track_cover.dart';
 
@@ -37,13 +36,17 @@ class CollectionScreen extends ConsumerWidget {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          SliverAppBar.large(
+          SliverAppBar(
             pinned: true,
-            // Без подложки крупный заголовок при прокрутке наезжает на
-            // обложки: прозрачная шапка у large-аппбара не самокрасится.
             backgroundColor: Theme.of(context).colorScheme.surface,
             title: Text(l.collectionTitle),
+            titleTextStyle: Theme.of(context).textTheme.headlineSmall,
             actions: [
+              IconButton(
+                tooltip: l.navSearch,
+                icon: const Icon(Icons.search_rounded),
+                onPressed: () => context.push(Routes.search),
+              ),
               IconButton(
                 tooltip: l.collectionSort,
                 icon: const Icon(Icons.swap_vert_rounded),
@@ -61,15 +64,14 @@ class CollectionScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                RiseIn(child: const _WaveBanner()),
-                const SizedBox(height: 20),
+                const SizedBox(height: 8),
                 RiseIn(
                   delay: const Duration(milliseconds: 40),
                   child: _BigSection(
                     title: l.collectionLiked,
                     count: likedRows.length,
                     icon: Icons.favorite_rounded,
-                    iconTint: true,
+                    covers: likedRows,
                     onTap: () => context.push(Routes.collectionLiked),
                     onPlay: likedRows.isEmpty
                         ? null
@@ -115,16 +117,15 @@ class CollectionScreen extends ConsumerWidget {
     final l = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final services = ref.read(appServicesProvider);
+    final source = ref.read(yandexSourceProvider);
 
     try {
-      final likes = await importYandexLikes(
-        source: ref.read(yandexSourceProvider),
-        db: services.db,
-      );
+      final likes = await importYandexLikes(source: source, db: services.db);
       final lists = await importYandexPlaylists(
-        source: ref.read(yandexSourceProvider),
+        source: source,
         db: services.db,
       );
+      if (!ref.context.mounted) return;
       ref.invalidate(collectionProvider);
       ref.invalidate(playlistsProvider);
       messenger.showSnackBar(
@@ -142,78 +143,17 @@ class CollectionScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _playAll(WidgetRef ref, List<CollectionRow> rows, CollectionKind kind) async {
-    await ref.read(playbackControllerProvider).playQueue(
-      [for (final row in rows) row.localTrackId],
-      sourceHint: {'kind': kind.name},
-    );
-  }
-}
-
-/// Баннер «моя волна» — запускает реальную станцию, ничего не имитирует.
-class _WaveBanner extends ConsumerWidget {
-  const _WaveBanner();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final title = ref.watch(waveStationTitleProvider);
-    final stationTitle = title.isEmpty ? l.waveTitle : title;
-
-    Future<void> start(BuildContext context) async {
-      if (await startWave(ref) && context.mounted) context.push(Routes.player);
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-      child: PressableScale(
-        onTap: () => start(context),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                scheme.primaryContainer,
-                scheme.secondaryContainer,
-                scheme.surfaceContainerHigh,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(
-              Motion.of(context).prefs.corner.radius + 6,
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l.navWave,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      stationTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.headlineSmall,
-                    ),
-                  ],
-                ),
-              ),
-              _RoundPlay(size: 52, onTap: () => start(context)),
-            ],
-          ),
-        ),
-      ),
-    );
+  Future<void> _playAll(
+    WidgetRef ref,
+    List<CollectionRow> rows,
+    CollectionKind kind,
+  ) async {
+    await ref
+        .read(playbackControllerProvider)
+        .playQueue(
+          [for (final row in rows) row.localTrackId],
+          sourceHint: {'kind': kind.name},
+        );
   }
 }
 
@@ -276,29 +216,35 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-/// Крупная строка раздела: иконка-обложка, название, счётчик, кнопка play.
+/// Крупная строка раздела: обложка-мозаика, название, счётчик, кнопка play.
 class _BigSection extends StatelessWidget {
   const _BigSection({
     required this.title,
     required this.count,
     required this.icon,
+    required this.covers,
     required this.onTap,
     this.onPlay,
-    this.iconTint = false,
   });
 
   final String title;
   final int? count;
   final IconData icon;
+  final List<CollectionRow> covers;
   final VoidCallback onTap;
   final VoidCallback? onPlay;
-  final bool iconTint;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l = AppLocalizations.of(context);
+    final urls = covers
+        .map((row) => row.coverPath ?? row.coverUrl)
+        .whereType<String>()
+        .take(4)
+        .toList();
+    final radius = Motion.of(context).prefs.corner.radius * 0.6;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -309,27 +255,47 @@ class _BigSection extends StatelessWidget {
             Container(
               width: 84,
               height: 84,
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                gradient: iconTint
-                    ? LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          scheme.primary.withValues(alpha: 0.85),
-                          scheme.tertiary.withValues(alpha: 0.6),
-                        ],
-                      )
-                    : null,
-                color: iconTint ? null : scheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(
-                  Motion.of(context).prefs.corner.radius * 0.6,
-                ),
+                color: scheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(radius),
               ),
-              child: Icon(
-                icon,
-                size: 40,
-                color: iconTint ? scheme.onPrimary : scheme.onSurfaceVariant,
-              ),
+              child: urls.isEmpty
+                  ? DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            scheme.primary.withValues(alpha: 0.85),
+                            scheme.tertiary.withValues(alpha: 0.6),
+                          ],
+                        ),
+                      ),
+                      child: Icon(icon, size: 40, color: scheme.onPrimary),
+                    )
+                  : Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _BigCoverMosaic(covers: urls),
+                        Positioned(
+                          right: 4,
+                          bottom: 4,
+                          child: Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: scheme.surface.withValues(alpha: 0.82),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.18),
+                              ),
+                            ),
+                            child: Icon(icon, size: 15, color: scheme.primary),
+                          ),
+                        ),
+                      ],
+                    ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -345,12 +311,37 @@ class _BigSection extends StatelessWidget {
                 ],
               ),
             ),
-            if (onPlay != null)
-              _RoundPlay(size: 48, onTap: onPlay!),
+            if (onPlay != null) _RoundPlay(size: 48, onTap: onPlay!),
             const SizedBox(width: 4),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Мозаика 2×2 из обложек раздела, как обложка «Мне нравится» в Яндексе.
+class _BigCoverMosaic extends StatelessWidget {
+  const _BigCoverMosaic({required this.covers});
+
+  final List<String> covers;
+
+  @override
+  Widget build(BuildContext context) {
+    if (covers.length == 1) {
+      return TrackCover(url: covers.first, size: double.infinity, radius: 0);
+    }
+    final empty = Theme.of(context).colorScheme.surfaceContainerHighest;
+    Widget cell(int index) => Expanded(
+      child: covers.length > index
+          ? TrackCover(url: covers[index], size: double.infinity, radius: 0)
+          : ColoredBox(color: empty),
+    );
+    return Column(
+      children: [
+        Expanded(child: Row(children: [cell(0), cell(1)])),
+        Expanded(child: Row(children: [cell(2), cell(3)])),
+      ],
     );
   }
 }
@@ -384,7 +375,11 @@ class _RecentCarousel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TrackCover(url: row.coverUrl, size: 118, radius: 18),
+                  TrackCover(
+                    url: row.coverPath ?? row.coverUrl,
+                    size: 118,
+                    radius: 18,
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     row.title,
@@ -414,11 +409,13 @@ class _RecentCarousel extends StatelessWidget {
   ) {
     final router = GoRouter.of(context);
     final ref = ProviderScope.containerOf(context);
-    ref.read(playbackControllerProvider).playQueue(
-      [for (final item in rows) item.localTrackId],
-      startIndex: rows.indexOf(row),
-      sourceHint: {'kind': 'library'},
-    );
+    ref
+        .read(playbackControllerProvider)
+        .playQueue(
+          [for (final item in rows) item.localTrackId],
+          startIndex: rows.indexOf(row),
+          sourceHint: {'kind': 'library'},
+        );
     router.push(Routes.player);
   }
 }
@@ -458,39 +455,36 @@ class _ArtistStrip extends StatelessWidget {
                   ? () => context.push(Routes.artistFor(artist.remoteId))
                   : null,
               child: Column(
-              children: [
-                ClipOval(
-                  child: SizedBox(
-                    width: 96,
-                    height: 96,
-                    child: artist.coverUrl == null
-                        ? ColoredBox(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            child: Icon(
-                              Icons.person_rounded,
-                              size: 40,
-                              color: theme.colorScheme.onSurfaceVariant,
+                children: [
+                  ClipOval(
+                    child: SizedBox(
+                      width: 96,
+                      height: 96,
+                      child: artist.coverUrl == null
+                          ? ColoredBox(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              child: Icon(
+                                Icons.person_rounded,
+                                size: 40,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            )
+                          : TrackCover(
+                              url: artist.coverUrl,
+                              size: 96,
+                              radius: 48,
                             ),
-                          )
-                        : TrackCover(
-                            url: artist.coverUrl,
-                            size: 96,
-                            radius: 48,
-                          ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  artist.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium,
-                ),
-                Text(
-                  _listened(l, artist),
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
+                  const SizedBox(height: 6),
+                  Text(
+                    artist.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  Text(_listened(l, artist), style: theme.textTheme.bodySmall),
+                ],
               ),
             ),
           );
@@ -519,43 +513,37 @@ class _AlsoInGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final tiles = [
-        (
-          title: l.collectionPlaylists,
-          count: playlists,
-          icon: Icons.queue_music_rounded,
-          route: Routes.collectionPlaylists,
-        ),
-        (
-          title: l.collectionFiles,
-          count: files,
-          icon: Icons.folder_rounded,
-          route: Routes.collectionFiles,
-        ),
-        (
-          title: l.collectionRecent,
-          count: recent,
-          icon: Icons.history_rounded,
-          route: Routes.collectionRecent,
-        ),
-        (
-          title: l.collectionDownloaded,
-          count: downloaded,
-          icon: Icons.offline_pin_rounded,
-          route: Routes.collectionDownloaded,
-        ),
-        (
-          title: l.collectionDisliked,
-          count: disliked,
-          icon: Icons.favorite_border_rounded,
-          route: Routes.collectionDisliked,
-        ),
-        (
-          title: l.chartOpen,
-          count: null,
-          icon: Icons.trending_up_rounded,
-          route: Routes.chart,
-        ),
-      ];
+      (
+        title: l.collectionPlaylists,
+        count: playlists,
+        icon: Icons.queue_music_rounded,
+        route: Routes.collectionPlaylists,
+      ),
+      (
+        title: l.collectionFiles,
+        count: files,
+        icon: Icons.folder_rounded,
+        route: Routes.collectionFiles,
+      ),
+      (
+        title: l.collectionRecent,
+        count: recent,
+        icon: Icons.history_rounded,
+        route: Routes.collectionRecent,
+      ),
+      (
+        title: l.collectionDownloaded,
+        count: downloaded,
+        icon: Icons.offline_pin_rounded,
+        route: Routes.collectionDownloaded,
+      ),
+      (
+        title: l.collectionDisliked,
+        count: disliked,
+        icon: Icons.favorite_border_rounded,
+        route: Routes.collectionDisliked,
+      ),
+    ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -621,8 +609,7 @@ class _GridTile extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.titleMedium,
             ),
-            if (count != null)
-              Text('$count', style: theme.textTheme.bodySmall),
+            if (count != null) Text('$count', style: theme.textTheme.bodySmall),
           ],
         ),
       ),
@@ -652,7 +639,10 @@ Future<void> showSortSheet(BuildContext context, WidgetRef ref) {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: Text(l.collectionSort, style: Theme.of(context).textTheme.titleLarge),
+            child: Text(
+              l.collectionSort,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
           for (final sort in CollectionSort.values)
             ListTile(

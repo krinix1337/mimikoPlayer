@@ -46,7 +46,7 @@ class CensorBase {
       followRedirects: true,
       validateStatus: (status) => status == 200 || status == 206,
       headers: const {
-        'User-Agent': 'mimikoPlayer/1.2.1 (+github.com/krinix1337)',
+        'User-Agent': 'mimikoPlayer/1.2.2 (+github.com/krinix1337)',
       },
     ),
   );

@@ -66,7 +66,8 @@ class MimikoPlatform {
 
   static Future<bool> setLauncherIcon(String component) async {
     try {
-      return await _channel.invokeMethod<bool>('setLauncherIcon', component) ?? false;
+      return await _channel.invokeMethod<bool>('setLauncherIcon', component) ??
+          false;
     } on PlatformException catch (error) {
       AppLogger.instance.warn('значок сменить не вышло: ${error.message}');
       return false;
@@ -74,6 +75,55 @@ class MimikoPlatform {
       return false;
     }
   }
+
+  /// Свободные байты на разделе данных; 0 — канал недоступен.
+  static Future<int> freeBytes() async {
+    try {
+      return await _channel.invokeMethod<int>('freeBytes') ?? 0;
+    } on PlatformException catch (error) {
+      AppLogger.instance.warn(
+        'свободное место прочитать не вышло: ${error.message}',
+      );
+      return 0;
+    } on MissingPluginException {
+      return 0;
+    }
+  }
+
+  static Future<NetworkStatus> networkStatus() async {
+    try {
+      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'networkStatus',
+      );
+      return NetworkStatus(
+        connected: raw?['connected'] == true,
+        wifi: raw?['wifi'] == true,
+        unmetered: raw?['unmetered'] == true,
+        vpn: raw?['vpn'] == true,
+      );
+    } on PlatformException catch (error) {
+      AppLogger.instance.warn('сеть прочитать не вышло: ${error.message}');
+      return const NetworkStatus();
+    } on MissingPluginException {
+      return const NetworkStatus();
+    }
+  }
+}
+
+final class NetworkStatus {
+  const NetworkStatus({
+    this.connected = false,
+    this.wifi = false,
+    this.unmetered = false,
+    this.vpn = false,
+  });
+
+  final bool connected;
+  final bool wifi;
+  final bool unmetered;
+  final bool vpn;
+
+  bool get canAutoDownload => connected && (wifi || unmetered);
 }
 
 final class LocalMediaInfo {
@@ -92,5 +142,9 @@ final class LocalMediaInfo {
   final Uint8List? art;
 
   bool get isEmpty =>
-      title == null && artist == null && album == null && durationMs == 0 && art == null;
+      title == null &&
+      artist == null &&
+      album == null &&
+      durationMs == 0 &&
+      art == null;
 }

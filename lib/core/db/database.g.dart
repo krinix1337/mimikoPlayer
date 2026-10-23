@@ -2573,7 +2573,7 @@ class $RemoteIdMappingsTable extends RemoteIdMappings
 class RemoteIdMapping extends DataClass implements Insertable<RemoteIdMapping> {
   final String source;
 
-  /// already с [RemoteTrackRef.mappingKey]: у Яндекса `trackId-albumId`.
+  /// Идентификатор ровно в терминах источника: у Яндекса голое число трека.
   final String remoteId;
   final String? albumRemoteId;
   final String localTrackId;
@@ -3851,7 +3851,7 @@ class $PlaylistTracksTable extends PlaylistTracks
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {playlistId, localTrackId};
+  Set<GeneratedColumn> get $primaryKey => {playlistId, position};
   @override
   PlaylistTrack map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -4847,7 +4847,7 @@ class HistoryData extends DataClass implements Insertable<HistoryData> {
   final String localTrackId;
   final DateTime playedAt;
 
-  /// Сколько реально прослушано — нужно дляRotor feedback и вытеснения офлайна.
+  /// Сколько реально прослушано — нужно для rotor feedback и вытеснения офлайна.
   final int playedMs;
   final bool completed;
   final String source;
@@ -7032,6 +7032,27 @@ class $DownloadedFilesTable extends DownloadedFiles
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _originMeta = const VerificationMeta('origin');
+  @override
+  late final GeneratedColumn<String> origin = GeneratedColumn<String>(
+    'origin',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('manual'),
+  );
+  static const VerificationMeta _coverPathMeta = const VerificationMeta(
+    'coverPath',
+  );
+  @override
+  late final GeneratedColumn<String> coverPath = GeneratedColumn<String>(
+    'cover_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _stateMeta = const VerificationMeta('state');
   @override
   late final GeneratedColumn<String> state = GeneratedColumn<String>(
@@ -7091,6 +7112,8 @@ class $DownloadedFilesTable extends DownloadedFiles
     sizeBytes,
     quality,
     codec,
+    origin,
+    coverPath,
     state,
     source,
     errorText,
@@ -7147,6 +7170,18 @@ class $DownloadedFilesTable extends DownloadedFiles
       context.handle(
         _codecMeta,
         codec.isAcceptableOrUnknown(data['codec']!, _codecMeta),
+      );
+    }
+    if (data.containsKey('origin')) {
+      context.handle(
+        _originMeta,
+        origin.isAcceptableOrUnknown(data['origin']!, _originMeta),
+      );
+    }
+    if (data.containsKey('cover_path')) {
+      context.handle(
+        _coverPathMeta,
+        coverPath.isAcceptableOrUnknown(data['cover_path']!, _coverPathMeta),
       );
     }
     if (data.containsKey('state')) {
@@ -7221,6 +7256,14 @@ class $DownloadedFilesTable extends DownloadedFiles
         DriftSqlType.string,
         data['${effectivePrefix}codec'],
       ),
+      origin: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin'],
+      )!,
+      coverPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cover_path'],
+      ),
       state: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}state'],
@@ -7258,6 +7301,12 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
   final String quality;
   final String? codec;
 
+  /// manual | auto — ручная загрузка или автозагрузка лайков.
+  final String origin;
+
+  /// Локальная копия обложки; без неё «Скачанное» пустеет офлайн.
+  final String? coverPath;
+
   /// pending | downloading | complete | failed
   final String state;
   final String source;
@@ -7273,6 +7322,8 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
     required this.sizeBytes,
     required this.quality,
     this.codec,
+    required this.origin,
+    this.coverPath,
     required this.state,
     required this.source,
     this.errorText,
@@ -7289,6 +7340,10 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
     map['quality'] = Variable<String>(quality);
     if (!nullToAbsent || codec != null) {
       map['codec'] = Variable<String>(codec);
+    }
+    map['origin'] = Variable<String>(origin);
+    if (!nullToAbsent || coverPath != null) {
+      map['cover_path'] = Variable<String>(coverPath);
     }
     map['state'] = Variable<String>(state);
     map['source'] = Variable<String>(source);
@@ -7312,6 +7367,10 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
       codec: codec == null && nullToAbsent
           ? const Value.absent()
           : Value(codec),
+      origin: Value(origin),
+      coverPath: coverPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coverPath),
       state: Value(state),
       source: Value(source),
       errorText: errorText == null && nullToAbsent
@@ -7334,6 +7393,8 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
       sizeBytes: serializer.fromJson<int>(json['sizeBytes']),
       quality: serializer.fromJson<String>(json['quality']),
       codec: serializer.fromJson<String?>(json['codec']),
+      origin: serializer.fromJson<String>(json['origin']),
+      coverPath: serializer.fromJson<String?>(json['coverPath']),
       state: serializer.fromJson<String>(json['state']),
       source: serializer.fromJson<String>(json['source']),
       errorText: serializer.fromJson<String?>(json['errorText']),
@@ -7351,6 +7412,8 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
       'sizeBytes': serializer.toJson<int>(sizeBytes),
       'quality': serializer.toJson<String>(quality),
       'codec': serializer.toJson<String?>(codec),
+      'origin': serializer.toJson<String>(origin),
+      'coverPath': serializer.toJson<String?>(coverPath),
       'state': serializer.toJson<String>(state),
       'source': serializer.toJson<String>(source),
       'errorText': serializer.toJson<String?>(errorText),
@@ -7366,6 +7429,8 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
     int? sizeBytes,
     String? quality,
     Value<String?> codec = const Value.absent(),
+    String? origin,
+    Value<String?> coverPath = const Value.absent(),
     String? state,
     String? source,
     Value<String?> errorText = const Value.absent(),
@@ -7378,6 +7443,8 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
     sizeBytes: sizeBytes ?? this.sizeBytes,
     quality: quality ?? this.quality,
     codec: codec.present ? codec.value : this.codec,
+    origin: origin ?? this.origin,
+    coverPath: coverPath.present ? coverPath.value : this.coverPath,
     state: state ?? this.state,
     source: source ?? this.source,
     errorText: errorText.present ? errorText.value : this.errorText,
@@ -7394,6 +7461,8 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
       sizeBytes: data.sizeBytes.present ? data.sizeBytes.value : this.sizeBytes,
       quality: data.quality.present ? data.quality.value : this.quality,
       codec: data.codec.present ? data.codec.value : this.codec,
+      origin: data.origin.present ? data.origin.value : this.origin,
+      coverPath: data.coverPath.present ? data.coverPath.value : this.coverPath,
       state: data.state.present ? data.state.value : this.state,
       source: data.source.present ? data.source.value : this.source,
       errorText: data.errorText.present ? data.errorText.value : this.errorText,
@@ -7413,6 +7482,8 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
           ..write('sizeBytes: $sizeBytes, ')
           ..write('quality: $quality, ')
           ..write('codec: $codec, ')
+          ..write('origin: $origin, ')
+          ..write('coverPath: $coverPath, ')
           ..write('state: $state, ')
           ..write('source: $source, ')
           ..write('errorText: $errorText, ')
@@ -7430,6 +7501,8 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
     sizeBytes,
     quality,
     codec,
+    origin,
+    coverPath,
     state,
     source,
     errorText,
@@ -7446,6 +7519,8 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
           other.sizeBytes == this.sizeBytes &&
           other.quality == this.quality &&
           other.codec == this.codec &&
+          other.origin == this.origin &&
+          other.coverPath == this.coverPath &&
           other.state == this.state &&
           other.source == this.source &&
           other.errorText == this.errorText &&
@@ -7460,6 +7535,8 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
   final Value<int> sizeBytes;
   final Value<String> quality;
   final Value<String?> codec;
+  final Value<String> origin;
+  final Value<String?> coverPath;
   final Value<String> state;
   final Value<String> source;
   final Value<String?> errorText;
@@ -7472,6 +7549,8 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
     this.sizeBytes = const Value.absent(),
     this.quality = const Value.absent(),
     this.codec = const Value.absent(),
+    this.origin = const Value.absent(),
+    this.coverPath = const Value.absent(),
     this.state = const Value.absent(),
     this.source = const Value.absent(),
     this.errorText = const Value.absent(),
@@ -7485,6 +7564,8 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
     this.sizeBytes = const Value.absent(),
     this.quality = const Value.absent(),
     this.codec = const Value.absent(),
+    this.origin = const Value.absent(),
+    this.coverPath = const Value.absent(),
     this.state = const Value.absent(),
     required String source,
     this.errorText = const Value.absent(),
@@ -7500,6 +7581,8 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
     Expression<int>? sizeBytes,
     Expression<String>? quality,
     Expression<String>? codec,
+    Expression<String>? origin,
+    Expression<String>? coverPath,
     Expression<String>? state,
     Expression<String>? source,
     Expression<String>? errorText,
@@ -7513,6 +7596,8 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
       if (sizeBytes != null) 'size_bytes': sizeBytes,
       if (quality != null) 'quality': quality,
       if (codec != null) 'codec': codec,
+      if (origin != null) 'origin': origin,
+      if (coverPath != null) 'cover_path': coverPath,
       if (state != null) 'state': state,
       if (source != null) 'source': source,
       if (errorText != null) 'error_text': errorText,
@@ -7528,6 +7613,8 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
     Value<int>? sizeBytes,
     Value<String>? quality,
     Value<String?>? codec,
+    Value<String>? origin,
+    Value<String?>? coverPath,
     Value<String>? state,
     Value<String>? source,
     Value<String?>? errorText,
@@ -7541,6 +7628,8 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
       sizeBytes: sizeBytes ?? this.sizeBytes,
       quality: quality ?? this.quality,
       codec: codec ?? this.codec,
+      origin: origin ?? this.origin,
+      coverPath: coverPath ?? this.coverPath,
       state: state ?? this.state,
       source: source ?? this.source,
       errorText: errorText ?? this.errorText,
@@ -7570,6 +7659,12 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
     if (codec.present) {
       map['codec'] = Variable<String>(codec.value);
     }
+    if (origin.present) {
+      map['origin'] = Variable<String>(origin.value);
+    }
+    if (coverPath.present) {
+      map['cover_path'] = Variable<String>(coverPath.value);
+    }
     if (state.present) {
       map['state'] = Variable<String>(state.value);
     }
@@ -7597,11 +7692,735 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
           ..write('sizeBytes: $sizeBytes, ')
           ..write('quality: $quality, ')
           ..write('codec: $codec, ')
+          ..write('origin: $origin, ')
+          ..write('coverPath: $coverPath, ')
           ..write('state: $state, ')
           ..write('source: $source, ')
           ..write('errorText: $errorText, ')
           ..write('sha1: $sha1, ')
           ..write('downloadedAt: $downloadedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DownloadTasksTable extends DownloadTasks
+    with TableInfo<$DownloadTasksTable, DownloadTask> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DownloadTasksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _localTrackIdMeta = const VerificationMeta(
+    'localTrackId',
+  );
+  @override
+  late final GeneratedColumn<String> localTrackId = GeneratedColumn<String>(
+    'local_track_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES tracks (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _stateMeta = const VerificationMeta('state');
+  @override
+  late final GeneratedColumn<String> state = GeneratedColumn<String>(
+    'state',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('queued'),
+  );
+  static const VerificationMeta _originMeta = const VerificationMeta('origin');
+  @override
+  late final GeneratedColumn<String> origin = GeneratedColumn<String>(
+    'origin',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('manual'),
+  );
+  static const VerificationMeta _priorityMeta = const VerificationMeta(
+    'priority',
+  );
+  @override
+  late final GeneratedColumn<int> priority = GeneratedColumn<int>(
+    'priority',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(10),
+  );
+  static const VerificationMeta _attemptsMeta = const VerificationMeta(
+    'attempts',
+  );
+  @override
+  late final GeneratedColumn<int> attempts = GeneratedColumn<int>(
+    'attempts',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _receivedBytesMeta = const VerificationMeta(
+    'receivedBytes',
+  );
+  @override
+  late final GeneratedColumn<int> receivedBytes = GeneratedColumn<int>(
+    'received_bytes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _totalBytesMeta = const VerificationMeta(
+    'totalBytes',
+  );
+  @override
+  late final GeneratedColumn<int> totalBytes = GeneratedColumn<int>(
+    'total_bytes',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _qualityMeta = const VerificationMeta(
+    'quality',
+  );
+  @override
+  late final GeneratedColumn<String> quality = GeneratedColumn<String>(
+    'quality',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastErrorMeta = const VerificationMeta(
+    'lastError',
+  );
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+    'last_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _nextAttemptAtMeta = const VerificationMeta(
+    'nextAttemptAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> nextAttemptAt =
+      GeneratedColumn<DateTime>(
+        'next_attempt_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    localTrackId,
+    state,
+    origin,
+    priority,
+    attempts,
+    receivedBytes,
+    totalBytes,
+    quality,
+    lastError,
+    nextAttemptAt,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'download_tasks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DownloadTask> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('local_track_id')) {
+      context.handle(
+        _localTrackIdMeta,
+        localTrackId.isAcceptableOrUnknown(
+          data['local_track_id']!,
+          _localTrackIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_localTrackIdMeta);
+    }
+    if (data.containsKey('state')) {
+      context.handle(
+        _stateMeta,
+        state.isAcceptableOrUnknown(data['state']!, _stateMeta),
+      );
+    }
+    if (data.containsKey('origin')) {
+      context.handle(
+        _originMeta,
+        origin.isAcceptableOrUnknown(data['origin']!, _originMeta),
+      );
+    }
+    if (data.containsKey('priority')) {
+      context.handle(
+        _priorityMeta,
+        priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
+      );
+    }
+    if (data.containsKey('attempts')) {
+      context.handle(
+        _attemptsMeta,
+        attempts.isAcceptableOrUnknown(data['attempts']!, _attemptsMeta),
+      );
+    }
+    if (data.containsKey('received_bytes')) {
+      context.handle(
+        _receivedBytesMeta,
+        receivedBytes.isAcceptableOrUnknown(
+          data['received_bytes']!,
+          _receivedBytesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('total_bytes')) {
+      context.handle(
+        _totalBytesMeta,
+        totalBytes.isAcceptableOrUnknown(data['total_bytes']!, _totalBytesMeta),
+      );
+    }
+    if (data.containsKey('quality')) {
+      context.handle(
+        _qualityMeta,
+        quality.isAcceptableOrUnknown(data['quality']!, _qualityMeta),
+      );
+    }
+    if (data.containsKey('last_error')) {
+      context.handle(
+        _lastErrorMeta,
+        lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
+      );
+    }
+    if (data.containsKey('next_attempt_at')) {
+      context.handle(
+        _nextAttemptAtMeta,
+        nextAttemptAt.isAcceptableOrUnknown(
+          data['next_attempt_at']!,
+          _nextAttemptAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {localTrackId};
+  @override
+  DownloadTask map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DownloadTask(
+      localTrackId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}local_track_id'],
+      )!,
+      state: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}state'],
+      )!,
+      origin: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin'],
+      )!,
+      priority: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}priority'],
+      )!,
+      attempts: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}attempts'],
+      )!,
+      receivedBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}received_bytes'],
+      )!,
+      totalBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}total_bytes'],
+      ),
+      quality: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}quality'],
+      ),
+      lastError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error'],
+      ),
+      nextAttemptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}next_attempt_at'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $DownloadTasksTable createAlias(String alias) {
+    return $DownloadTasksTable(attachedDatabase, alias);
+  }
+}
+
+class DownloadTask extends DataClass implements Insertable<DownloadTask> {
+  final String localTrackId;
+
+  /// queued | downloading | paused | failed | skipped | excluded
+  final String state;
+  final String origin;
+
+  /// Меньше — раньше; ручные задачи идут впереди автозагрузки.
+  final int priority;
+  final int attempts;
+  final int receivedBytes;
+  final int? totalBytes;
+  final String? quality;
+  final String? lastError;
+  final DateTime? nextAttemptAt;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const DownloadTask({
+    required this.localTrackId,
+    required this.state,
+    required this.origin,
+    required this.priority,
+    required this.attempts,
+    required this.receivedBytes,
+    this.totalBytes,
+    this.quality,
+    this.lastError,
+    this.nextAttemptAt,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['local_track_id'] = Variable<String>(localTrackId);
+    map['state'] = Variable<String>(state);
+    map['origin'] = Variable<String>(origin);
+    map['priority'] = Variable<int>(priority);
+    map['attempts'] = Variable<int>(attempts);
+    map['received_bytes'] = Variable<int>(receivedBytes);
+    if (!nullToAbsent || totalBytes != null) {
+      map['total_bytes'] = Variable<int>(totalBytes);
+    }
+    if (!nullToAbsent || quality != null) {
+      map['quality'] = Variable<String>(quality);
+    }
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
+    }
+    if (!nullToAbsent || nextAttemptAt != null) {
+      map['next_attempt_at'] = Variable<DateTime>(nextAttemptAt);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  DownloadTasksCompanion toCompanion(bool nullToAbsent) {
+    return DownloadTasksCompanion(
+      localTrackId: Value(localTrackId),
+      state: Value(state),
+      origin: Value(origin),
+      priority: Value(priority),
+      attempts: Value(attempts),
+      receivedBytes: Value(receivedBytes),
+      totalBytes: totalBytes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(totalBytes),
+      quality: quality == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quality),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
+      nextAttemptAt: nextAttemptAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextAttemptAt),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory DownloadTask.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DownloadTask(
+      localTrackId: serializer.fromJson<String>(json['localTrackId']),
+      state: serializer.fromJson<String>(json['state']),
+      origin: serializer.fromJson<String>(json['origin']),
+      priority: serializer.fromJson<int>(json['priority']),
+      attempts: serializer.fromJson<int>(json['attempts']),
+      receivedBytes: serializer.fromJson<int>(json['receivedBytes']),
+      totalBytes: serializer.fromJson<int?>(json['totalBytes']),
+      quality: serializer.fromJson<String?>(json['quality']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
+      nextAttemptAt: serializer.fromJson<DateTime?>(json['nextAttemptAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'localTrackId': serializer.toJson<String>(localTrackId),
+      'state': serializer.toJson<String>(state),
+      'origin': serializer.toJson<String>(origin),
+      'priority': serializer.toJson<int>(priority),
+      'attempts': serializer.toJson<int>(attempts),
+      'receivedBytes': serializer.toJson<int>(receivedBytes),
+      'totalBytes': serializer.toJson<int?>(totalBytes),
+      'quality': serializer.toJson<String?>(quality),
+      'lastError': serializer.toJson<String?>(lastError),
+      'nextAttemptAt': serializer.toJson<DateTime?>(nextAttemptAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  DownloadTask copyWith({
+    String? localTrackId,
+    String? state,
+    String? origin,
+    int? priority,
+    int? attempts,
+    int? receivedBytes,
+    Value<int?> totalBytes = const Value.absent(),
+    Value<String?> quality = const Value.absent(),
+    Value<String?> lastError = const Value.absent(),
+    Value<DateTime?> nextAttemptAt = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => DownloadTask(
+    localTrackId: localTrackId ?? this.localTrackId,
+    state: state ?? this.state,
+    origin: origin ?? this.origin,
+    priority: priority ?? this.priority,
+    attempts: attempts ?? this.attempts,
+    receivedBytes: receivedBytes ?? this.receivedBytes,
+    totalBytes: totalBytes.present ? totalBytes.value : this.totalBytes,
+    quality: quality.present ? quality.value : this.quality,
+    lastError: lastError.present ? lastError.value : this.lastError,
+    nextAttemptAt: nextAttemptAt.present
+        ? nextAttemptAt.value
+        : this.nextAttemptAt,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  DownloadTask copyWithCompanion(DownloadTasksCompanion data) {
+    return DownloadTask(
+      localTrackId: data.localTrackId.present
+          ? data.localTrackId.value
+          : this.localTrackId,
+      state: data.state.present ? data.state.value : this.state,
+      origin: data.origin.present ? data.origin.value : this.origin,
+      priority: data.priority.present ? data.priority.value : this.priority,
+      attempts: data.attempts.present ? data.attempts.value : this.attempts,
+      receivedBytes: data.receivedBytes.present
+          ? data.receivedBytes.value
+          : this.receivedBytes,
+      totalBytes: data.totalBytes.present
+          ? data.totalBytes.value
+          : this.totalBytes,
+      quality: data.quality.present ? data.quality.value : this.quality,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      nextAttemptAt: data.nextAttemptAt.present
+          ? data.nextAttemptAt.value
+          : this.nextAttemptAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DownloadTask(')
+          ..write('localTrackId: $localTrackId, ')
+          ..write('state: $state, ')
+          ..write('origin: $origin, ')
+          ..write('priority: $priority, ')
+          ..write('attempts: $attempts, ')
+          ..write('receivedBytes: $receivedBytes, ')
+          ..write('totalBytes: $totalBytes, ')
+          ..write('quality: $quality, ')
+          ..write('lastError: $lastError, ')
+          ..write('nextAttemptAt: $nextAttemptAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    localTrackId,
+    state,
+    origin,
+    priority,
+    attempts,
+    receivedBytes,
+    totalBytes,
+    quality,
+    lastError,
+    nextAttemptAt,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DownloadTask &&
+          other.localTrackId == this.localTrackId &&
+          other.state == this.state &&
+          other.origin == this.origin &&
+          other.priority == this.priority &&
+          other.attempts == this.attempts &&
+          other.receivedBytes == this.receivedBytes &&
+          other.totalBytes == this.totalBytes &&
+          other.quality == this.quality &&
+          other.lastError == this.lastError &&
+          other.nextAttemptAt == this.nextAttemptAt &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class DownloadTasksCompanion extends UpdateCompanion<DownloadTask> {
+  final Value<String> localTrackId;
+  final Value<String> state;
+  final Value<String> origin;
+  final Value<int> priority;
+  final Value<int> attempts;
+  final Value<int> receivedBytes;
+  final Value<int?> totalBytes;
+  final Value<String?> quality;
+  final Value<String?> lastError;
+  final Value<DateTime?> nextAttemptAt;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const DownloadTasksCompanion({
+    this.localTrackId = const Value.absent(),
+    this.state = const Value.absent(),
+    this.origin = const Value.absent(),
+    this.priority = const Value.absent(),
+    this.attempts = const Value.absent(),
+    this.receivedBytes = const Value.absent(),
+    this.totalBytes = const Value.absent(),
+    this.quality = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.nextAttemptAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DownloadTasksCompanion.insert({
+    required String localTrackId,
+    this.state = const Value.absent(),
+    this.origin = const Value.absent(),
+    this.priority = const Value.absent(),
+    this.attempts = const Value.absent(),
+    this.receivedBytes = const Value.absent(),
+    this.totalBytes = const Value.absent(),
+    this.quality = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.nextAttemptAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : localTrackId = Value(localTrackId);
+  static Insertable<DownloadTask> custom({
+    Expression<String>? localTrackId,
+    Expression<String>? state,
+    Expression<String>? origin,
+    Expression<int>? priority,
+    Expression<int>? attempts,
+    Expression<int>? receivedBytes,
+    Expression<int>? totalBytes,
+    Expression<String>? quality,
+    Expression<String>? lastError,
+    Expression<DateTime>? nextAttemptAt,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (localTrackId != null) 'local_track_id': localTrackId,
+      if (state != null) 'state': state,
+      if (origin != null) 'origin': origin,
+      if (priority != null) 'priority': priority,
+      if (attempts != null) 'attempts': attempts,
+      if (receivedBytes != null) 'received_bytes': receivedBytes,
+      if (totalBytes != null) 'total_bytes': totalBytes,
+      if (quality != null) 'quality': quality,
+      if (lastError != null) 'last_error': lastError,
+      if (nextAttemptAt != null) 'next_attempt_at': nextAttemptAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DownloadTasksCompanion copyWith({
+    Value<String>? localTrackId,
+    Value<String>? state,
+    Value<String>? origin,
+    Value<int>? priority,
+    Value<int>? attempts,
+    Value<int>? receivedBytes,
+    Value<int?>? totalBytes,
+    Value<String?>? quality,
+    Value<String?>? lastError,
+    Value<DateTime?>? nextAttemptAt,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return DownloadTasksCompanion(
+      localTrackId: localTrackId ?? this.localTrackId,
+      state: state ?? this.state,
+      origin: origin ?? this.origin,
+      priority: priority ?? this.priority,
+      attempts: attempts ?? this.attempts,
+      receivedBytes: receivedBytes ?? this.receivedBytes,
+      totalBytes: totalBytes ?? this.totalBytes,
+      quality: quality ?? this.quality,
+      lastError: lastError ?? this.lastError,
+      nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (localTrackId.present) {
+      map['local_track_id'] = Variable<String>(localTrackId.value);
+    }
+    if (state.present) {
+      map['state'] = Variable<String>(state.value);
+    }
+    if (origin.present) {
+      map['origin'] = Variable<String>(origin.value);
+    }
+    if (priority.present) {
+      map['priority'] = Variable<int>(priority.value);
+    }
+    if (attempts.present) {
+      map['attempts'] = Variable<int>(attempts.value);
+    }
+    if (receivedBytes.present) {
+      map['received_bytes'] = Variable<int>(receivedBytes.value);
+    }
+    if (totalBytes.present) {
+      map['total_bytes'] = Variable<int>(totalBytes.value);
+    }
+    if (quality.present) {
+      map['quality'] = Variable<String>(quality.value);
+    }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
+    if (nextAttemptAt.present) {
+      map['next_attempt_at'] = Variable<DateTime>(nextAttemptAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DownloadTasksCompanion(')
+          ..write('localTrackId: $localTrackId, ')
+          ..write('state: $state, ')
+          ..write('origin: $origin, ')
+          ..write('priority: $priority, ')
+          ..write('attempts: $attempts, ')
+          ..write('receivedBytes: $receivedBytes, ')
+          ..write('totalBytes: $totalBytes, ')
+          ..write('quality: $quality, ')
+          ..write('lastError: $lastError, ')
+          ..write('nextAttemptAt: $nextAttemptAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -8614,6 +9433,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $DownloadedFilesTable downloadedFiles = $DownloadedFilesTable(
     this,
   );
+  late final $DownloadTasksTable downloadTasks = $DownloadTasksTable(this);
   late final $AuthTokensTable authTokens = $AuthTokensTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   late final Index artistsBySource = Index(
@@ -8714,6 +9534,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     streamResolutions,
     trackFailures,
     downloadedFiles,
+    downloadTasks,
     authTokens,
     appSettings,
     artistsBySource,
@@ -8822,6 +9643,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('downloaded_files', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'tracks',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('download_tasks', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -9850,6 +10678,24 @@ final class $$TracksTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$DownloadTasksTable, List<DownloadTask>>
+  _downloadTasksRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.downloadTasks,
+    aliasName: 'tracks__id__download_tasks__local_track_id',
+  );
+
+  $$DownloadTasksTableProcessedTableManager get downloadTasksRefs {
+    final manager = $$DownloadTasksTableTableManager(
+      $_db,
+      $_db.downloadTasks,
+    ).filter((f) => f.localTrackId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_downloadTasksRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$TracksTableFilterComposer
@@ -10173,6 +11019,31 @@ class $$TracksTableFilterComposer
           }) => $$DownloadedFilesTableFilterComposer(
             $db: $db,
             $table: $db.downloadedFiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> downloadTasksRefs(
+    Expression<bool> Function($$DownloadTasksTableFilterComposer f) f,
+  ) {
+    final $$DownloadTasksTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.downloadTasks,
+      getReferencedColumn: (t) => t.localTrackId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DownloadTasksTableFilterComposer(
+            $db: $db,
+            $table: $db.downloadTasks,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -10630,6 +11501,31 @@ class $$TracksTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> downloadTasksRefs<T extends Object>(
+    Expression<T> Function($$DownloadTasksTableAnnotationComposer a) f,
+  ) {
+    final $$DownloadTasksTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.downloadTasks,
+      getReferencedColumn: (t) => t.localTrackId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DownloadTasksTableAnnotationComposer(
+            $db: $db,
+            $table: $db.downloadTasks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$TracksTableTableManager
@@ -10656,6 +11552,7 @@ class $$TracksTableTableManager
             bool streamResolutionsRefs,
             bool trackFailuresRefs,
             bool downloadedFilesRefs,
+            bool downloadTasksRefs,
           })
         > {
   $$TracksTableTableManager(_$AppDatabase db, $TracksTable table)
@@ -10769,6 +11666,7 @@ class $$TracksTableTableManager
                 streamResolutionsRefs = false,
                 trackFailuresRefs = false,
                 downloadedFilesRefs = false,
+                downloadTasksRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -10781,6 +11679,7 @@ class $$TracksTableTableManager
                     if (streamResolutionsRefs) db.streamResolutions,
                     if (trackFailuresRefs) db.trackFailures,
                     if (downloadedFilesRefs) db.downloadedFiles,
+                    if (downloadTasksRefs) db.downloadTasks,
                   ],
                   addJoins:
                       <
@@ -10985,6 +11884,27 @@ class $$TracksTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (downloadTasksRefs)
+                        await $_getPrefetchedData<
+                          Track,
+                          $TracksTable,
+                          DownloadTask
+                        >(
+                          currentTable: table,
+                          referencedTable: $$TracksTableReferences
+                              ._downloadTasksRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$TracksTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).downloadTasksRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.localTrackId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -11016,6 +11936,7 @@ typedef $$TracksTableProcessedTableManager =
         bool streamResolutionsRefs,
         bool trackFailuresRefs,
         bool downloadedFilesRefs,
+        bool downloadTasksRefs,
       })
     >;
 typedef $$TrackArtistsTableCreateCompanionBuilder =
@@ -14560,6 +15481,8 @@ typedef $$DownloadedFilesTableCreateCompanionBuilder =
       Value<int> sizeBytes,
       Value<String> quality,
       Value<String?> codec,
+      Value<String> origin,
+      Value<String?> coverPath,
       Value<String> state,
       required String source,
       Value<String?> errorText,
@@ -14574,6 +15497,8 @@ typedef $$DownloadedFilesTableUpdateCompanionBuilder =
       Value<int> sizeBytes,
       Value<String> quality,
       Value<String?> codec,
+      Value<String> origin,
+      Value<String?> coverPath,
       Value<String> state,
       Value<String> source,
       Value<String?> errorText,
@@ -14639,6 +15564,16 @@ class $$DownloadedFilesTableFilterComposer
 
   ColumnFilters<String> get codec => $composableBuilder(
     column: $table.codec,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get origin => $composableBuilder(
+    column: $table.origin,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get coverPath => $composableBuilder(
+    column: $table.coverPath,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -14725,6 +15660,16 @@ class $$DownloadedFilesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get origin => $composableBuilder(
+    column: $table.origin,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get coverPath => $composableBuilder(
+    column: $table.coverPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get state => $composableBuilder(
     column: $table.state,
     builder: (column) => ColumnOrderings(column),
@@ -14797,6 +15742,12 @@ class $$DownloadedFilesTableAnnotationComposer
 
   GeneratedColumn<String> get codec =>
       $composableBuilder(column: $table.codec, builder: (column) => column);
+
+  GeneratedColumn<String> get origin =>
+      $composableBuilder(column: $table.origin, builder: (column) => column);
+
+  GeneratedColumn<String> get coverPath =>
+      $composableBuilder(column: $table.coverPath, builder: (column) => column);
 
   GeneratedColumn<String> get state =>
       $composableBuilder(column: $table.state, builder: (column) => column);
@@ -14875,6 +15826,8 @@ class $$DownloadedFilesTableTableManager
                 Value<int> sizeBytes = const Value.absent(),
                 Value<String> quality = const Value.absent(),
                 Value<String?> codec = const Value.absent(),
+                Value<String> origin = const Value.absent(),
+                Value<String?> coverPath = const Value.absent(),
                 Value<String> state = const Value.absent(),
                 Value<String> source = const Value.absent(),
                 Value<String?> errorText = const Value.absent(),
@@ -14887,6 +15840,8 @@ class $$DownloadedFilesTableTableManager
                 sizeBytes: sizeBytes,
                 quality: quality,
                 codec: codec,
+                origin: origin,
+                coverPath: coverPath,
                 state: state,
                 source: source,
                 errorText: errorText,
@@ -14901,6 +15856,8 @@ class $$DownloadedFilesTableTableManager
                 Value<int> sizeBytes = const Value.absent(),
                 Value<String> quality = const Value.absent(),
                 Value<String?> codec = const Value.absent(),
+                Value<String> origin = const Value.absent(),
+                Value<String?> coverPath = const Value.absent(),
                 Value<String> state = const Value.absent(),
                 required String source,
                 Value<String?> errorText = const Value.absent(),
@@ -14913,6 +15870,8 @@ class $$DownloadedFilesTableTableManager
                 sizeBytes: sizeBytes,
                 quality: quality,
                 codec: codec,
+                origin: origin,
+                coverPath: coverPath,
                 state: state,
                 source: source,
                 errorText: errorText,
@@ -14982,6 +15941,464 @@ typedef $$DownloadedFilesTableProcessedTableManager =
       $$DownloadedFilesTableUpdateCompanionBuilder,
       (DownloadedFile, $$DownloadedFilesTableReferences),
       DownloadedFile,
+      PrefetchHooks Function({bool localTrackId})
+    >;
+typedef $$DownloadTasksTableCreateCompanionBuilder =
+    DownloadTasksCompanion Function({
+      required String localTrackId,
+      Value<String> state,
+      Value<String> origin,
+      Value<int> priority,
+      Value<int> attempts,
+      Value<int> receivedBytes,
+      Value<int?> totalBytes,
+      Value<String?> quality,
+      Value<String?> lastError,
+      Value<DateTime?> nextAttemptAt,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$DownloadTasksTableUpdateCompanionBuilder =
+    DownloadTasksCompanion Function({
+      Value<String> localTrackId,
+      Value<String> state,
+      Value<String> origin,
+      Value<int> priority,
+      Value<int> attempts,
+      Value<int> receivedBytes,
+      Value<int?> totalBytes,
+      Value<String?> quality,
+      Value<String?> lastError,
+      Value<DateTime?> nextAttemptAt,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$DownloadTasksTableReferences
+    extends BaseReferences<_$AppDatabase, $DownloadTasksTable, DownloadTask> {
+  $$DownloadTasksTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $TracksTable _localTrackIdTable(_$AppDatabase db) =>
+      db.tracks.createAlias('download_tasks__local_track_id__tracks__id');
+
+  $$TracksTableProcessedTableManager get localTrackId {
+    final $_column = $_itemColumn<String>('local_track_id')!;
+
+    final manager = $$TracksTableTableManager(
+      $_db,
+      $_db.tracks,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_localTrackIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$DownloadTasksTableFilterComposer
+    extends Composer<_$AppDatabase, $DownloadTasksTable> {
+  $$DownloadTasksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get state => $composableBuilder(
+    column: $table.state,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get origin => $composableBuilder(
+    column: $table.origin,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get receivedBytes => $composableBuilder(
+    column: $table.receivedBytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get totalBytes => $composableBuilder(
+    column: $table.totalBytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get quality => $composableBuilder(
+    column: $table.quality,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$TracksTableFilterComposer get localTrackId {
+    final $$TracksTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.localTrackId,
+      referencedTable: $db.tracks,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TracksTableFilterComposer(
+            $db: $db,
+            $table: $db.tracks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DownloadTasksTableOrderingComposer
+    extends Composer<_$AppDatabase, $DownloadTasksTable> {
+  $$DownloadTasksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get state => $composableBuilder(
+    column: $table.state,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get origin => $composableBuilder(
+    column: $table.origin,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get receivedBytes => $composableBuilder(
+    column: $table.receivedBytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get totalBytes => $composableBuilder(
+    column: $table.totalBytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get quality => $composableBuilder(
+    column: $table.quality,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$TracksTableOrderingComposer get localTrackId {
+    final $$TracksTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.localTrackId,
+      referencedTable: $db.tracks,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TracksTableOrderingComposer(
+            $db: $db,
+            $table: $db.tracks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DownloadTasksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DownloadTasksTable> {
+  $$DownloadTasksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get state =>
+      $composableBuilder(column: $table.state, builder: (column) => column);
+
+  GeneratedColumn<String> get origin =>
+      $composableBuilder(column: $table.origin, builder: (column) => column);
+
+  GeneratedColumn<int> get priority =>
+      $composableBuilder(column: $table.priority, builder: (column) => column);
+
+  GeneratedColumn<int> get attempts =>
+      $composableBuilder(column: $table.attempts, builder: (column) => column);
+
+  GeneratedColumn<int> get receivedBytes => $composableBuilder(
+    column: $table.receivedBytes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get totalBytes => $composableBuilder(
+    column: $table.totalBytes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get quality =>
+      $composableBuilder(column: $table.quality, builder: (column) => column);
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$TracksTableAnnotationComposer get localTrackId {
+    final $$TracksTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.localTrackId,
+      referencedTable: $db.tracks,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TracksTableAnnotationComposer(
+            $db: $db,
+            $table: $db.tracks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DownloadTasksTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DownloadTasksTable,
+          DownloadTask,
+          $$DownloadTasksTableFilterComposer,
+          $$DownloadTasksTableOrderingComposer,
+          $$DownloadTasksTableAnnotationComposer,
+          $$DownloadTasksTableCreateCompanionBuilder,
+          $$DownloadTasksTableUpdateCompanionBuilder,
+          (DownloadTask, $$DownloadTasksTableReferences),
+          DownloadTask,
+          PrefetchHooks Function({bool localTrackId})
+        > {
+  $$DownloadTasksTableTableManager(_$AppDatabase db, $DownloadTasksTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DownloadTasksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DownloadTasksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DownloadTasksTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> localTrackId = const Value.absent(),
+                Value<String> state = const Value.absent(),
+                Value<String> origin = const Value.absent(),
+                Value<int> priority = const Value.absent(),
+                Value<int> attempts = const Value.absent(),
+                Value<int> receivedBytes = const Value.absent(),
+                Value<int?> totalBytes = const Value.absent(),
+                Value<String?> quality = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<DateTime?> nextAttemptAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DownloadTasksCompanion(
+                localTrackId: localTrackId,
+                state: state,
+                origin: origin,
+                priority: priority,
+                attempts: attempts,
+                receivedBytes: receivedBytes,
+                totalBytes: totalBytes,
+                quality: quality,
+                lastError: lastError,
+                nextAttemptAt: nextAttemptAt,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String localTrackId,
+                Value<String> state = const Value.absent(),
+                Value<String> origin = const Value.absent(),
+                Value<int> priority = const Value.absent(),
+                Value<int> attempts = const Value.absent(),
+                Value<int> receivedBytes = const Value.absent(),
+                Value<int?> totalBytes = const Value.absent(),
+                Value<String?> quality = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<DateTime?> nextAttemptAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DownloadTasksCompanion.insert(
+                localTrackId: localTrackId,
+                state: state,
+                origin: origin,
+                priority: priority,
+                attempts: attempts,
+                receivedBytes: receivedBytes,
+                totalBytes: totalBytes,
+                quality: quality,
+                lastError: lastError,
+                nextAttemptAt: nextAttemptAt,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$DownloadTasksTable, DownloadTask>(table),
+                  $$DownloadTasksTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({localTrackId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (localTrackId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.localTrackId,
+                        referencedTable: $$DownloadTasksTableReferences
+                            ._localTrackIdTable(db),
+                        referencedColumn: $$DownloadTasksTableReferences
+                            ._localTrackIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$DownloadTasksTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DownloadTasksTable,
+      DownloadTask,
+      $$DownloadTasksTableFilterComposer,
+      $$DownloadTasksTableOrderingComposer,
+      $$DownloadTasksTableAnnotationComposer,
+      $$DownloadTasksTableCreateCompanionBuilder,
+      $$DownloadTasksTableUpdateCompanionBuilder,
+      (DownloadTask, $$DownloadTasksTableReferences),
+      DownloadTask,
       PrefetchHooks Function({bool localTrackId})
     >;
 typedef $$AuthTokensTableCreateCompanionBuilder = AuthTokensCompanion Function({
@@ -15528,6 +16945,8 @@ class $AppDatabaseManager {
       $$TrackFailuresTableTableManager(_db, _db.trackFailures);
   $$DownloadedFilesTableTableManager get downloadedFiles =>
       $$DownloadedFilesTableTableManager(_db, _db.downloadedFiles);
+  $$DownloadTasksTableTableManager get downloadTasks =>
+      $$DownloadTasksTableTableManager(_db, _db.downloadTasks);
   $$AuthTokensTableTableManager get authTokens =>
       $$AuthTokensTableTableManager(_db, _db.authTokens);
   $$AppSettingsTableTableManager get appSettings =>

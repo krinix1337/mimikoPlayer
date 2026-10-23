@@ -16,7 +16,6 @@ class AppTheme {
     final scheme = _scheme(brightness, prefs, platformScheme);
     final radius = prefs.corner.radius;
     final text = _textTheme(scheme, prefs.contrast);
-
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
@@ -26,6 +25,7 @@ class AppTheme {
       disabledColor: scheme.onSurface.withValues(alpha: 0.38),
       textTheme: text,
       primaryTextTheme: text,
+      extensions: const [],
       dividerTheme: DividerThemeData(
         color: scheme.outlineVariant,
         thickness: 1,
@@ -54,7 +54,10 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
+          side: BorderSide.none,
+        ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: scheme.surfaceContainerLow,
@@ -87,7 +90,9 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          shape: const StadiumBorder(),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           textStyle: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           animationDuration: prefs.scaleMs(200),
@@ -95,7 +100,9 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          shape: const StadiumBorder(),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
           side: BorderSide(color: scheme.outlineVariant, width: 1),
           foregroundColor: scheme.onSurface,
@@ -105,17 +112,35 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: _actionInk(scheme),
-          shape: const StadiumBorder(),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
         ),
       ),
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
           foregroundColor: scheme.onSurfaceVariant,
-          shape: const StadiumBorder(),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
+        ),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+          ),
+        ),
+      ),
+      searchBarTheme: SearchBarThemeData(
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
         ),
       ),
       chipTheme: ChipThemeData(
-        shape: const StadiumBorder(),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
+        ),
         side: BorderSide.none,
         backgroundColor: scheme.surfaceContainerHigh,
         selectedColor: scheme.primaryContainer,
@@ -189,7 +214,10 @@ class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: scheme.surfaceContainerHigh,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius + 8)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius + 8),
+          side: BorderSide.none,
+        ),
         titleTextStyle: text.headlineSmall,
         contentTextStyle: text.bodyMedium,
       ),
@@ -200,15 +228,43 @@ class AppTheme {
           color: scheme.onInverseSurface,
         ),
         actionTextColor: _actionInk(scheme),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
+        ),
         width: 420,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: scheme.surfaceContainerHigh,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
+          side: BorderSide.none,
+        ),
+      ),
+      menuTheme: MenuThemeData(
+        style: MenuStyle(
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+          ),
+        ),
+      ),
+      expansionTileTheme: ExpansionTileThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
+        ),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
+        ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: scheme.surfaceContainerLow,
         surfaceTintColor: Colors.transparent,
         modalElevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(radius + 12)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(radius + 12),
+          ),
+          side: BorderSide.none,
         ),
       ),
     );
@@ -224,6 +280,10 @@ class AppTheme {
     if (prefs.palette == AppPalette.dynamic && platformScheme != null) {
       // Material You: роли берём целиком у системы, своих тонов не подмешиваем.
       return platformScheme;
+    }
+
+    if (prefs.palette == AppPalette.amoled) {
+      return _amoledScheme(brightness, prefs);
     }
 
     if (prefs.contrast == Contrast.high) {
@@ -245,6 +305,41 @@ class AppTheme {
       brightness: brightness,
     );
     return _withSurfaceTones(base, prefs, brightness);
+  }
+
+  /// AMOLED: поверхности уходят в настоящий чёрный, чтобы на OLED-экране
+  /// пиксели действительно гасли. Акцент пользователь выбирает сам, он же
+  /// остаётся единственным цветным пятном.
+  static ColorScheme _amoledScheme(Brightness brightness, Prefs prefs) {
+    final base = _withSurfaceTones(
+      ColorScheme.fromSeed(
+        seedColor: prefs.accent.color,
+        brightness: brightness,
+      ),
+      prefs,
+      brightness,
+    );
+    if (brightness == Brightness.light) {
+      return base.copyWith(
+        surface: const Color(0xFFFFFFFF),
+        surfaceContainerLowest: const Color(0xFFFFFFFF),
+        surfaceDim: const Color(0xFFF2F2F2),
+      );
+    }
+    return base.copyWith(
+      surface: const Color(0xFF000000),
+      onSurface: const Color(0xFFFFFFFF),
+      onSurfaceVariant: const Color(0xFFB7B7B7),
+      surfaceContainerLowest: const Color(0xFF000000),
+      surfaceContainerLow: const Color(0xFF080808),
+      surfaceContainer: const Color(0xFF121212),
+      surfaceContainerHigh: const Color(0xFF1A1A1A),
+      surfaceContainerHighest: const Color(0xFF232323),
+      surfaceBright: const Color(0xFF2B2B2B),
+      surfaceDim: const Color(0xFF000000),
+      outline: const Color(0xFF8A8A8A),
+      outlineVariant: const Color(0xFF2A2A2A),
+    );
   }
 
   /// Tonal ramp: surface и контейнеры — нейтральные тоны M3, а не произвольные

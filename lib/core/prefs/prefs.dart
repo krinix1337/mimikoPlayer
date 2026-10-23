@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../db/daos/library_dao.dart';
 
+/// Лимит автозагрузки по умолчанию: 10 ГБ. `null` в настройках = без лимита.
+const int defaultDownloadLimitBytes = 10 * 1024 * 1024 * 1024;
+
 /// Всё, что пользователь крутит в настройках. Один снимок — одна запись в БД,
 /// поэтому смена темы, языка и иконки не расползается по нескольким ключам.
 @immutable
@@ -29,6 +32,15 @@ final class Prefs {
     this.artworkShape = ArtworkShape.rounded,
     this.hideAiTracks = false,
     this.censorBypass = true,
+    this.searchHistory = const [],
+    this.homeCoverTone = HomeCoverTone.normal,
+    this.homeCoverBlur = false,
+    this.showDjInfo = true,
+    this.autoDownloadLikes = false,
+    this.autoDownloadWifiOnly = true,
+    this.autoDownloadAllApproved = false,
+    this.downloadLimitBytes = defaultDownloadLimitBytes,
+    this.autoDownloadQuality = 'normal',
   });
 
   final ThemeMode themeMode;
@@ -74,6 +86,33 @@ final class Prefs {
   /// Подменять зацензуренные треки версией из открытой базы.
   final bool censorBypass;
 
+  /// Недавние поисковые запросы, новые сверху.
+  final List<String> searchHistory;
+
+  /// Тон фоновой обложки на главной.
+  final HomeCoverTone homeCoverTone;
+
+  /// Растянутая (размытая) или резкая фоновая обложка.
+  final bool homeCoverBlur;
+
+  /// Показывать BPM и тональность в сведениях о треке.
+  final bool showDjInfo;
+
+  /// Автозагрузка лайков выключена, пока пользователь сам не включит её.
+  final bool autoDownloadLikes;
+
+  /// Автозагрузка ходит только по Wi-Fi/unmetered; ручные загрузки — везде.
+  final bool autoDownloadWifiOnly;
+
+  /// Пробные 20 треков уже приняты, можно ставить в очередь все лайки.
+  final bool autoDownloadAllApproved;
+
+  /// Байты; null — без лимита, только проверка свободного места.
+  final int? downloadLimitBytes;
+
+  /// low | normal | high — отдельно от качества потокового воспроизведения.
+  final String autoDownloadQuality;
+
   Locale? get locale => localeCode == null ? null : Locale(localeCode!);
 
   /// Длительность перехода с учётом пользовательского масштаба анимаций.
@@ -110,6 +149,16 @@ final class Prefs {
     ArtworkShape? artworkShape,
     bool? hideAiTracks,
     bool? censorBypass,
+    List<String>? searchHistory,
+    HomeCoverTone? homeCoverTone,
+    bool? homeCoverBlur,
+    bool? showDjInfo,
+    bool? autoDownloadLikes,
+    bool? autoDownloadWifiOnly,
+    bool? autoDownloadAllApproved,
+    int? downloadLimitBytes,
+    bool clearDownloadLimit = false,
+    String? autoDownloadQuality,
   }) => Prefs(
     themeMode: themeMode ?? this.themeMode,
     palette: palette ?? this.palette,
@@ -133,6 +182,18 @@ final class Prefs {
     artworkShape: artworkShape ?? this.artworkShape,
     hideAiTracks: hideAiTracks ?? this.hideAiTracks,
     censorBypass: censorBypass ?? this.censorBypass,
+    searchHistory: searchHistory ?? this.searchHistory,
+    homeCoverTone: homeCoverTone ?? this.homeCoverTone,
+    homeCoverBlur: homeCoverBlur ?? this.homeCoverBlur,
+    showDjInfo: showDjInfo ?? this.showDjInfo,
+    autoDownloadLikes: autoDownloadLikes ?? this.autoDownloadLikes,
+    autoDownloadWifiOnly: autoDownloadWifiOnly ?? this.autoDownloadWifiOnly,
+    autoDownloadAllApproved:
+        autoDownloadAllApproved ?? this.autoDownloadAllApproved,
+    downloadLimitBytes: clearDownloadLimit
+        ? null
+        : (downloadLimitBytes ?? this.downloadLimitBytes),
+    autoDownloadQuality: autoDownloadQuality ?? this.autoDownloadQuality,
   );
 
   Map<String, Object?> toJson() => {
@@ -158,6 +219,15 @@ final class Prefs {
     'artwork_shape': artworkShape.name,
     'hide_ai_tracks': hideAiTracks,
     'censor_bypass': censorBypass,
+    'search_history': searchHistory,
+    'home_cover_tone': homeCoverTone.name,
+    'home_cover_blur': homeCoverBlur,
+    'show_dj_info': showDjInfo,
+    'auto_download_likes': autoDownloadLikes,
+    'auto_download_wifi_only': autoDownloadWifiOnly,
+    'auto_download_all_approved': autoDownloadAllApproved,
+    'download_limit_bytes': downloadLimitBytes,
+    'auto_download_quality': autoDownloadQuality,
   };
 
   static Prefs fromJson(Map<String, Object?> json) {
@@ -172,6 +242,8 @@ final class Prefs {
     T required<T>(String key, List<T> options, T fallback) =>
         byName(options, json[key] is String ? json[key]! as String : null) ??
         fallback;
+
+    final rawLimit = json['download_limit_bytes'];
 
     return Prefs(
       themeMode: required('theme_mode', ThemeMode.values, ThemeMode.dark),
@@ -216,6 +288,34 @@ final class Prefs {
       ),
       hideAiTracks: json['hide_ai_tracks'] == true,
       censorBypass: json['censor_bypass'] != false,
+      homeCoverTone: required(
+        'home_cover_tone',
+        HomeCoverTone.values,
+        HomeCoverTone.normal,
+      ),
+      homeCoverBlur: json['home_cover_blur'] == true,
+      showDjInfo: json['show_dj_info'] != false,
+      autoDownloadLikes: json['auto_download_likes'] == true,
+      autoDownloadWifiOnly: json['auto_download_wifi_only'] != false,
+      autoDownloadAllApproved: json['auto_download_all_approved'] == true,
+      downloadLimitBytes: json.containsKey('download_limit_bytes')
+          ? switch (rawLimit) {
+              final num value when value > 0 => value.toInt(),
+              _ => null,
+            }
+          : defaultDownloadLimitBytes,
+      autoDownloadQuality: switch (json['auto_download_quality']) {
+        'low' => 'low',
+        'high' => 'high',
+        _ => 'normal',
+      },
+      searchHistory: switch (json['search_history']) {
+        final List<Object?> items => [
+          for (final item in items)
+            if (item is String && item.trim().isNotEmpty) item,
+        ],
+        _ => const [],
+      },
       homeBackground: required(
         'home_background',
         HomeBackground.values,
@@ -226,7 +326,8 @@ final class Prefs {
 }
 
 /// Источник цветовых ролей. `dynamic` работает только на Android 12+.
-enum AppPalette { brand, dynamic, mono }
+/// `amoled` — чёрные поверхности без тона, чтобы на OLED гасли пиксели.
+enum AppPalette { brand, dynamic, mono, amoled }
 
 /// Пресеты акцента: тон-сид для всей тоновой палитры.
 enum AccentColor {
@@ -238,7 +339,8 @@ enum AccentColor {
   ice(0xFF7FC8FF),
   sky(0xFF4F8BFF),
   rose(0xFFFF5C9A),
-  leaf(0xFF52D273);
+  leaf(0xFF52D273),
+  orchid(0xFFCA7BFF);
 
   const AccentColor(this.hex);
 
@@ -263,6 +365,9 @@ enum AnimationsSpeed { off, fast, normal, slow }
 
 /// Фон главной: обложка волны, цветные пятна или оба слоя.
 enum HomeBackground { cover, blobs, both }
+
+/// Насколько притемнить фоновую обложку главной.
+enum HomeCoverTone { darker, normal, lighter }
 
 /// Форма обложки в полноэкранном плеере.
 enum ArtworkShape { rounded, soft, circle }
@@ -290,8 +395,7 @@ enum LauncherIcon {
   violet('MimikoLauncherViolet'),
   ice('MimikoLauncherIce'),
   amber('MimikoLauncherAmber'),
-  forest('MimikoLauncherForest'),
-  crimson('MimikoLauncherCrimson');
+  forest('MimikoLauncherForest');
 
   const LauncherIcon(this.component);
 

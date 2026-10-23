@@ -26,49 +26,120 @@ class TracksDao {
   Future<IngestResult> ingest(SourceTrack track) => _db.transaction(() async {
     final source = track.ref.source;
 
-    final existing = await (_db.select(_db.remoteIdMappings)
-          ..where(
-            (t) =>
-                t.source.equals(source.wire) &
-                t.remoteId.equals(track.ref.remoteId),
-          )
-          ..limit(1))
-        .getSingleOrNull();
+    final existing =
+        await (_db.select(_db.remoteIdMappings)
+              ..where(
+                (t) =>
+                    t.source.equals(source.wire) &
+                    t.remoteId.equals(track.ref.remoteId),
+              )
+              ..limit(1))
+            .getSingleOrNull();
 
     if (existing != null) {
-      await _touch(existing.localTrackId, source);
-      return IngestResult(existing.localTrackId, MatchTier.exactRemote);
+      // Связь, созданная из короткой ссылки плейлиста (`{id, albumId}` без
+      // названия и длительности), могла свести разные треки в одну строку.
+      // Когда приходит полноценный трек, такую связь не доверяем, а сводим
+      // заново и перезаписываем mapping ниже.
+      final poisoned =
+          _isShortRefJson(existing.remoteJson) && track.title.trim().isNotEmpty;
+      if (!poisoned) {
+        await _touch(existing.localTrackId, source);
+        await _fillMissingMetadata(existing.localTrackId, track);
+        return IngestResult(existing.localTrackId, MatchTier.exactRemote);
+      }
     }
 
     final isrc = normalizeIsrc(track.isrc);
     if (isrc.isNotEmpty) {
-      final byIsrc = await (_db.select(_db.tracks)
-            ..where((t) => t.isrc.equals(isrc))
-            ..limit(1))
-          .getSingleOrNull();
+      final byIsrc =
+          await (_db.select(_db.tracks)
+                ..where((t) => t.isrc.equals(isrc))
+                ..limit(1))
+              .getSingleOrNull();
       if (byIsrc != null) {
         await _attachMapping(track, byIsrc.id, MatchTier.isrc);
+        await _fillMissingMetadata(byIsrc.id, track);
         return IngestResult(byIsrc.id, MatchTier.isrc);
       }
     }
 
     final fingerprint = trackFingerprint(track);
-    final byFingerprint = await (_db.select(_db.tracks)
-          ..where((t) => t.fingerprint.equals(fingerprint))
-          ..limit(1))
-        .getSingleOrNull();
+    final byFingerprint =
+        await (_db.select(_db.tracks)
+              ..where((t) => t.fingerprint.equals(fingerprint))
+              ..limit(1))
+            .getSingleOrNull();
     if (byFingerprint != null) {
       await _attachMapping(track, byFingerprint.id, MatchTier.fingerprint);
+      await _fillMissingMetadata(byFingerprint.id, track);
       return IngestResult(byFingerprint.id, MatchTier.fingerprint);
     }
 
     if (await _findFuzzyMatch(track) case final fuzzy?) {
       await _attachMapping(track, fuzzy, MatchTier.fuzzy);
+      await _fillMissingMetadata(fuzzy, track);
       return IngestResult(fuzzy, MatchTier.fuzzy);
     }
 
     return _create(track, fingerprint);
   });
+
+  /// Раньше точное совпадение только трогало `lastSeenAt`, поэтому трек,
+  /// попавший в базу пустым (например, из старого импорта), навсегда оставался
+  /// без названия, обложки и артистов в плеере и меню. Заполняем только
+  /// пустые поля, чтобы не затереть локальные правки.
+  Future<void> _fillMissingMetadata(
+    String localTrackId,
+    SourceTrack track,
+  ) async {
+    final row = await byId(localTrackId);
+    if (row == null) return;
+    final fillTitle = row.title.trim().isEmpty && track.title.trim().isNotEmpty;
+    final fillCover = row.coverUrl == null && track.coverUrl != null;
+    final fillDuration = row.durationSec == 0 && track.duration.inSeconds > 0;
+    final fillSource =
+        row.metadataSource == SourceId.local.wire &&
+        track.ref.source != SourceId.local;
+    if (fillTitle || fillCover || fillDuration || fillSource) {
+      await (_db.update(
+        _db.tracks,
+      )..where((t) => t.id.equals(localTrackId))).write(
+        TracksCompanion(
+          title: fillTitle ? Value(track.title) : const Value.absent(),
+          titleNorm: fillTitle
+              ? Value(normalizeTitle(track.title))
+              : const Value.absent(),
+          coverUrl: fillCover ? Value(track.coverUrl) : const Value.absent(),
+          durationSec: fillDuration
+              ? Value(track.duration.inSeconds)
+              : const Value.absent(),
+          metadataSource: fillSource
+              ? Value(track.ref.source.wire)
+              : const Value.absent(),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
+
+    if ((await artistNamesOf(localTrackId)).isNotEmpty) return;
+    final artists = await _upsertArtists(track);
+    await _db.batch((batch) {
+      for (var i = 0; i < artists.ids.length; i++) {
+        batch.insert(
+          _db.trackArtists,
+          TrackArtistsCompanion.insert(
+            trackId: localTrackId,
+            artistId: artists.ids[i],
+            position: Value(i),
+          ),
+          onConflict: DoUpdate(
+            (_) => TrackArtistsCompanion(position: Value(i)),
+          ),
+        );
+      }
+    });
+  }
 
   Future<IngestResult> _create(SourceTrack track, String fingerprint) async {
     final localId = localTrackIdFor(track);
@@ -76,37 +147,43 @@ class TracksDao {
     final albumId = await _upsertAlbum(track);
     final now = DateTime.now();
 
-    await _db.into(_db.tracks).insert(
-      TracksCompanion.insert(
-        id: localId,
-        title: track.title,
-        titleNorm: normalizeTitle(track.title),
-        durationSec: (track.duration.inMilliseconds / 1000).round(),
-        mainArtistId: Value(artists.mainId),
-        albumId: Value(albumId),
-        coverUrl: Value(track.coverUrl),
-        isrc: Value(normalizeIsrc(track.isrc).isEmpty ? null : normalizeIsrc(track.isrc)),
-        explicitFlag: Value(track.explicitFlag),
-        lyricsAvailable: Value(track.lyricsAvailable ?? false),
-        fingerprint: fingerprint,
-        metadataSource: track.ref.source.wire,
-        createdAt: Value(now),
-        updatedAt: Value(now),
-        lastSeenAt: Value(now),
-      ),
-      onConflict: DoUpdate(
-        // Повторный ingest того же отпечатка не должен затирать локальные
-        // правки и стирать обложку, если новые метаданные пришли без неё.
-        (_) => TracksCompanion(
-          title: Value(track.title),
-          coverUrl: track.coverUrl == null
-              ? const Value.absent()
-              : Value(track.coverUrl),
-          updatedAt: Value(now),
-          lastSeenAt: Value(now),
-        ),
-      ),
-    );
+    await _db
+        .into(_db.tracks)
+        .insert(
+          TracksCompanion.insert(
+            id: localId,
+            title: track.title,
+            titleNorm: normalizeTitle(track.title),
+            durationSec: (track.duration.inMilliseconds / 1000).round(),
+            mainArtistId: Value(artists.mainId),
+            albumId: Value(albumId),
+            coverUrl: Value(track.coverUrl),
+            isrc: Value(
+              normalizeIsrc(track.isrc).isEmpty
+                  ? null
+                  : normalizeIsrc(track.isrc),
+            ),
+            explicitFlag: Value(track.explicitFlag),
+            lyricsAvailable: Value(track.lyricsAvailable ?? false),
+            fingerprint: fingerprint,
+            metadataSource: track.ref.source.wire,
+            createdAt: Value(now),
+            updatedAt: Value(now),
+            lastSeenAt: Value(now),
+          ),
+          onConflict: DoUpdate(
+            // Повторный ingest того же отпечатка не должен затирать локальные
+            // правки и стирать обложку, если новые метаданные пришли без неё.
+            (_) => TracksCompanion(
+              title: Value(track.title),
+              coverUrl: track.coverUrl == null
+                  ? const Value.absent()
+                  : Value(track.coverUrl),
+              updatedAt: Value(now),
+              lastSeenAt: Value(now),
+            ),
+          ),
+        );
 
     await _db.batch((batch) {
       for (var i = 0; i < artists.ids.length; i++) {
@@ -133,28 +210,43 @@ class TracksDao {
   /// давал ~10 секунд между тапом и стартом воспроизведения.
   Future<List<String>> ingestAll(List<SourceTrack> tracks) =>
       _db.transaction(() async {
-        return [
-          for (final track in tracks) (await ingest(track)).localTrackId,
-        ];
+        return [for (final track in tracks) (await ingest(track)).localTrackId];
       });
 
   Future<List<Track>> byIdList(List<String> localTrackIds) =>
       (_db.select(_db.tracks)..where((t) => t.id.isIn(localTrackIds))).get();
 
-  Future<Track?> byId(String localTrackId) =>
-      (_db.select(_db.tracks)..where((t) => t.id.equals(localTrackId)))
-          .getSingleOrNull();
+  Future<Track?> byId(String localTrackId) => (_db.select(
+    _db.tracks,
+  )..where((t) => t.id.equals(localTrackId))).getSingleOrNull();
 
   Future<List<String>> artistNamesOf(String trackId) async {
-    final query = _db.select(_db.trackArtists).join([
-      innerJoin(_db.artists, _db.artists.id.equalsExp(_db.trackArtists.artistId)),
-    ])
-      ..where(_db.trackArtists.trackId.equals(trackId))
-      ..orderBy([OrderingTerm.asc(_db.trackArtists.position)]);
+    final query =
+        _db.select(_db.trackArtists).join([
+            innerJoin(
+              _db.artists,
+              _db.artists.id.equalsExp(_db.trackArtists.artistId),
+            ),
+          ])
+          ..where(_db.trackArtists.trackId.equals(trackId))
+          ..orderBy([OrderingTerm.asc(_db.trackArtists.position)]);
 
     return (await query.get())
         .map((row) => row.readTable(_db.artists).name)
         .toList();
+  }
+
+  /// Локальная строка для удалённого трека, если он уже сводился.
+  /// Нужна спискам поиска/чарта, чтобы показать «скачано» ещё до ingest.
+  Future<String?> localIdForRemote(RemoteTrackRef ref) async {
+    final mapping =
+        await (_db.select(_db.remoteIdMappings)..where(
+              (t) =>
+                  t.source.equals(ref.source.wire) &
+                  t.remoteId.equals(ref.remoteId),
+            ))
+            .getSingleOrNull();
+    return mapping?.localTrackId;
   }
 
   /// Все известные варианты этого трека по источникам — ровно то, с чем
@@ -163,9 +255,9 @@ class TracksDao {
     final track = await byId(localTrackId);
     if (track == null) return const [];
 
-    final mappings = await (_db.select(_db.remoteIdMappings)
-          ..where((t) => t.localTrackId.equals(localTrackId)))
-        .get();
+    final mappings = await (_db.select(
+      _db.remoteIdMappings,
+    )..where((t) => t.localTrackId.equals(localTrackId))).get();
     final artists = await artistNamesOf(localTrackId);
 
     return [
@@ -194,12 +286,16 @@ class TracksDao {
   /// Главный исполнитель вместе с удалённым id: по нему открывается
   /// карточка артиста, а не только строка с именем.
   Future<({String name, String remoteId})?> mainArtistOf(String trackId) async {
-    final query = _db.select(_db.trackArtists).join([
-      innerJoin(_db.artists, _db.artists.id.equalsExp(_db.trackArtists.artistId)),
-    ])
-      ..where(_db.trackArtists.trackId.equals(trackId))
-      ..orderBy([OrderingTerm.asc(_db.trackArtists.position)])
-      ..limit(1);
+    final query =
+        _db.select(_db.trackArtists).join([
+            innerJoin(
+              _db.artists,
+              _db.artists.id.equalsExp(_db.trackArtists.artistId),
+            ),
+          ])
+          ..where(_db.trackArtists.trackId.equals(trackId))
+          ..orderBy([OrderingTerm.asc(_db.trackArtists.position)])
+          ..limit(1);
     final row = await query.getSingleOrNull();
     if (row == null) return null;
     final artist = row.readTable(_db.artists);
@@ -208,10 +304,11 @@ class TracksDao {
 
   /// Удалённый id альбома из связки с источником — для перехода на альбом.
   Future<String?> albumRemoteIdOf(String trackId) async {
-    final mapping = await (_db.select(_db.remoteIdMappings)
-          ..where((t) => t.localTrackId.equals(trackId))
-          ..limit(1))
-        .getSingleOrNull();
+    final mapping =
+        await (_db.select(_db.remoteIdMappings)
+              ..where((t) => t.localTrackId.equals(trackId))
+              ..limit(1))
+            .getSingleOrNull();
     return mapping?.albumRemoteId;
   }
 
@@ -222,24 +319,37 @@ class TracksDao {
     return _albumTitle(track!.albumId!);
   }
 
+  Future<int?> albumYearOf(String trackId) async {
+    final track = await byId(trackId);
+    if (track?.albumId == null) return null;
+    final album =
+        await (_db.select(_db.albums)
+              ..where((t) => t.id.equals(track!.albumId!))
+              ..limit(1))
+            .getSingleOrNull();
+    return album?.year;
+  }
+
   Future<String?> _albumTitle(int albumId) async {
-    final album = await (_db.select(_db.albums)
-          ..where((t) => t.id.equals(albumId))
-          ..limit(1))
-        .getSingleOrNull();
+    final album =
+        await (_db.select(_db.albums)
+              ..where((t) => t.id.equals(albumId))
+              ..limit(1))
+            .getSingleOrNull();
     return album?.title;
   }
 
   Future<String?> _findFuzzyMatch(SourceTrack track) async {
     final seconds = (track.duration.inMilliseconds / 1000).round();
-    final candidates = await (_db.select(_db.tracks)
-          ..where((t) => t.titleNorm.equals(normalizeTitle(track.title)))
-          ..where(
-            (t) =>
-                t.durationSec.isBiggerOrEqualValue(seconds - 3) &
-                t.durationSec.isSmallerOrEqualValue(seconds + 3),
-          ))
-        .get();
+    final candidates =
+        await (_db.select(_db.tracks)
+              ..where((t) => t.titleNorm.equals(normalizeTitle(track.title)))
+              ..where(
+                (t) =>
+                    t.durationSec.isBiggerOrEqualValue(seconds - 3) &
+                    t.durationSec.isSmallerOrEqualValue(seconds + 3),
+              ))
+            .get();
 
     for (final candidate in candidates) {
       final asSource = SourceTrack(
@@ -253,6 +363,19 @@ class TracksDao {
     return null;
   }
 
+  /// JSON короткой ссылки плейлиста: в нём нет ни названия, ни длительности.
+  static bool _isShortRefJson(String? raw) {
+    if (raw == null) return false;
+    try {
+      final json = jsonDecode(raw);
+      return json is Map &&
+          !json.containsKey('title') &&
+          !json.containsKey('durationMs');
+    } on FormatException {
+      return false;
+    }
+  }
+
   Future<void> _touch(String localTrackId, SourceId source) =>
       (_db.update(_db.tracks)..where((t) => t.id.equals(localTrackId))).write(
         TracksCompanion(
@@ -261,8 +384,13 @@ class TracksDao {
         ),
       );
 
-  Future<void> _attachMapping(SourceTrack track, String localTrackId, MatchTier tier) =>
-      _db.into(_db.remoteIdMappings).insertOnConflictUpdate(
+  Future<void> _attachMapping(
+    SourceTrack track,
+    String localTrackId,
+    MatchTier tier,
+  ) => _db
+      .into(_db.remoteIdMappings)
+      .insertOnConflictUpdate(
         RemoteIdMappingsCompanion.insert(
           source: track.ref.source.wire,
           // Ключ — id в терминах источника: составной `track-album` Яндекс
@@ -294,10 +422,11 @@ class TracksDao {
           ? track.artistCovers[i]
           : null;
 
-      final existing = await (_db.select(_db.artists)
-            ..where((t) => t.nameNorm.equals(nameNorm))
-            ..limit(1))
-          .getSingleOrNull();
+      final existing =
+          await (_db.select(_db.artists)
+                ..where((t) => t.nameNorm.equals(nameNorm))
+                ..limit(1))
+              .getSingleOrNull();
 
       if (existing != null) {
         // У артиста из локального тега удалённого id нет, и на все такие
@@ -305,41 +434,43 @@ class TracksDao {
         // источника падал на уникальном индексе artists_by_source.
         // Поэтому без id держим суррогат, а когда id наконец приходит —
         // дописываем его в ту же строку.
-        final nextRemote = remoteArtistId != null &&
-                existing.remoteArtistId != remoteArtistId
+        final nextRemote =
+            remoteArtistId != null && existing.remoteArtistId != remoteArtistId
             ? remoteArtistId
             : null;
         final nextCover = existing.coverUrl == null && cover != null
             ? cover
             : null;
         if (nextRemote != null || nextCover != null) {
-          await (_db.update(_db.artists)
-                ..where((t) => t.id.equals(existing.id)))
-              .write(
-                ArtistsCompanion(
-                  remoteArtistId: nextRemote == null
-                      ? const Value.absent()
-                      : Value(nextRemote),
-                  coverUrl: nextCover == null
-                      ? const Value.absent()
-                      : Value(nextCover),
-                ),
-              );
+          await (_db.update(
+            _db.artists,
+          )..where((t) => t.id.equals(existing.id))).write(
+            ArtistsCompanion(
+              remoteArtistId: nextRemote == null
+                  ? const Value.absent()
+                  : Value(nextRemote),
+              coverUrl: nextCover == null
+                  ? const Value.absent()
+                  : Value(nextCover),
+            ),
+          );
         }
         ids.add(existing.id);
         continue;
       }
 
-      final id = await _db.into(_db.artists).insert(
-        ArtistsCompanion.insert(
-          name: name,
-          nameNorm: nameNorm,
-          coverUrl: Value(cover),
-          source: source.wire,
-          remoteArtistId: remoteArtistId ?? 'name:$nameNorm',
-          updatedAt: Value(DateTime.now()),
-        ),
-      );
+      final id = await _db
+          .into(_db.artists)
+          .insert(
+            ArtistsCompanion.insert(
+              name: name,
+              nameNorm: nameNorm,
+              coverUrl: Value(cover),
+              source: source.wire,
+              remoteArtistId: remoteArtistId ?? 'name:$nameNorm',
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
       ids.add(id);
     }
 
@@ -350,27 +481,30 @@ class TracksDao {
     final title = track.album;
     if (title == null || title.isEmpty) return null;
 
-    final existing = await (_db.select(_db.albums)
-          ..where((t) => t.source.equals(track.ref.source.wire))
-          ..where(
-            (t) => track.albumRemoteId == null
-                ? t.title.equals(title)
-                : t.remoteAlbumId.equals(track.albumRemoteId!),
-          )
-          ..limit(1))
-        .getSingleOrNull();
+    final existing =
+        await (_db.select(_db.albums)
+              ..where((t) => t.source.equals(track.ref.source.wire))
+              ..where(
+                (t) => track.albumRemoteId == null
+                    ? t.title.equals(title)
+                    : t.remoteAlbumId.equals(track.albumRemoteId!),
+              )
+              ..limit(1))
+            .getSingleOrNull();
     if (existing != null) return existing.id;
 
-    return _db.into(_db.albums).insert(
-      AlbumsCompanion.insert(
-        title: title,
-        coverUrl: Value(track.coverUrl),
-        source: track.ref.source.wire,
-        remoteAlbumId: track.albumRemoteId ?? '',
-        artistIdsCsv: Value(track.artistIds.join(',')),
-        updatedAt: Value(DateTime.now()),
-      ),
-    );
+    return _db
+        .into(_db.albums)
+        .insert(
+          AlbumsCompanion.insert(
+            title: title,
+            coverUrl: Value(track.coverUrl),
+            source: track.ref.source.wire,
+            remoteAlbumId: track.albumRemoteId ?? '',
+            artistIdsCsv: Value(track.artistIds.join(',')),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
   }
 }
 

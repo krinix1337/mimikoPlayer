@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app_services.dart';
 import 'core/content/ai_filter.dart';
 import 'core/content/censor_base.dart';
+import 'core/db/daos/downloads_dao.dart';
 import 'core/db/daos/library_dao.dart';
 import 'core/db/database.dart';
 import 'core/logging/app_logger.dart';
@@ -51,26 +52,11 @@ final localTracksProvider = FutureProvider<List<Track>>((ref) async {
   return services.db.tracksDao.byIdList(ids);
 });
 
-final historyProvider = FutureProvider<List<RecentPlay>>((ref) async {
-  final services = ref.watch(appServicesProvider);
-  final rows = await services.db.historyDao.recent(limit: 30);
-  if (rows.isEmpty) return const [];
-
-  final tracks = await services.db.tracksDao.byIdList(
-    rows.map((e) => e.localTrackId).toSet().toList(),
-  );
-  final byId = {for (final t in tracks) t.id: t};
-
-  return [
-    for (final row in rows)
-      if (byId[row.localTrackId] case final track?)
-        RecentPlay(
-          localTrackId: row.localTrackId,
-          title: track.title,
-          playedAt: row.playedAt,
-          source: SourceId.fromWire(row.source),
-        ),
-  ];
+/// Пикер «Недавних»: любая новая запись истории пересобирает раздел, даже
+/// если экран всё это время лежал под плеером и не пересоздавался.
+final historyTickProvider = StreamProvider.autoDispose<int>((ref) {
+  final db = ref.watch(appServicesProvider).db;
+  return db.select(db.history).watch().map((rows) => rows.length);
 });
 
 final databaseInfoProvider = FutureProvider<DatabaseInfo>((ref) async {
@@ -80,6 +66,20 @@ final databaseInfoProvider = FutureProvider<DatabaseInfo>((ref) async {
     rows: await db.rowCountSnapshot(),
   );
 });
+
+final downloadQueueStatsProvider =
+    StreamProvider.autoDispose<DownloadQueueStats>(
+      (ref) => ref.watch(appServicesProvider).db.downloadsDao.watchStats(),
+    );
+
+final downloadedFilesSummaryProvider =
+    StreamProvider.autoDispose<DownloadedFilesSummary>(
+      (ref) => ref
+          .watch(appServicesProvider)
+          .db
+          .downloadsDao
+          .watchCompletedFilesSummary(),
+    );
 
 final sourcePriorityProvider = FutureProvider<List<SourceId>>(
   (ref) => ref.watch(appServicesProvider).db.settingsDao.playbackPriority(),
@@ -159,6 +159,37 @@ class PrefsController extends Notifier<Prefs> {
     await _write(state.copyWith(hideAiTracks: value));
   }
 
+  Future<void> setHomeCoverTone(HomeCoverTone tone) =>
+      _write(state.copyWith(homeCoverTone: tone));
+
+  Future<void> setHomeCoverBlur(bool value) =>
+      _write(state.copyWith(homeCoverBlur: value));
+
+  Future<void> setShowDjInfo(bool value) =>
+      _write(state.copyWith(showDjInfo: value));
+
+  Future<void> setAutoDownloadLikes(bool value) =>
+      _write(state.copyWith(autoDownloadLikes: value));
+
+  Future<void> setAutoDownloadWifiOnly(bool value) =>
+      _write(state.copyWith(autoDownloadWifiOnly: value));
+
+  Future<void> setAutoDownloadAllApproved(bool value) =>
+      _write(state.copyWith(autoDownloadAllApproved: value));
+
+  Future<void> setDownloadLimitBytes(int? bytes) => _write(
+    bytes == null
+        ? state.copyWith(clearDownloadLimit: true)
+        : state.copyWith(downloadLimitBytes: bytes),
+  );
+
+  Future<void> setAutoDownloadQuality(String quality) {
+    final normalized = const {'low', 'normal', 'high'}.contains(quality)
+        ? quality
+        : 'normal';
+    return _write(state.copyWith(autoDownloadQuality: normalized));
+  }
+
   Future<void> setCensorBypass(bool value) async {
     CensorBase.instance.enabled = value;
     final services = ref.read(appServicesProvider);
@@ -169,6 +200,29 @@ class PrefsController extends Notifier<Prefs> {
     }
     await _write(state.copyWith(censorBypass: value));
   }
+
+  static const _searchHistoryLimit = 12;
+
+  /// Запрос попадает в историю только когда его реально отправили или
+  /// открыли результат: иначе туда текут все промежуточные нажатия.
+  Future<void> rememberSearch(String query) async {
+    final normalized = query.trim();
+    if (normalized.isEmpty) return;
+    if (state.searchHistory.isNotEmpty &&
+        state.searchHistory.first.toLowerCase() == normalized.toLowerCase()) {
+      return;
+    }
+    final next = [
+      normalized,
+      ...state.searchHistory.where(
+        (item) => item.toLowerCase() != normalized.toLowerCase(),
+      ),
+    ].take(_searchHistoryLimit).toList();
+    await _write(state.copyWith(searchHistory: next));
+  }
+
+  Future<void> clearSearchHistory() =>
+      _write(state.copyWith(searchHistory: const []));
 
   Future<void> setHomeBackground(HomeBackground value) =>
       _write(state.copyWith(homeBackground: value));
@@ -184,12 +238,22 @@ final prefsProvider = NotifierProvider<PrefsController, Prefs>(
 );
 
 /// Заголовок трека по локальному id — для очередей и списков истории.
-final trackTitleProvider = FutureProvider.family<String, String>((
+final trackTitleProvider = FutureProvider.autoDispose.family<String, String>((
   ref,
   id,
 ) async {
   final track = await ref.watch(appServicesProvider).db.tracksDao.byId(id);
   return track?.title ?? id;
+});
+
+/// Обложка трека по локальному id — нужна для превью соседнего трека при
+/// свайпе в плеере, где под рукой только очередь из id.
+final trackCoverProvider = FutureProvider.autoDispose.family<String?, String>((
+  ref,
+  id,
+) async {
+  final track = await ref.watch(appServicesProvider).db.tracksDao.byId(id);
+  return track?.coverUrl;
 });
 
 /// Поиск по всем подключённым источникам сразу. Источник без входа
@@ -290,6 +354,9 @@ final collectionProvider = FutureProvider.autoDispose
       final db = ref.watch(appServicesProvider).db;
       final sort = ref.watch(prefsProvider.select((p) => p.collectionSort));
       final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+      // «Недавние» остаются смонтированными под открытым плеером, поэтому
+      // без тика истории список показывал бы старый порядок до перезахода.
+      if (kind == CollectionKind.recent) ref.watch(historyTickProvider);
       final rows = await db.libraryDao.collectionRows(kind, sort: sort);
       if (!hideAi) return rows;
       await AiFilter.instance.ensureLoaded();
@@ -401,6 +468,36 @@ final artistBriefProvider = FutureProvider.autoDispose
       );
     });
 
+/// Все треки артиста, а не только популярная пятёрка.
+final artistTracksProvider = FutureProvider.autoDispose
+    .family<List<SourceTrack>, String>((ref, artistId) async {
+      final source = ref.watch(yandexSourceProvider);
+      if (source == null) return const [];
+      final tracks = await source.artistTracks(artistId);
+      final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+      if (!hideAi) return tracks;
+      await AiFilter.instance.ensureLoaded();
+      return [
+        for (final track in tracks)
+          if (!AiFilter.instance.isAiTrack(track)) track,
+      ];
+    });
+
+/// Полная дискография артиста.
+final artistAlbumsProvider = FutureProvider.autoDispose
+    .family<List<AlbumBrief>, String>((ref, artistId) async {
+      final source = ref.watch(yandexSourceProvider);
+      if (source == null) return const [];
+      final albums = await source.artistAlbums(artistId);
+      final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+      if (!hideAi) return albums;
+      await AiFilter.instance.ensureLoaded();
+      return [
+        for (final album in albums)
+          if (!album.artistIds.any(AiFilter.instance.isAiArtistId)) album,
+      ];
+    });
+
 /// Альбом целиком — треки приходят в порядке диска.
 final albumProvider = FutureProvider.autoDispose.family<AlbumSnapshot?, String>(
   (ref, albumId) async {
@@ -424,6 +521,38 @@ final albumProvider = FutureProvider.autoDispose.family<AlbumSnapshot?, String>(
     );
   },
 );
+
+/// Новинки лендинга для раздела «Что послушать».
+final newReleasesProvider = FutureProvider.autoDispose<List<AlbumBrief>>((
+  ref,
+) async {
+  final source = ref.watch(yandexSourceProvider);
+  if (source == null || !ref.watch(yandexReadyProvider)) return const [];
+  final albums = await source.newReleases(limit: 12);
+  final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+  if (!hideAi) return albums;
+  await AiFilter.instance.ensureLoaded();
+  return [
+    for (final album in albums)
+      if (!album.artistIds.any(AiFilter.instance.isAiArtistId)) album,
+  ];
+});
+
+/// Полная лента новинок для страницы «Новые релизы».
+final newReleasesPageProvider = FutureProvider.autoDispose<List<AlbumBrief>>((
+  ref,
+) async {
+  final source = ref.watch(yandexSourceProvider);
+  if (source == null || !ref.watch(yandexReadyProvider)) return const [];
+  final albums = await source.newReleases(limit: 30);
+  final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
+  if (!hideAi) return albums;
+  await AiFilter.instance.ensureLoaded();
+  return [
+    for (final album in albums)
+      if (!album.artistIds.any(AiFilter.instance.isAiArtistId)) album,
+  ];
+});
 
 /// Чарт Яндекса: позиция и трек.
 final chartProvider = FutureProvider<List<ChartEntry>>((ref) async {
@@ -465,23 +594,33 @@ final librarySyncProvider = FutureProvider<void>((ref) async {
   final last = lastRaw == null
       ? null
       : DateTime.tryParse(lastRaw.replaceAll('"', ''));
-  if (last != null &&
-      DateTime.now().difference(last) < const Duration(hours: 24)) {
-    return;
-  }
+  final likesFresh =
+      last != null &&
+      DateTime.now().difference(last) < const Duration(hours: 24);
 
   var likes = 0;
-  try {
-    likes = await importYandexLikes(source: source, db: services.db);
-  } on Object catch (error) {
-    AppLogger.instance.warn('лайки не синхронизировались: $error');
-  }
-  if (likes > 0) {
-    await services.db.settingsDao.setValue(
-      _likesSyncedKey,
-      DateTime.now().toIso8601String(),
-    );
-    ref.invalidate(collectionProvider);
+  if (!likesFresh) {
+    try {
+      likes = await importYandexLikes(source: source, db: services.db);
+    } on Object catch (error) {
+      AppLogger.instance.warn('лайки не синхронизировались: $error');
+    }
+    // Если часть пачек не разрешилась, отметку не ставим: иначе недостающие
+    // лайки не доберутся ещё сутки.
+    final complete =
+        source.lastLikesExpected == 0 || likes >= source.lastLikesExpected;
+    if (likes > 0 && complete) {
+      await services.db.settingsDao.setValue(
+        _likesSyncedKey,
+        DateTime.now().toIso8601String(),
+      );
+      ref.invalidate(collectionProvider);
+    } else if (likes > 0) {
+      AppLogger.instance.warn(
+        'лайки: импортировано $likes из ${source.lastLikesExpected}, повторю позже',
+      );
+      ref.invalidate(collectionProvider);
+    }
   }
 
   // Плейлисты — отдельно: падение одного не должно отменять лайки.
@@ -501,7 +640,27 @@ final playlistsProvider = FutureProvider<List<PlaylistOverview>>(
 /// Плейлист по локальному id (`yandex:<kind>`): шапка и треки в порядке источника.
 final playlistProvider = FutureProvider.autoDispose
     .family<PlaylistDetail?, String>((ref, id) async {
-      final db = ref.watch(appServicesProvider).db;
+      final services = ref.watch(appServicesProvider);
+      final db = services.db;
+      // Открываем плейлист — тянем его содержимое с Яндекса: треки, добавленные
+      // в «настоящем» приложении, иначе дождались бы только суточной
+      // синхронизации. Без сети или при отказе молча читаем то, что в базе.
+      final yandex = services.yandex;
+      if (id.startsWith('yandex:') &&
+          yandex != null &&
+          yandex.auth is AuthReady) {
+        try {
+          final snapshot = await yandex.getPlaylist(id.substring(7));
+          if (snapshot != null) {
+            await db.libraryDao.importPlaylist(
+              source: SourceId.yandex,
+              snapshot: snapshot,
+            );
+          }
+        } on Object {
+          // Офлайн — показываем кэш.
+        }
+      }
       final overview = await db.libraryDao.playlistById(id);
       if (overview == null) return null;
       final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
@@ -522,6 +681,26 @@ final playlistProvider = FutureProvider.autoDispose
             : rows,
       );
     });
+
+/// Разовый переимпорт плейлистов. Первый маркер (v3) чинил повторы после
+/// миграции; второй (v4) — короткие ссылки `/playlists`; третий (v5) —
+/// отравленные этими ссылками mapping'и: импорт теперь перезаписывает их
+/// полноценными треками. Маркер не даёт гонять это на каждом запуске; без
+/// сети просто повторим в следующий раз.
+Future<void> reimportPlaylistsOnce(WidgetRef ref) async {
+  final services = ref.read(appServicesProvider);
+  final marker = await services.db.settingsDao.value('playlists_v5_done');
+  if (marker != null) return;
+  final source = services.yandex;
+  if (source == null) return;
+  try {
+    await importYandexPlaylists(source: source, db: services.db);
+    await services.db.settingsDao.setValue('playlists_v5_done', '1');
+    ref.invalidate(playlistsProvider);
+  } on Object {
+    // Офлайн или отказ — попробуем при следующем запуске.
+  }
+}
 
 /// Импортирует лайки Яндекса в локальную базу. Аргументы явные, чтобы
 /// функцию могли вызвать и провайдер, и виджет.
@@ -563,7 +742,12 @@ Future<int> importYandexPlaylists({
   // Сеть держим вне транзакции: под замком БД на время запроса остальные
   // чтения встают на секунды.
   final snapshots = <PlaylistSnapshot>[];
-  for (final summary in (await source.playlists()).take(limit)) {
+  // Свои плейлисты и понравившиеся чужие — это два разных эндпоинта.
+  final summaries = <PlaylistSummary>[
+    ...await source.playlists(),
+    ...await source.likedPlaylists(),
+  ];
+  for (final summary in summaries.take(limit)) {
     final snapshot = await source.getPlaylist(summary.remotePlaylistId);
     if (snapshot != null) snapshots.add(snapshot);
   }
@@ -575,21 +759,14 @@ Future<int> importYandexPlaylists({
       );
     }
   });
+  // Плейлисты, удалённые на сервере, больше не висят в коллекции. Чистим
+  // только если список пришёл целиком — иначе снесём лишнее при обрезке.
+  if (summaries.length <= limit) {
+    await db.libraryDao.removePlaylistsExcept({
+      for (final summary in summaries) 'yandex:${summary.remotePlaylistId}',
+    });
+  }
   return snapshots.length;
-}
-
-final class RecentPlay {
-  const RecentPlay({
-    required this.localTrackId,
-    required this.title,
-    required this.playedAt,
-    required this.source,
-  });
-
-  final String localTrackId;
-  final String title;
-  final DateTime playedAt;
-  final SourceId source;
 }
 
 final class DatabaseInfo {

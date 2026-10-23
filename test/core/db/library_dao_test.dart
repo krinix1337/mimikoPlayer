@@ -12,15 +12,14 @@ SourceTrack _track(
   String artist,
   int seconds, {
   List<String?> artistCovers = const [],
-}) =>
-    SourceTrack(
-      ref: RemoteTrackRef(SourceId.yandex, id),
-      title: title,
-      artists: [artist],
-      artistCovers: artistCovers,
-      duration: Duration(seconds: seconds),
-      coverUrl: 'https://example/$id.jpg',
-    );
+}) => SourceTrack(
+  ref: RemoteTrackRef(SourceId.yandex, id),
+  title: title,
+  artists: [artist],
+  artistCovers: artistCovers,
+  duration: Duration(seconds: seconds),
+  coverUrl: 'https://example/$id.jpg',
+);
 
 void main() {
   late AppDatabase db;
@@ -32,19 +31,28 @@ void main() {
   });
   tearDown(() => db.close());
 
-  Future<String> seed(String id, String title, String artist, int seconds) async =>
-      (await db.tracksDao.ingest(_track(id, title, artist, seconds))).localTrackId;
+  Future<String> seed(
+    String id,
+    String title,
+    String artist,
+    int seconds,
+  ) async =>
+      (await db.tracksDao.ingest(_track(id, title, artist, seconds)))
+          .localTrackId;
 
-  test('строки несут исполнителя и обложку, а не служебное имя источника', () async {
-    final id = await seed('11', 'Молчит', 'Король и Шут', 200);
-    await dao.setLike(id, 1);
+  test(
+    'строки несут исполнителя и обложку, а не служебное имя источника',
+    () async {
+      final id = await seed('11', 'Молчит', 'Король и Шут', 200);
+      await dao.setLike(id, 1);
 
-    final rows = await dao.collectionRows(CollectionKind.liked);
-    expect(rows.single.localTrackId, id);
-    expect(rows.single.artist, 'Король и Шут');
-    expect(rows.single.coverUrl, 'https://example/11.jpg');
-    expect(rows.single.durationSec, 200);
-  });
+      final rows = await dao.collectionRows(CollectionKind.liked);
+      expect(rows.single.localTrackId, id);
+      expect(rows.single.artist, 'Король и Шут');
+      expect(rows.single.coverUrl, 'https://example/11.jpg');
+      expect(rows.single.durationSec, 200);
+    },
+  );
 
   test('повторный импорт не переставляет коллекцию', () async {
     // Регресс: массовая загрузка лайков писала likedAt = now каждому треку,
@@ -109,11 +117,13 @@ void main() {
     await dao.setLike(hated, -1);
 
     expect(
-      (await dao.collectionRows(CollectionKind.liked)).map((row) => row.localTrackId),
+      (await dao.collectionRows(CollectionKind.liked))
+          .map((row) => row.localTrackId),
       [liked],
     );
     expect(
-      (await dao.collectionRows(CollectionKind.disliked)).map((row) => row.localTrackId),
+      (await dao.collectionRows(CollectionKind.disliked))
+          .map((row) => row.localTrackId),
       [hated],
     );
   });
@@ -132,18 +142,78 @@ void main() {
     expect(artist.coverUrl, 'https://example/artist.jpg');
   });
 
-  test('плейлист без собственной обложки берёт обложку первого трека', () async {
+  test(
+    'плейлист без собственной обложки берёт обложку первого трека',
+    () async {
+      await dao.importPlaylist(
+        source: SourceId.yandex,
+        snapshot: PlaylistSnapshot(
+          remotePlaylistId: '77',
+          title: 'Без обложки',
+          tracks: [_track('10', 'Первый', 'Артист', 100)],
+        ),
+      );
+
+      final overview = await dao.playlistsOverview();
+      expect(overview.single.coverUrl, 'https://example/10.jpg');
+    },
+  );
+
+  test('повтор трека сохраняется отдельной строкой, source/remote верные', () async {
+    final first = _track('20', 'Первый', 'Артист', 100);
+    final second = _track('21', 'Второй', 'Артист', 120);
     await dao.importPlaylist(
       source: SourceId.yandex,
       snapshot: PlaylistSnapshot(
-        remotePlaylistId: '77',
-        title: 'Без обложки',
-        tracks: [_track('10', 'Первый', 'Артист', 100)],
+        remotePlaylistId: '88',
+        title: 'С дублем',
+        // Один и тот же трек дважды: PK (playlist, track) второй раз не пустит.
+        tracks: [first, first, second],
       ),
     );
 
-    final overview = await dao.playlistsOverview();
-    expect(overview.single.coverUrl, 'https://example/10.jpg');
+    final links = await db.select(db.playlistTracks).get();
+    links.sort((a, b) => a.position.compareTo(b.position));
+    expect(links.map((l) => l.remoteId), ['20', '20', '21']);
+    expect(links.map((l) => l.position), [0, 1, 2]);
+    expect((await dao.playlistRows('yandex:88')).length, 3);
+  });
+
+  test('короткая ссылка без метаданных не создаёт трек в плейлисте', () async {
+    final broken = SourceTrack(
+      ref: const RemoteTrackRef(SourceId.yandex, '99'),
+      title: '',
+      artists: const [],
+      duration: Duration.zero,
+    );
+    await dao.importPlaylist(
+      source: SourceId.yandex,
+      snapshot: PlaylistSnapshot(
+        remotePlaylistId: '89',
+        title: 'Короткие ссылки',
+        tracks: [broken, _track('22', 'Живой', 'Артист', 120)],
+      ),
+    );
+
+    final links = await db.select(db.playlistTracks).get();
+    expect(links, hasLength(1));
+    expect(links.single.remoteId, '22');
+  });
+
+  test('плейлист, удалённый на сервере, исчезает и локально', () async {
+    for (final (kind, title, id) in [('1', 'A', '30'), ('2', 'B', '31')]) {
+      await dao.importPlaylist(
+        source: SourceId.yandex,
+        snapshot: PlaylistSnapshot(
+          remotePlaylistId: kind,
+          title: title,
+          tracks: [_track(id, title, 'Артист', 100)],
+        ),
+      );
+    }
+
+    expect(await dao.removePlaylistsExcept({'yandex:1'}), 1);
+    expect((await dao.playlistsOverview()).map((p) => p.id), ['yandex:1']);
   });
 
   test('скачанное попадает в отдельный раздел коллекции', () async {

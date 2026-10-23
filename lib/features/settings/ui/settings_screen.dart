@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app_providers.dart';
 import '../../../core/prefs/prefs.dart';
+import '../../../features/downloads/download_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import 'settings_widgets.dart';
@@ -167,18 +170,35 @@ class _AppearancePage extends ConsumerWidget {
                 ],
               ),
             ),
+            ChoiceRow<String>(
+              label: l.settingsLanguage,
+              values: const ['system', 'ru', 'en'],
+              current: prefs.localeCode ?? 'system',
+              columns: 3,
+              labelOf: (value) => switch (value) {
+                'ru' => 'Русский',
+                'en' => 'English',
+                _ => l.languageSystem,
+              },
+              onPick: (value) =>
+                  controller.setLocaleCode(value == 'system' ? null : value),
+            ),
             ChoiceRow<AppPalette>(
               label: l.settingsPalette,
               values: AppPalette.values,
               current: prefs.palette,
+              columns: 2,
               labelOf: (palette) => switch (palette) {
                 AppPalette.brand => l.paletteBrand,
                 AppPalette.dynamic => l.paletteDynamic,
                 AppPalette.mono => l.paletteMono,
+                AppPalette.amoled => l.paletteAmoled,
               },
-              note: prefs.palette == AppPalette.dynamic
-                  ? l.paletteDynamicNote
-                  : null,
+              note: switch (prefs.palette) {
+                AppPalette.dynamic => l.paletteDynamicNote,
+                AppPalette.amoled => l.paletteAmoledNote,
+                _ => null,
+              },
               onPick: controller.setPalette,
             ),
             AccentRow(
@@ -191,6 +211,7 @@ class _AppearancePage extends ConsumerWidget {
               label: l.settingsContrast,
               values: Contrast.values,
               current: prefs.contrast,
+              columns: 2,
               labelOf: (value) =>
                   value == Contrast.normal ? l.contrastNormal : l.contrastHigh,
               onPick: controller.setContrast,
@@ -199,6 +220,7 @@ class _AppearancePage extends ConsumerWidget {
               label: l.settingsCorners,
               values: CornerRadius.values,
               current: prefs.corner,
+              columns: 3,
               labelOf: (value) => switch (value) {
                 CornerRadius.soft => l.cornerSoft,
                 CornerRadius.round => l.cornerRound,
@@ -210,6 +232,7 @@ class _AppearancePage extends ConsumerWidget {
               label: l.artworkShape,
               values: ArtworkShape.values,
               current: prefs.artworkShape,
+              columns: 3,
               labelOf: (value) => switch (value) {
                 ArtworkShape.rounded => l.artworkRounded,
                 ArtworkShape.soft => l.artworkSoft,
@@ -221,6 +244,7 @@ class _AppearancePage extends ConsumerWidget {
               label: l.settingsMotion,
               values: AnimationsSpeed.values,
               current: prefs.animations,
+              columns: 4,
               labelOf: (value) => switch (value) {
                 AnimationsSpeed.off => l.motionOff,
                 AnimationsSpeed.fast => l.motionFast,
@@ -262,6 +286,7 @@ class _AppearancePage extends ConsumerWidget {
               label: l.homeBackground,
               values: HomeBackground.values,
               current: prefs.homeBackground,
+              columns: 3,
               labelOf: (value) => switch (value) {
                 HomeBackground.cover => l.bgCover,
                 HomeBackground.blobs => l.bgBlobs,
@@ -269,14 +294,28 @@ class _AppearancePage extends ConsumerWidget {
               },
               onPick: controller.setHomeBackground,
             ),
+            ChoiceRow<HomeCoverTone>(
+              label: l.homeCoverTone,
+              values: HomeCoverTone.values,
+              current: prefs.homeCoverTone,
+              columns: 3,
+              labelOf: (value) => switch (value) {
+                HomeCoverTone.darker => l.homeCoverDarker,
+                HomeCoverTone.normal => l.homeCoverNormal,
+                HomeCoverTone.lighter => l.homeCoverLighter,
+              },
+              onPick: controller.setHomeCoverTone,
+            ),
+            SwitchRow(
+              label: l.homeCoverBlur,
+              value: prefs.homeCoverBlur,
+              note: l.homeCoverBlurNote,
+              onChanged: controller.setHomeCoverBlur,
+            ),
             // Частота кадров относится к экрану, а не к звуку: раньше она
             // лежала в разделе «Звук» и путала.
             const FrameTile(),
           ],
-        ),
-        SettingsSection(
-          title: l.settingsLanguage,
-          children: const [LanguageRow()],
         ),
         SettingsSection(
           title: l.settingsLauncherIcon,
@@ -306,6 +345,7 @@ class _SoundPage extends ConsumerWidget {
               label: l.settingsQuality,
               values: const ['auto', 'low', 'normal', 'high', 'lossless'],
               current: prefs.quality,
+              columns: 3,
               labelOf: (value) => switch (value) {
                 'auto' => l.qualityAuto,
                 'low' => l.qualityLow,
@@ -326,6 +366,12 @@ class _SoundPage extends ConsumerWidget {
               value: prefs.censorBypass,
               note: l.censorBypassNote,
               onChanged: controller.setCensorBypass,
+            ),
+            SwitchRow(
+              label: l.djInfo,
+              value: prefs.showDjInfo,
+              note: l.djInfoNote,
+              onChanged: controller.setShowDjInfo,
             ),
             const PriorityTile(),
           ],
@@ -383,12 +429,84 @@ class _StoragePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
+    final prefs = ref.watch(prefsProvider);
+    final controller = ref.read(prefsProvider.notifier);
+    final limitGb = prefs.downloadLimitBytes == null
+        ? 0
+        : (prefs.downloadLimitBytes! / (1024 * 1024 * 1024)).round();
     return _Page(
       title: l.settingsSectionStorage,
       children: [
         SettingsSection(
           title: l.settingsStorage,
           children: const [CacheTile()],
+        ),
+        SettingsSection(
+          title: l.settingsDownloads,
+          children: [
+            const DownloadsTile(),
+            SwitchRow(
+              label: l.downloadsAutoLikes,
+              value: prefs.autoDownloadLikes,
+              note: l.downloadsAutoLikesNote,
+              onChanged: (value) async {
+                await controller.setAutoDownloadLikes(value);
+                final downloads = ref.read(downloadControllerProvider.notifier);
+                if (value) {
+                  unawaited(downloads.kickAutoDownloads());
+                } else {
+                  unawaited(downloads.cancelAutoQueue());
+                }
+              },
+            ),
+            if (prefs.autoDownloadLikes && !prefs.autoDownloadAllApproved)
+              ListTile(
+                leading: const Icon(Icons.playlist_add_check_rounded),
+                title: Text(l.downloadsDownloadAll),
+                subtitle: Text(l.downloadsDownloadAllNote),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  await controller.setAutoDownloadAllApproved(true);
+                  unawaited(
+                    ref
+                        .read(downloadControllerProvider.notifier)
+                        .kickAutoDownloads(),
+                  );
+                },
+              ),
+            SwitchRow(
+              label: l.downloadsWifiOnly,
+              value: prefs.autoDownloadWifiOnly,
+              note: l.downloadsWifiOnlyNote,
+              onChanged: controller.setAutoDownloadWifiOnly,
+            ),
+            ChoiceRow<int>(
+              label: l.downloadsLimit,
+              values: const [0, 2, 5, 10, 20],
+              current: limitGb,
+              columns: 3,
+              labelOf: (gb) =>
+                  gb == 0 ? l.downloadsUnlimited : l.downloadsGb(gb),
+              note: l.downloadsLimitNote,
+              onPick: (gb) => controller.setDownloadLimitBytes(
+                gb == 0 ? null : gb * 1024 * 1024 * 1024,
+              ),
+            ),
+            ChoiceRow<String>(
+              label: l.downloadsQuality,
+              values: const ['low', 'normal', 'high'],
+              current: prefs.autoDownloadQuality,
+              columns: 3,
+              labelOf: (quality) => switch (quality) {
+                'low' => l.qualityLow,
+                'high' => l.qualityHigh,
+                _ => l.qualityNormal,
+              },
+              note: l.downloadsQualityNote,
+              onPick: controller.setAutoDownloadQuality,
+            ),
+            const DeleteDownloadsTile(),
+          ],
         ),
         SettingsSection(
           title: l.settingsData,
@@ -522,7 +640,7 @@ class _AboutPage extends StatelessWidget {
     );
   }
 
-  static const String _version = '1.2.1';
+  static const String _version = '1.2.2';
 }
 
 /// Общая оболочка страницы раздела: крупный заголовок и кнопка назад.
@@ -568,6 +686,7 @@ extension on AccentColor {
     AccentColor.sky => l.accentSky,
     AccentColor.rose => l.accentRose,
     AccentColor.leaf => l.accentLeaf,
+    AccentColor.orchid => l.accentOrchid,
   };
 }
 

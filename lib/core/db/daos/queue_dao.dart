@@ -27,29 +27,32 @@ class QueueDao {
     required bool shuffleEnabled,
     Map<String, Object?>? sourceHint,
   }) => _db.transaction(() async {
-    await (_db.delete(_db.queueSnapshots)
-          ..where((t) => t.kind.equals(kind)))
-        .go();
-    await _db.into(_db.queueSnapshots).insert(
-      QueueSnapshotsCompanion.insert(
-        kind: kind,
-        itemsJson: jsonEncode(localTrackIds),
-        queueIndex: Value(index),
-        positionMs: Value(position.inMilliseconds),
-        repeatMode: Value(repeatMode),
-        shuffleEnabled: Value(shuffleEnabled),
-        sourceHintJson: sourceHint == null
-            ? const Value.absent()
-            : Value(jsonEncode(sourceHint)),
-        savedAt: Value(DateTime.now()),
-      ),
-    );
+    await (_db.delete(
+      _db.queueSnapshots,
+    )..where((t) => t.kind.equals(kind))).go();
+    await _db
+        .into(_db.queueSnapshots)
+        .insert(
+          QueueSnapshotsCompanion.insert(
+            kind: kind,
+            itemsJson: jsonEncode(localTrackIds),
+            queueIndex: Value(index),
+            positionMs: Value(position.inMilliseconds),
+            repeatMode: Value(repeatMode),
+            shuffleEnabled: Value(shuffleEnabled),
+            sourceHintJson: sourceHint == null
+                ? const Value.absent()
+                : Value(jsonEncode(sourceHint)),
+            savedAt: Value(DateTime.now()),
+          ),
+        );
   });
 
-  Future<QueueSnapshot?> load(String kind) => (_db.select(_db.queueSnapshots)
-        ..where((t) => t.kind.equals(kind))
-        ..limit(1))
-      .getSingleOrNull();
+  Future<QueueSnapshot?> load(String kind) =>
+      (_db.select(_db.queueSnapshots)
+            ..where((t) => t.kind.equals(kind))
+            ..limit(1))
+          .getSingleOrNull();
 
   static List<String> itemsOf(QueueSnapshot snapshot) =>
       (jsonDecode(snapshot.itemsJson) as List).map((e) => '$e').toList();

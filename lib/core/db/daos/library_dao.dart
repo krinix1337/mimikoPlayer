@@ -173,6 +173,7 @@ class LibraryDao {
     };
     final artists = await mainArtistNames(ids);
     final artistRemoteIds = await artistRemoteIdsForTracks(ids);
+    final localCovers = await _localCovers(ids);
 
     final rows = <CollectionRow>[
       for (final (id, markedAt) in ordered)
@@ -183,6 +184,7 @@ class LibraryDao {
             artist: artists[id] ?? '',
             artistRemoteIds: artistRemoteIds[id] ?? const [],
             coverUrl: track.coverUrl,
+            coverPath: localCovers[id],
             durationSec: track.durationSec,
             markedAt: markedAt,
             source: SourceId.fromWire(track.metadataSource),
@@ -302,6 +304,24 @@ class LibraryDao {
     return result;
   }
 
+  /// Локальные обложки скачанных треков: списки должны оставаться
+  /// цветными в авиарежиме, даже если кэш картинок очистили.
+  Future<Map<String, String>> _localCovers(List<String> trackIds) async {
+    if (trackIds.isEmpty) return const {};
+    final rows =
+        await (_db.select(_db.downloadedFiles)..where(
+              (t) =>
+                  t.localTrackId.isIn(trackIds) &
+                  t.state.equals('complete') &
+                  t.coverPath.isNotNull(),
+            ))
+            .get();
+    return {
+      for (final row in rows)
+        if (row.coverPath != null) row.localTrackId: row.coverPath!,
+    };
+  }
+
   static int _compareFold(String a, String b) =>
       a.toLowerCase().compareTo(b.toLowerCase());
 
@@ -361,6 +381,7 @@ class LibraryDao {
     };
     final artists = await mainArtistNames(ids);
     final artistRemoteIds = await artistRemoteIdsForTracks(ids);
+    final localCovers = await _localCovers(ids);
 
     return [
       for (final link in links)
@@ -371,6 +392,7 @@ class LibraryDao {
             artist: artists[track.id] ?? '',
             artistRemoteIds: artistRemoteIds[track.id] ?? const [],
             coverUrl: track.coverUrl,
+            coverPath: localCovers[track.id],
             durationSec: track.durationSec,
             markedAt: link.addedAt,
             source: SourceId.fromWire(track.metadataSource),
@@ -414,18 +436,28 @@ class LibraryDao {
 
   /// Имиты удалённого плейлиста в локальный: строки треков уже сведены
   /// `TracksDao.ingest`, здесь остаются только связи.
+  /// Удаляет локальные плейлисты, которых больше нет на сервере: иначе
+  /// удалённый в другом клиенте плейлист остаётся в коллекции навсегда.
+  Future<int> removePlaylistsExcept(Set<String> keepIds) {
+    if (keepIds.isEmpty) return Future.value(0);
+    return (_db.delete(_db.playlists)..where(
+          (t) => t.source.equals(SourceId.yandex.wire) & t.id.isNotIn(keepIds),
+        ))
+        .go();
+  }
+
   Future<String> importPlaylist({
     required SourceId source,
     required PlaylistSnapshot snapshot,
   }) async {
-    final id = '${source.wire}:${snapshot.remotePlaylistId}';
+    final playlistId = '${source.wire}:${snapshot.remotePlaylistId}';
     final now = DateTime.now();
 
     await _db
         .into(_db.playlists)
         .insertOnConflictUpdate(
           PlaylistsCompanion.insert(
-            id: id,
+            id: playlistId,
             source: Value(source.wire),
             remotePlaylistId: Value(snapshot.remotePlaylistId),
             title: snapshot.title,
@@ -440,42 +472,55 @@ class LibraryDao {
           ),
         );
 
-    await (_db.delete(
-      _db.playlistTracks,
-    )..where((t) => t.playlistId.equals(id))).go();
-
-    // В плейлисте Яндекса один и тот же трек может встречаться дважды:
-    // первичный ключ (playlist_id, local_track_id) второй раз не пустит,
-    // поэтому повторные вхождения схлопываем.
-    final localIds = <String>[];
-    final seen = <String>{};
+    // Каждое вхождение трека сохраняем отдельной строкой: в плейлистах
+    // Яндекса повторы — норма, а ключ теперь (playlist_id, position).
+    final entries = <_PlaylistEntry>[];
     for (final track in snapshot.tracks) {
-      final id = (await _db.tracksDao.ingest(track)).localTrackId;
-      if (!seen.add(id)) continue;
-      localIds.add(id);
+      // Страховка от коротких ссылок источника: без названия и длительности
+      // у всех таких записей один пустой отпечаток, и они сливаются в один
+      // трек. Настоящий трек всегда несёт хотя бы название или длительность.
+      if (track.title.trim().isEmpty && track.duration == Duration.zero) {
+        continue;
+      }
+      final ingested = await _db.tracksDao.ingest(track);
+      entries.add(_PlaylistEntry(ingested.localTrackId, track));
     }
 
-    await _db.batch((batch) {
-      for (var i = 0; i < localIds.length; i++) {
-        final track = snapshot.tracks[i];
-        batch.insert(
-          _db.playlistTracks,
-          PlaylistTracksCompanion.insert(
-            playlistId: id,
-            // Трек обязательно уже сведён: ingest идемпотентен и возвращает
-            // тот же localTrackId для того же удалённого id.
-            localTrackId: localIds[i],
-            position: Value(i),
-            sourceId: track.ref.source.wire,
-            remoteId: track.ref.remoteId,
-            addedAt: Value(now),
-          ),
-        );
-      }
+    // Удаление старых связей и вставка новых — одной транзакцией: раньше kill
+    // в этом окне оставлял плейлист пустым или обрезанным.
+    await _db.transaction(() async {
+      await (_db.delete(
+        _db.playlistTracks,
+      )..where((t) => t.playlistId.equals(playlistId))).go();
+      await _db.batch((batch) {
+        for (var i = 0; i < entries.length; i++) {
+          final entry = entries[i];
+          batch.insert(
+            _db.playlistTracks,
+            PlaylistTracksCompanion.insert(
+              playlistId: playlistId,
+              // Трек обязательно уже сведён: ingest идемпотентен и возвращает
+              // тот же localTrackId для того же удалённого id.
+              localTrackId: entry.localTrackId,
+              position: Value(i),
+              sourceId: entry.track.ref.source.wire,
+              remoteId: entry.track.ref.remoteId,
+              addedAt: Value(now),
+            ),
+          );
+        }
+      });
     });
 
-    return id;
+    return playlistId;
   }
+}
+
+final class _PlaylistEntry {
+  const _PlaylistEntry(this.localTrackId, this.track);
+
+  final String localTrackId;
+  final SourceTrack track;
 }
 
 /// Строка списка коллекции: трек + то, что реально видно в строке.
@@ -487,6 +532,7 @@ final class CollectionRow {
     required this.durationSec,
     required this.source,
     this.coverUrl,
+    this.coverPath,
     this.markedAt,
     this.artistRemoteIds = const [],
   });
@@ -500,6 +546,9 @@ final class CollectionRow {
   final int durationSec;
   final SourceId source;
   final String? coverUrl;
+
+  /// Локальная копия обложки у скачанного трека.
+  final String? coverPath;
 
   /// Когда попало в раздел: лайк, скачивание или проигрывание.
   final DateTime? markedAt;

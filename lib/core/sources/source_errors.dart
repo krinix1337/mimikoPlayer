@@ -81,7 +81,8 @@ final class SourceFailure implements Exception {
     SourceFailReason.notInCatalog ||
     SourceFailReason.unavailable ||
     SourceFailReason.geoBlocked => const Duration(days: 7),
-    SourceFailReason.remoteThrottled || SourceFailReason.network => const Duration(minutes: 5),
+    SourceFailReason.remoteThrottled ||
+    SourceFailReason.network => const Duration(minutes: 5),
     _ => Duration.zero,
   };
 

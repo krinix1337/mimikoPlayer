@@ -8,6 +8,8 @@ import '../../../features/player/player_snapshot.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../theme/app_motion.dart';
+import '../../../features/downloads/download_service.dart';
+import '../../../features/player/ui/mini_player.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/track_cover.dart';
 import '../../../widgets/track_tile.dart';
@@ -34,16 +36,31 @@ class CollectionKindScreen extends ConsumerWidget {
     };
 
     return Scaffold(
+      // Пилюля уважает настройку и не заезжает под системную навигацию.
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Consumer(
+          builder: (context, ref, _) => ref.watch(prefsProvider).showMiniPlayer
+              ? const MiniPlayer()
+              : const SizedBox.shrink(),
+        ),
+      ),
       body: rows.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _ErrorBox(text: l.dbError('$error')),
         data: (data) => CustomScrollView(
           slivers: [
-            SliverAppBar.large(
+            SliverAppBar(
               pinned: true,
               backgroundColor: Theme.of(context).colorScheme.surface,
               title: Text(title),
               actions: [
+                if (kind == CollectionKind.liked)
+                  IconButton(
+                    tooltip: l.collectionDownloadAllLikes,
+                    icon: const Icon(Icons.download_rounded),
+                    onPressed: () => _downloadAll(context, ref),
+                  ),
                 IconButton(
                   tooltip: l.collectionSort,
                   icon: const Icon(Icons.swap_vert_rounded),
@@ -67,22 +84,11 @@ class CollectionKindScreen extends ConsumerWidget {
               )
             else ...[
               SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Row(
-                    children: [
-                      FilledButton.icon(
-                        onPressed: () => _play(context, ref, data, 0),
-                        icon: const Icon(Icons.play_arrow_rounded),
-                        label: Text(l.collectionPlayAll),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        l.collectionCount(data.length),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
+                child: _CollectionHero(
+                  kind: kind,
+                  rows: data,
+                  onPlay: () => _play(context, ref, data, 0),
+                  onShuffle: () => _play(context, ref, data, 0, shuffle: true),
                 ),
               ),
               SliverList.builder(
@@ -106,6 +112,17 @@ class CollectionKindScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _downloadAll(BuildContext context, WidgetRef ref) async {
+    final l = AppLocalizations.of(context);
+    final queued = await ref
+        .read(downloadControllerProvider.notifier)
+        .downloadAllLikes();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l.collectionDownloadQueued(queued))));
+  }
+
   String _emptyFor(AppLocalizations l) => switch (kind) {
     CollectionKind.liked => l.collectionEmptyLiked,
     CollectionKind.disliked => l.collectionEmptyDisliked,
@@ -118,15 +135,380 @@ class CollectionKindScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     List<CollectionRow> rows,
-    int index,
-  ) async {
+    int index, {
+    bool shuffle = false,
+  }) async {
     final router = GoRouter.of(context);
-    await ref.read(playbackControllerProvider).playQueue(
+    final controller = ref.read(playbackControllerProvider);
+    await controller.playQueue(
       [for (final row in rows) row.localTrackId],
       startIndex: index,
       sourceHint: {'kind': kind.name},
     );
+    if (shuffle) {
+      await controller.setShuffle(PlaybackShuffle.shuffled);
+    }
     router.push(Routes.player);
+  }
+}
+
+/// Шапка раздела: крупная мозаика, счётчик, длительность и действия.
+/// Обложка живёт на световом ореоле — это даёт глубину без тяжёлого блюра.
+class _CollectionHero extends StatelessWidget {
+  const _CollectionHero({
+    required this.kind,
+    required this.rows,
+    required this.onPlay,
+    required this.onShuffle,
+  });
+
+  final CollectionKind kind;
+  final List<CollectionRow> rows;
+  final VoidCallback onPlay;
+  final VoidCallback onShuffle;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final covers = rows
+        .map((row) => row.coverPath ?? row.coverUrl)
+        .whereType<String>()
+        .toList();
+    final totalSec = rows.fold<int>(0, (sum, row) => sum + row.durationSec);
+    final minutes = totalSec ~/ 60;
+    final duration = minutes < 60
+        ? l.listenedMinutes(minutes)
+        : '${l.listenedHours(minutes ~/ 60)} ${l.listenedMinutes(minutes % 60)}';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 22),
+      child: Column(
+        children: [
+          _HeroArtwork(covers: covers, kind: kind),
+          const SizedBox(height: 20),
+          Text(
+            l.collectionCount(rows.length),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (rows.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                duration,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 18),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: _HeroButton(
+                  primary: true,
+                  icon: Icons.play_arrow_rounded,
+                  label: l.collectionPlayAll,
+                  onTap: onPlay,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: _HeroButton(
+                  primary: false,
+                  icon: Icons.shuffle_rounded,
+                  label: l.collectionShuffleAll,
+                  onTap: onShuffle,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Стопка обложек с бликом по стеклу и жетоном раздела. Задние карточки
+/// выглядывают из-под основной и добавляют объём, не превращаясь в кашу.
+class _HeroArtwork extends StatelessWidget {
+  const _HeroArtwork({required this.covers, required this.kind});
+
+  final List<String> covers;
+  final CollectionKind kind;
+
+  static const _size = 176.0;
+
+  IconData get _icon => switch (kind) {
+    CollectionKind.liked => Icons.favorite_rounded,
+    CollectionKind.disliked => Icons.favorite_border_rounded,
+    CollectionKind.files => Icons.folder_rounded,
+    CollectionKind.recent => Icons.history_rounded,
+    CollectionKind.downloaded => Icons.offline_pin_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final radius = Motion.of(context).prefs.corner.radius + 6;
+    final shown = covers.take(4).toList();
+
+    return SizedBox(
+      width: _size + 28,
+      height: _size + 28,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    scheme.primary.withValues(alpha: 0.30),
+                    scheme.tertiary.withValues(alpha: 0.10),
+                    Colors.transparent,
+                  ],
+                  stops: const [0, 0.55, 1],
+                ),
+              ),
+            ),
+          ),
+          if (shown.length > 1)
+            Transform.rotate(
+              angle: -0.055,
+              child: Container(
+                width: _size - 6,
+                height: _size - 6,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(radius),
+                  color: scheme.surfaceContainerHighest,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.10),
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: TrackCover(
+                  url: shown[1],
+                  size: double.infinity,
+                  radius: radius,
+                ),
+              ),
+            ),
+          Container(
+            width: _size,
+            height: _size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.16),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.42),
+                  blurRadius: 34,
+                  offset: const Offset(0, 18),
+                ),
+                BoxShadow(
+                  color: scheme.primary.withValues(alpha: 0.12),
+                  blurRadius: 22,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (shown.isEmpty)
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          scheme.primary.withValues(alpha: 0.65),
+                          scheme.tertiary.withValues(alpha: 0.40),
+                        ],
+                      ),
+                    ),
+                    child: Icon(
+                      _icon,
+                      size: 64,
+                      color: scheme.onPrimary.withValues(alpha: 0.92),
+                    ),
+                  )
+                else
+                  _CoverMosaic(covers: shown, size: _size),
+                // Стеклянный блик по диагонали: верхняя левая четверть
+                // светлее, к центру растворяется.
+                IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withValues(alpha: 0.20),
+                          Colors.white.withValues(alpha: 0.03),
+                          Colors.transparent,
+                        ],
+                        stops: const [0, 0.38, 0.72],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [scheme.primary, scheme.tertiary],
+                ),
+                border: Border.all(
+                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.9),
+                  width: 3,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.3),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Icon(_icon, size: 26, color: scheme.onPrimary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Пара действий под шапкой. Основная — заливка акцентом с мягким свечением,
+/// вторичная — стеклянная капсула.
+class _HeroButton extends StatelessWidget {
+  const _HeroButton({
+    required this.primary,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final bool primary;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final radius = BorderRadius.circular(
+      Motion.of(context).prefs.corner.radius * 1.4,
+    );
+    final foreground = primary ? scheme.onPrimary : scheme.onSurface;
+
+    return PressableScale(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          gradient: primary
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    scheme.primary,
+                    Color.lerp(scheme.primary, scheme.tertiary, 0.35) ??
+                        scheme.primary,
+                  ],
+                )
+              : null,
+          color: primary ? null : scheme.surfaceContainerHigh,
+          border: primary
+              ? Border.all(color: Colors.white.withValues(alpha: 0.20))
+              : Border.all(color: scheme.outlineVariant),
+          boxShadow: primary
+              ? [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.28),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: foreground),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CoverMosaic extends StatelessWidget {
+  const _CoverMosaic({required this.covers, required this.size});
+
+  final List<String> covers;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    if (covers.length == 1) {
+      return TrackCover(url: covers.first, size: size, radius: 0);
+    }
+    final empty = Theme.of(context).colorScheme.surfaceContainerHighest;
+    Widget cell(int index) => Expanded(
+      child: covers.length > index
+          ? TrackCover(url: covers[index], size: double.infinity, radius: 0)
+          : ColoredBox(color: empty),
+    );
+    return Column(
+      children: [
+        Expanded(child: Row(children: [cell(0), cell(1)])),
+        Expanded(child: Row(children: [cell(2), cell(3)])),
+      ],
+    );
   }
 }
 
@@ -140,6 +522,15 @@ class PlaylistsScreen extends ConsumerWidget {
     final playlists = ref.watch(playlistsProvider);
 
     return Scaffold(
+      // Пилюля уважает настройку и не заезжает под системную навигацию.
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Consumer(
+          builder: (context, ref, _) => ref.watch(prefsProvider).showMiniPlayer
+              ? const MiniPlayer()
+              : const SizedBox.shrink(),
+        ),
+      ),
       body: CustomScrollView(
         slivers: [
           SliverAppBar.large(
@@ -223,10 +614,7 @@ class _PlaylistCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.titleMedium,
           ),
-          Text(
-            '${playlist.trackCount}',
-            style: theme.textTheme.bodySmall,
-          ),
+          Text('${playlist.trackCount}', style: theme.textTheme.bodySmall),
         ],
       ),
     );
@@ -245,78 +633,136 @@ class PlaylistScreen extends ConsumerWidget {
     final detail = ref.watch(playlistProvider(playlistId));
 
     return Scaffold(
+      // Фон с оттенком обложки должен уходить под мини-плеер, иначе вокруг
+      // пилюли остаётся чёрная полоса.
+      extendBody: true,
+      // Пилюля уважает настройку и не заезжает под системную навигацию.
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Consumer(
+          builder: (context, ref, _) => ref.watch(prefsProvider).showMiniPlayer
+              ? const MiniPlayer()
+              : const SizedBox.shrink(),
+        ),
+      ),
       body: detail.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _ErrorBox(text: l.dbError('$error')),
+        loading: () => _statusView(
+          context,
+          l,
+          const Center(child: CircularProgressIndicator()),
+        ),
+        error: (error, _) =>
+            _statusView(context, l, Center(child: Text(l.dbError('$error')))),
         data: (value) {
           if (value == null) {
-            return Center(child: Text(l.collectionEmptyPlaylists));
+            return _statusView(
+              context,
+              l,
+              Center(child: Text(l.collectionEmptyPlaylists)),
+            );
           }
           final rows = value.rows;
-          return CustomScrollView(
-            slivers: [
-              SliverAppBar(
-                pinned: true,
-                expandedHeight: 210,
-                flexibleSpace: FlexibleSpaceBar(
-                  titlePadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  title: Text(
-                    value.overview.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  background: _PlaylistBackdrop(coverUrl: value.overview.coverUrl),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SectionHeader(
-                        title: l.collectionCount(rows.length),
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              // Лёгкий оттенок обложки на всей странице: низ больше не
+              // выглядит чёрной дырой вокруг мини-плеера и панели.
+              BlurredCover(url: value.overview.coverUrl, opacity: 0.16),
+              CustomScrollView(
+                slivers: [
+                  SliverAppBar(
+                    pinned: true,
+                    // Без непрозрачного фона свёрнутая шапка просвечивала
+                    // списком треков прямо под заголовком.
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    expandedHeight: 380,
+                    flexibleSpace: FlexibleSpaceBar(
+                      titlePadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                      title: Text(
+                        value.overview.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 10),
-                      Row(
+                      background: _PlaylistBackdrop(
+                        coverUrl: value.overview.coverUrl,
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          FilledButton.icon(
-                            onPressed: rows.isEmpty
-                                ? null
-                                : () => _play(context, ref, rows, 0),
-                            icon: const Icon(Icons.play_arrow_rounded),
-                            label: Text(l.collectionPlayAll),
-                          ),
-                          const SizedBox(width: 10),
-                          OutlinedButton.icon(
-                            onPressed: rows.isEmpty
-                                ? null
-                                : () => _play(context, ref, rows, 0, shuffle: true),
-                            icon: const Icon(Icons.shuffle_rounded),
-                            label: Text(l.collectionShuffleAll),
+                          SectionHeader(title: l.collectionCount(rows.length)),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              FilledButton.icon(
+                                onPressed: rows.isEmpty
+                                    ? null
+                                    : () => _play(context, ref, rows, 0),
+                                icon: const Icon(Icons.play_arrow_rounded),
+                                label: Text(l.collectionPlayAll),
+                              ),
+                              const SizedBox(width: 10),
+                              OutlinedButton.icon(
+                                onPressed: rows.isEmpty
+                                    ? null
+                                    : () => _play(
+                                        context,
+                                        ref,
+                                        rows,
+                                        0,
+                                        shuffle: true,
+                                      ),
+                                icon: const Icon(Icons.shuffle_rounded),
+                                label: Text(l.collectionShuffleAll),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  SliverList.builder(
+                    itemCount: rows.length,
+                    itemBuilder: (context, index) => TrackTile(
+                      row: rows[index],
+                      queue: rows,
+                      index: index,
+                      kind: 'playlist',
+                    ),
+                  ),
+                  // Место под плавающую пилюлю мини-плеера: с extendBody
+                  // список уезжает под неё.
+                  const SliverToBoxAdapter(child: SizedBox(height: 108)),
+                ],
               ),
-              SliverList.builder(
-                itemCount: rows.length,
-                itemBuilder: (context, index) => TrackTile(
-                  row: rows[index],
-                  queue: rows,
-                  index: index,
-                  kind: 'playlist',
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],
           );
         },
       ),
     );
   }
+
+  /// Ветки загрузки/ошибки раньше оставались без шапки: уйти с экрана можно
+  /// было только системным «назад», кнопки на самом экране не было.
+  Widget _statusView(BuildContext context, AppLocalizations l, Widget child) =>
+      CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            leading: IconButton(
+              tooltip: l.playerBack,
+              icon: const Icon(Icons.arrow_back_rounded),
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+          ),
+          SliverFillRemaining(hasScrollBody: false, child: child),
+        ],
+      );
 
   Future<void> _play(
     BuildContext context,
@@ -357,9 +803,21 @@ class _PlaylistBackdrop extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [Colors.transparent, scheme.surface],
+              stops: const [0.62, 1],
             ),
           ),
         ),
+        // Сама обложка — чёткая и поверх затемнения: в списках плейлистов
+        // раньше был только blur, и обложку было не разглядеть.
+        if (coverUrl != null)
+          Positioned(
+            top: 76,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: TrackCover(url: coverUrl, size: 200, radius: 22),
+            ),
+          ),
       ],
     );
   }

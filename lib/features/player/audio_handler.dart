@@ -92,9 +92,30 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         isRadio: sourceHint?['kind'] == 'radio',
       ),
     );
+    // Тот же трек, который уже стоит в плеере: очередь переставляем под него,
+    // а позицию не трогаем. Иначе повторный тап по строке сбрасывает минуту
+    // прослушанного в ноль.
+    final started = startIndex >= 0 && startIndex < localTrackIds.length
+        ? localTrackIds[startIndex]
+        : null;
+    if (started != null &&
+        started == _snapshot.current?.localTrackId &&
+        _player.processingState != ProcessingState.idle) {
+      _queue.setQueue(localTrackIds, startIndex: startIndex);
+      _publish(
+        _snapshot.copyWith(
+          queue: _queue.displayOrder,
+          index: _queue.displayPosition,
+        ),
+      );
+      if (!_snapshot.playing) await play();
+      return;
+    }
+
     _pendingSeek = Duration.zero;
     _queue.setQueue(localTrackIds, startIndex: startIndex);
     _consecutiveFailures = 0;
+    _generation++;
     await _playCurrent();
   }
 
@@ -160,6 +181,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       return;
     }
     _pendingSeek = Duration.zero;
+    _generation++;
     await _playCurrent();
   }
 
@@ -172,20 +194,23 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     final id = _queue.rewind();
     if (id == null) return;
     _pendingSeek = Duration.zero;
+    _generation++;
     await _playCurrent();
   }
 
   @override
-  Future<void> skipTo(String localTrackId) async {
-    final id = _queue.jumpTo(localTrackId);
+  Future<void> skipToIndex(int displayIndex) async {
+    final id = _queue.jumpToPosition(displayIndex);
     if (id == null) return;
     _pendingSeek = Duration.zero;
+    _generation++;
     await _playCurrent();
   }
 
   @override
   Future<void> setRepeat(PlaybackRepeat value) async {
     _queue.setRepeat(value);
+    _publish(_snapshot.copyWith(repeat: value));
     _emitServiceState();
     _scheduleSnapshot();
   }
@@ -197,6 +222,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       _snapshot.copyWith(
         queue: _queue.displayOrder,
         index: _queue.displayPosition,
+        shuffle: value,
       ),
     );
     _emitServiceState();
@@ -205,6 +231,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> stop() async {
+    _generation++;
     _pauseWatchdog?.cancel();
     _stallProbe?.cancel();
     final played = _player.position;
@@ -241,7 +268,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     await _player.setVolume(0);
     // just_audio резолвит play() только на паузе или в конце трека: ждать
     // его — значит повесить вызов на всю длину песни.
-    unawaited(_player.play());
+    _startPlayback();
     unawaited(_fadeIn());
   }
 
@@ -266,15 +293,19 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> skipToQueueItem(int index) async {
-    final order = _queue.displayOrder;
-    if (index < 0 || index >= order.length) return;
-    await skipTo(order[index]);
+    await skipToIndex(index);
   }
 
   @override
   Future<void> addQueueItem(MediaItem mediaItem) async {
-    _queue.append(mediaItem.id);
-    _publish(_snapshot.copyWith(queue: _queue.displayOrder));
+    // playNext уже вставил трек в очередь — повторный append давал дубль.
+    if (!_queue.items.contains(mediaItem.id)) _queue.append(mediaItem.id);
+    _publish(
+      _snapshot.copyWith(
+        queue: _queue.displayOrder,
+        index: _queue.displayPosition,
+      ),
+    );
     _emitServiceState();
     _scheduleSnapshot();
   }
@@ -289,7 +320,12 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   @override
   Future<void> removeQueueItem(MediaItem mediaItem) async {
     _queue.remove(mediaItem.id);
-    _publish(_snapshot.copyWith(queue: _queue.displayOrder));
+    _publish(
+      _snapshot.copyWith(
+        queue: _queue.displayOrder,
+        index: _queue.displayPosition,
+      ),
+    );
     _emitServiceState();
     _scheduleSnapshot();
   }
@@ -343,22 +379,44 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
 
     _player.sequenceStateStream.listen((_) => _scheduleSnapshot());
 
-    // just_audio сообщает о протухшей ссылке ошибком в потоке событий, а не
-    // исключением: на Android 17 это ещё и молчаливый отказ аудио-API.
+    // just_audio сообщает об ошибке уже загруженного потока в errorStream
+    // (плюс дублирует её в errorCode события). Без этой подписки обрыв
+    // стриминга проходил молча: обработчик ниже ловил только ошибки загрузки.
+    _player.errorStream.listen(
+      _onStreamError,
+      onError: (Object error, StackTrace _) => _onStreamError(error),
+    );
     _player.playbackEventStream.listen(
       null,
-      onError: (Object error, StackTrace _) {
-        _publishIssue(
-          PlayerIssue([
-            SourceFailure(
-              source: _snapshot.usedSource ?? SourceId.local,
-              reason: SourceFailReason.network,
-              message: '$error',
-            ),
-          ], needsUserAction: false),
-        );
-        unawaited(_revalidate(resume: _snapshot.playing));
-      },
+      onError: (Object error, StackTrace _) => _onStreamError(error),
+    );
+  }
+
+  /// Перевалидировать протухшую ссылку и продолжить с той же позиции.
+  /// Во время первого резолва ошибку уже обрабатывает `_playCurrent`.
+  void _onStreamError(Object error) {
+    if (_snapshot.resolving || _snapshot.current == null) return;
+    AppLogger.instance.warn('поток прервался: $error');
+    _publishIssue(
+      PlayerIssue([
+        SourceFailure(
+          source: _snapshot.usedSource ?? SourceId.local,
+          reason: SourceFailReason.network,
+          message: '$error',
+        ),
+      ], needsUserAction: false),
+    );
+    unawaited(_revalidate(resume: _snapshot.playing));
+  }
+
+  /// `play()` резолвится только на паузе или в конце трека, поэтому ждать его
+  /// нельзя; но и оставлять future без обработчика нельзя — ошибка платформы
+  /// уходила в необработанный async error.
+  void _startPlayback() {
+    unawaited(
+      _player.play().catchError((Object error, StackTrace _) {
+        _onStreamError(error);
+      }),
     );
   }
 
@@ -385,14 +443,22 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
 
   Future<void> _fadeOut() => _ramp(1, 0, _fadeDown);
 
+  /// Растёт на каждый новый старт/стоп: поздний резолв старого трека видит
+  /// чужое поколение и молча выходит, а не играет поверх паузы.
+  int _generation = 0;
+
   Future<void> _playCurrent() async {
+    final generation = _generation;
+    _pauseWatchdog?.cancel();
     final localTrackId = _queue.currentId;
     if (localTrackId == null) return;
 
     final db = _services.db;
     final track = await db.tracksDao.byId(localTrackId);
     final artists = await db.tracksDao.artistNamesOf(localTrackId);
-    final title = track?.title ?? localTrackId;
+    final title = track?.title.trim().isNotEmpty == true
+        ? track!.title
+        : localTrackId;
     final artist = artists.isEmpty ? 'Локальный файл' : artists.join(', ');
     final liked = await db.libraryDao.likeState(localTrackId) == 1;
 
@@ -416,7 +482,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
           coverUrl: track?.coverUrl,
         ),
         queue: _queue.displayOrder,
-        index: _queue.currentBaseIndex,
+        index: _queue.displayPosition,
         resolving: true,
         duration: Duration(seconds: track?.durationSec ?? 0),
         liked: liked,
@@ -468,7 +534,22 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     // Если что-то уже играет, старую песню гасим до подмены источника,
     // иначе слышен щелчок на склейке.
     if (_player.playing) await _fadeOut();
-    await _load(playback.target, initialPosition: _pendingSeek);
+    // Пока резолвили/грузили, могли нажать паузу, стоп или другой трек.
+    if (generation != _generation) return;
+    try {
+      await _load(playback.target, initialPosition: _pendingSeek);
+    } on Object catch (error) {
+      // Без этого исключение уходило наружу: `resolving` висел true,
+      // громкость оставалась на нуле, а плеер — на прошлом треке.
+      AppLogger.instance.warn('playback: не загрузился $localTrackId: $error');
+      _pendingSeek = Duration.zero;
+      await _player.setVolume(1);
+      if (generation == _generation) {
+        _publish(_snapshot.copyWith(resolving: false));
+      }
+      return;
+    }
+    if (generation != _generation) return;
     _pendingSeek = Duration.zero;
     await _player.setVolume(0);
     _publish(
@@ -478,7 +559,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         quality: playback.quality,
       ),
     );
-    unawaited(_player.play());
+    _startPlayback();
     unawaited(_fadeIn());
 
     await _reportEvent(
@@ -510,11 +591,11 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   }
 
   Future<void> _onTrackFinished() async {
-    await _reportCurrent(PlaybackEventType.trackFinished);
+    unawaited(_reportCurrent(PlaybackEventType.trackFinished));
     await _saveSnapshotNow();
     if (_queue.repeat == PlaybackRepeat.one) {
       await _player.seek(Duration.zero);
-      unawaited(_player.play());
+      _startPlayback();
       return;
     }
     final id = _queue.advance(manual: false);
@@ -525,10 +606,15 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         await _playCurrent();
         return;
       }
+      // just_audio оставляет playing=true после конца очереди, и кнопка
+      // play дальше ничего не делала.
+      await _player.pause();
+      _publish(_snapshot.copyWith(playing: false));
       _emitServiceState(stopped: true);
       return;
     }
     _pendingSeek = Duration.zero;
+    _generation++;
     await _playCurrent();
   }
 
@@ -574,7 +660,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       _publish(
         _snapshot.copyWith(
           queue: _queue.displayOrder,
-          index: _queue.currentBaseIndex,
+          index: _queue.displayPosition,
         ),
       );
       _emitServiceState();
@@ -714,35 +800,52 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
 
   /// Самоизлечение: подпись ссылки могла истечь — выбрасываем кэш этого
   /// источника, перевалидируем и продолжаем с той же позиции.
+  bool _revalidating = false;
+
   Future<void> _revalidate({required bool resume}) async {
-    final localTrackId = _queue.currentId;
-    if (localTrackId == null) return;
-    final used = _snapshot.usedSource;
-    if (used != null) {
-      await _services.resolver.didLoseTrust(localTrackId, used);
-    }
+    if (_revalidating) return;
+    _revalidating = true;
+    final generation = _generation;
+    try {
+      final localTrackId = _queue.currentId;
+      if (localTrackId == null) return;
+      final used = _snapshot.usedSource;
+      if (used != null) {
+        await _services.resolver.didLoseTrust(localTrackId, used);
+      }
 
-    final position = _player.position;
-    final result = await _services.resolver.resolve(
-      localTrackId: localTrackId,
-      variants: await _services.db.tracksDao.variantsOf(localTrackId),
-      quality: _services.defaultQuality,
-      bypassCache: true,
-    );
-    final fresh = result.playback;
-    if (fresh == null) {
-      _publishIssue(
-        PlayerIssue(result.failures, needsUserAction: result.needsUserAction),
+      final position = _player.position;
+      final result = await _services.resolver.resolve(
+        localTrackId: localTrackId,
+        variants: await _services.db.tracksDao.variantsOf(localTrackId),
+        quality: _services.defaultQuality,
+        bypassCache: true,
       );
-      return;
-    }
+      // Пока резолвили, могли переключить трек: чужую ссылку не подставляем.
+      if (generation != _generation) return;
+      final fresh = result.playback;
+      if (fresh == null) {
+        _publishIssue(
+          PlayerIssue(result.failures, needsUserAction: result.needsUserAction),
+        );
+        return;
+      }
 
-    await _load(fresh.target);
-    if (position > Duration.zero) await _player.seek(position);
-    if (resume) unawaited(_player.play());
-    _publish(
-      _snapshot.copyWith(usedSource: fresh.usedSource, quality: fresh.quality),
-    );
+      await _load(fresh.target);
+      if (generation != _generation) return;
+      if (position > Duration.zero) await _player.seek(position);
+      if (resume) _startPlayback();
+      _publish(
+        _snapshot.copyWith(
+          usedSource: fresh.usedSource,
+          quality: fresh.quality,
+        ),
+      );
+    } on Object catch (error) {
+      AppLogger.instance.warn('перевалидация не удалась: $error');
+    } finally {
+      _revalidating = false;
+    }
   }
 
   void _startPauseWatchdog() {

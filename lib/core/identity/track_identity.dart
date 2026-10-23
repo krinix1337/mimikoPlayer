@@ -31,7 +31,8 @@ String normalizeIsrc(String? isrc) {
 /// Отпечаток: нормализованное имя | первый артист | длительность в секундах.
 String trackFingerprint(SourceTrack track) {
   final seconds = (track.duration.inMilliseconds / 1000).round();
-  final key = '${normalizeTitle(track.title)}|'
+  final key =
+      '${normalizeTitle(track.title)}|'
       '${mainArtistOf(track.artists)}|$seconds';
   return sha1.convert(utf8.encode(key)).toString();
 }
@@ -69,11 +70,13 @@ int _editDistance(String a, String b) {
     final current = [i];
     for (var j = 1; j <= b.length; j++) {
       final cost = a.codeUnitAt(i - 1) == b.codeUnitAt(j - 1) ? 0 : 1;
-      current.add([
-        previous[j] + 1,
-        current[j - 1] + 1,
-        previous[j - 1] + cost,
-      ].reduce((x, y) => x < y ? x : y));
+      current.add(
+        [
+          previous[j] + 1,
+          current[j - 1] + 1,
+          previous[j - 1] + cost,
+        ].reduce((x, y) => x < y ? x : y),
+      );
     }
     previous = current;
   }

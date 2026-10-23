@@ -22,23 +22,26 @@ void main() {
     }
   });
 
-  test('цепочку останавливают только те отказы, чинит которые пользователь', () {
-    for (final reason in [
-      SourceFailReason.authRequired,
-      SourceFailReason.authExpired,
-      SourceFailReason.remoteThrottled,
-      SourceFailReason.allSourcesExhausted,
-    ]) {
-      expect(fail(reason).fallbackToNextSource, isFalse, reason: reason.name);
-    }
+  test(
+    'цепочку останавливают только те отказы, чинит которые пользователь',
+    () {
+      for (final reason in [
+        SourceFailReason.authRequired,
+        SourceFailReason.authExpired,
+        SourceFailReason.remoteThrottled,
+        SourceFailReason.allSourcesExhausted,
+      ]) {
+        expect(fail(reason).fallbackToNextSource, isFalse, reason: reason.name);
+      }
 
-    expect(fail(SourceFailReason.authRequired).needsUserAction, isTrue);
-    expect(fail(SourceFailReason.authExpired).needsUserAction, isTrue);
-    expect(fail(SourceFailReason.needsPlus).needsUserAction, isTrue);
-    // Подписку тоже чинит человек, но остальные источники стоит попробовать.
-    expect(fail(SourceFailReason.needsPlus).fallbackToNextSource, isTrue);
-    expect(fail(SourceFailReason.unavailable).needsUserAction, isFalse);
-  });
+      expect(fail(SourceFailReason.authRequired).needsUserAction, isTrue);
+      expect(fail(SourceFailReason.authExpired).needsUserAction, isTrue);
+      expect(fail(SourceFailReason.needsPlus).needsUserAction, isTrue);
+      // Подписку тоже чинит человек, но остальные источники стоит попробовать.
+      expect(fail(SourceFailReason.needsPlus).fallbackToNextSource, isTrue);
+      expect(fail(SourceFailReason.unavailable).needsUserAction, isFalse);
+    },
+  );
 
   test('троттлинг ретраится в том же источнике, а не в следующем', () {
     expect(fail(SourceFailReason.remoteThrottled).retrySameSource, isTrue);
@@ -47,11 +50,26 @@ void main() {
   });
 
   test('негативный кэш: снятый трек помнится долго, сеть — пять минут', () {
-    expect(fail(SourceFailReason.notInCatalog).negativeCacheTtl, const Duration(days: 7));
-    expect(fail(SourceFailReason.unavailable).negativeCacheTtl, const Duration(days: 7));
-    expect(fail(SourceFailReason.geoBlocked).negativeCacheTtl, const Duration(days: 7));
-    expect(fail(SourceFailReason.network).negativeCacheTtl, const Duration(minutes: 5));
-    expect(fail(SourceFailReason.remoteThrottled).negativeCacheTtl, const Duration(minutes: 5));
+    expect(
+      fail(SourceFailReason.notInCatalog).negativeCacheTtl,
+      const Duration(days: 7),
+    );
+    expect(
+      fail(SourceFailReason.unavailable).negativeCacheTtl,
+      const Duration(days: 7),
+    );
+    expect(
+      fail(SourceFailReason.geoBlocked).negativeCacheTtl,
+      const Duration(days: 7),
+    );
+    expect(
+      fail(SourceFailReason.network).negativeCacheTtl,
+      const Duration(minutes: 5),
+    );
+    expect(
+      fail(SourceFailReason.remoteThrottled).negativeCacheTtl,
+      const Duration(minutes: 5),
+    );
   });
 
   test('отказ, который чинится на месте, в кэше не держится', () {

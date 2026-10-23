@@ -20,7 +20,16 @@ void main() {
       hideAiTracks: true,
       censorBypass: false,
       accent: AccentColor.rose,
-      launcherIcon: LauncherIcon.crimson,
+      launcherIcon: LauncherIcon.forest,
+      searchHistory: ['queen', 'joji'],
+      homeCoverTone: HomeCoverTone.darker,
+      homeCoverBlur: true,
+      showDjInfo: false,
+      autoDownloadLikes: true,
+      autoDownloadWifiOnly: false,
+      autoDownloadAllApproved: true,
+      downloadLimitBytes: 5 * 1024 * 1024 * 1024,
+      autoDownloadQuality: 'high',
     );
 
     final restored = Prefs.fromJson(prefs.toJson());
@@ -33,14 +42,53 @@ void main() {
     expect(restored.animations, AnimationsSpeed.slow);
     expect(restored.localeCode, 'en');
     expect(restored.collectionSort, CollectionSort.artist);
-    expect(restored.launcherIcon, LauncherIcon.crimson);
+    expect(restored.launcherIcon, LauncherIcon.forest);
     expect(restored.quality, 'lossless');
     expect(restored.frameHz, 90);
     expect(restored.showNavLabels, isFalse);
     expect(restored.artworkShape, ArtworkShape.circle);
     expect(restored.hideAiTracks, isTrue);
     expect(restored.censorBypass, isFalse);
+    expect(restored.searchHistory, ['queen', 'joji']);
+    expect(restored.homeCoverTone, HomeCoverTone.darker);
+    expect(restored.homeCoverBlur, isTrue);
+    expect(restored.showDjInfo, isFalse);
+    expect(restored.autoDownloadLikes, isTrue);
+    expect(restored.autoDownloadWifiOnly, isFalse);
+    expect(restored.autoDownloadAllApproved, isTrue);
+    expect(restored.downloadLimitBytes, 5 * 1024 * 1024 * 1024);
+    expect(restored.autoDownloadQuality, 'high');
     expect(const Prefs().censorBypass, isTrue);
+  });
+
+  test('автозагрузка по умолчанию выключена, лимит 10 ГБ', () {
+    const defaults = Prefs();
+    expect(defaults.autoDownloadLikes, isFalse);
+    expect(defaults.autoDownloadWifiOnly, isTrue);
+    expect(defaults.autoDownloadAllApproved, isFalse);
+    expect(defaults.downloadLimitBytes, defaultDownloadLimitBytes);
+    expect(defaults.autoDownloadQuality, 'normal');
+
+    expect(Prefs.fromJson({}).downloadLimitBytes, defaultDownloadLimitBytes);
+    expect(
+      Prefs.fromJson({'download_limit_bytes': null}).downloadLimitBytes,
+      isNull,
+    );
+    expect(
+      Prefs.fromJson({'download_limit_bytes': 0}).downloadLimitBytes,
+      isNull,
+    );
+    expect(
+      const Prefs().copyWith(clearDownloadLimit: true).downloadLimitBytes,
+      isNull,
+    );
+  });
+
+  test('история поиска чистится от пустых и нестроковых значений', () {
+    final restored = Prefs.fromJson({
+      'search_history': ['queen', '', 5, ' joji '],
+    });
+    expect(restored.searchHistory, ['queen', ' joji ']);
   });
 
   test('«как в системе» отличается от «не задано»', () {

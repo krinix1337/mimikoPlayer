@@ -2,7 +2,11 @@ import 'package:drift/drift.dart';
 
 import 'library.dart';
 
-@TableIndex(name: 'playlists_by_source', columns: {#source, #remotePlaylistId}, unique: true)
+@TableIndex(
+  name: 'playlists_by_source',
+  columns: {#source, #remotePlaylistId},
+  unique: true,
+)
 @TableIndex(name: 'playlists_by_kind', columns: {#kind})
 class Playlists extends Table {
   /// Свой id `pl_...` для локальных, `source:remoteId` для импортированных.
@@ -44,8 +48,10 @@ class PlaylistTracks extends Table {
   TextColumn get remoteId => text()();
   DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
 
+  /// Позиция входит в ключ: в плейлисте Яндекс Музыки один трек может
+  /// встречаться несколько раз, и это надо хранить, а не схлопывать.
   @override
-  Set<Column> get primaryKey => {playlistId, localTrackId};
+  Set<Column> get primaryKey => {playlistId, position};
 }
 
 @TableIndex(name: 'likes_by_state', columns: {#state, #likedAt})
@@ -58,7 +64,8 @@ class Likes extends Table {
   DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
 
   /// Лайк живёт локально до тех пор, пока не синхронизирован в каталог.
-  BoolColumn get syncedToRemote => boolean().withDefault(const Constant(false))();
+  BoolColumn get syncedToRemote =>
+      boolean().withDefault(const Constant(false))();
   TextColumn get remoteSource => text().nullable()();
 
   /// 1 = поставить, -1 = снять; null = ничего не ждём.

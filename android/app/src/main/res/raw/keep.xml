@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  audio_service выбирает иконки транспорта по имени ресурса из Dart. Для
+  resource shrinker такие ссылки невидимы, поэтому в release он вырезал
+  audio_service_* и падал на CustomAction с iconId = 0. Держим их явно.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/audio_service_*,@drawable/ic_stat_mimiko" />

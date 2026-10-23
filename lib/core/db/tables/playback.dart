@@ -38,7 +38,8 @@ class QueueSnapshots extends Table {
 
   /// off | all | one — значения совпадают с AudioService.repeatMode.
   TextColumn get repeatMode => text().withDefault(const Constant('off'))();
-  BoolColumn get shuffleEnabled => boolean().withDefault(const Constant(false))();
+  BoolColumn get shuffleEnabled =>
+      boolean().withDefault(const Constant(false))();
 
   /// Откуда очередь пришла (плейлист, волна, поиск) — нужно для дозаполнения
   /// «Моей волны» после смерти процесса.
@@ -79,8 +80,10 @@ class TrackFailures extends Table {
   TextColumn get reason => text()();
   IntColumn get httpStatus => integer().nullable()();
   TextColumn get note => text().nullable()();
-  DateTimeColumn get firstFailedAt => dateTime().withDefault(currentDateAndTime)();
-  DateTimeColumn get lastFailedAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get firstFailedAt =>
+      dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get lastFailedAt =>
+      dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get expiresAt => dateTime()();
 
   @override
@@ -97,6 +100,12 @@ class DownloadedFiles extends Table {
   TextColumn get quality => text().withDefault(const Constant('auto'))();
   TextColumn get codec => text().nullable()();
 
+  /// manual | auto — ручная загрузка или автозагрузка лайков.
+  TextColumn get origin => text().withDefault(const Constant('manual'))();
+
+  /// Локальная копия обложки; без неё «Скачанное» пустеет офлайн.
+  TextColumn get coverPath => text().nullable()();
+
   /// pending | downloading | complete | failed
   TextColumn get state => text().withDefault(const Constant('pending'))();
   TextColumn get source => text()();
@@ -104,8 +113,35 @@ class DownloadedFiles extends Table {
 
   /// Контрольная сумма файла: перекачка после обрыва не должна портить трек.
   TextColumn get sha1 => text().nullable()();
-  DateTimeColumn get downloadedAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get downloadedAt =>
+      dateTime().withDefault(currentDateAndTime)();
 
   @override
-  List<Set<Column>> get uniqueKeys => [{localTrackId}];
+  List<Set<Column>> get uniqueKeys => [
+    {localTrackId},
+  ];
+}
+
+/// Очередь загрузок: живёт дольше процесса и переживает kill.
+class DownloadTasks extends Table {
+  TextColumn get localTrackId =>
+      text().references(Tracks, #id, onDelete: KeyAction.cascade)();
+
+  /// queued | downloading | paused | failed | skipped | excluded
+  TextColumn get state => text().withDefault(const Constant('queued'))();
+  TextColumn get origin => text().withDefault(const Constant('manual'))();
+
+  /// Меньше — раньше; ручные задачи идут впереди автозагрузки.
+  IntColumn get priority => integer().withDefault(const Constant(10))();
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+  IntColumn get receivedBytes => integer().withDefault(const Constant(0))();
+  IntColumn get totalBytes => integer().nullable()();
+  TextColumn get quality => text().nullable()();
+  TextColumn get lastError => text().nullable()();
+  DateTimeColumn get nextAttemptAt => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {localTrackId};
 }

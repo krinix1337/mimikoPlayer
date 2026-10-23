@@ -19,15 +19,35 @@ import '../player_snapshot.dart';
 /// Позиция трека приходит ~5 раз в секунду, поэтому она изолирована в
 /// [_Progress] — иначе на каждом тике пересобиралось всё дерево вместе с
 /// обложкой, и на бюджетном железе это заметная просадка кадров.
-class PlayerScreen extends ConsumerWidget {
+class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
+}
+
+class _PlayerScreenState extends ConsumerState<PlayerScreen> {
+  double _swipeDirection = 1;
+
+  /// Смещение обложки под пальцем: соседний трек въезжает вместе с ним.
+  double _drag = 0;
+
+  @override
+  Widget build(BuildContext context) {
     final snapshot = ref.watch(
       playerSnapshotProviderValue.select((s) => (s.current, s.isRadio)),
     );
     final current = snapshot.$1;
+    // Соседи по очереди: их обложки показываются во время свайпа.
+    final place = ref.watch(
+      playerSnapshotProviderValue.select((s) => (s.queue, s.index)),
+    );
+    final nextCover = place.$1.length > place.$2 + 1
+        ? ref.watch(trackCoverProvider(place.$1[place.$2 + 1])).value
+        : null;
+    final prevCover = place.$2 > 0
+        ? ref.watch(trackCoverProvider(place.$1[place.$2 - 1])).value
+        : null;
 
     return Scaffold(
       body: Stack(
@@ -45,10 +65,82 @@ class PlayerScreen extends ConsumerWidget {
                         isRadio: snapshot.$2,
                         trackId: current.localTrackId,
                       ),
-                      Expanded(child: _Artwork(current: current)),
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, box) {
+                            final artSize = _artworkSize(
+                              context,
+                              box.maxHeight,
+                            );
+                            final offset = _drag.clamp(
+                              -box.maxWidth,
+                              box.maxWidth,
+                            );
+                            final toward = offset <= 0 ? 1 : -1;
+                            final neighbor = toward == 1
+                                ? nextCover
+                                : prevCover;
+                            return GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onHorizontalDragUpdate: (details) =>
+                                  setState(() => _drag += details.delta.dx),
+                              onHorizontalDragCancel: () =>
+                                  setState(() => _drag = 0),
+                              onHorizontalDragEnd: _onSwipe,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  if (neighbor != null && offset != 0)
+                                    Transform.translate(
+                                      offset: Offset(
+                                        offset + toward * box.maxWidth,
+                                        0,
+                                      ),
+                                      child: _NeighborArt(
+                                        url: neighbor,
+                                        artSize: artSize,
+                                      ),
+                                    ),
+                                  Transform.translate(
+                                    offset: Offset(offset, 0),
+                                    child: AnimatedSwitcher(
+                                      duration: const Duration(
+                                        milliseconds: 320,
+                                      ),
+                                      switchInCurve: Curves.easeOutCubic,
+                                      switchOutCurve: Curves.easeInCubic,
+                                      transitionBuilder: (child, animation) {
+                                        final slide = Tween<Offset>(
+                                          begin: Offset(
+                                            0.16 * _swipeDirection,
+                                            0,
+                                          ),
+                                          end: Offset.zero,
+                                        ).animate(animation);
+                                        return FadeTransition(
+                                          opacity: animation,
+                                          child: SlideTransition(
+                                            position: slide,
+                                            child: child,
+                                          ),
+                                        );
+                                      },
+                                      child: _Artwork(
+                                        key: ValueKey(current.localTrackId),
+                                        current: current,
+                                        artSize: artSize,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                       const _IssueStrip(),
                       const _Progress(),
-                      _Controls(playing: _playing(ref)),
+                      _Controls(playing: _playing()),
                       const SizedBox(height: 20),
                     ],
                   ),
@@ -58,8 +150,67 @@ class PlayerScreen extends ConsumerWidget {
     );
   }
 
-  static bool _playing(WidgetRef ref) =>
+  bool _playing() =>
       ref.watch(playerSnapshotProviderValue.select((s) => s.playing));
+
+  void _onSwipe(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    final dragged = _drag;
+    final forward = velocity < 0 || (velocity == 0 && dragged < 0);
+    if (velocity.abs() < 160 && dragged.abs() < 90) {
+      if (dragged != 0) setState(() => _drag = 0);
+      return;
+    }
+    final controller = ref.read(playbackControllerProvider);
+    setState(() => _drag = 0);
+    _swipeDirection = forward ? 1 : -1;
+    if (forward) {
+      controller.skipNext();
+    } else {
+      controller.skipPrevious();
+    }
+  }
+}
+
+/// Радиус обложки в плеере: одна формула на текущий трек и на превью соседа.
+double _artworkRadius(BuildContext context, double artSize) {
+  final motion = Motion.of(context);
+  return switch (motion.prefs.artworkShape) {
+    ArtworkShape.rounded => motion.prefs.corner.radius,
+    ArtworkShape.soft => 10,
+    ArtworkShape.circle => artSize / 2,
+  };
+}
+
+/// Размер обложки в плеере: чуть крупнее на широких экранах, без переполнения
+/// на узких.
+double _artworkSize(BuildContext context, double availableHeight) {
+  final byWidth = (MediaQuery.sizeOf(context).width - 56).clamp(220.0, 340.0);
+  // Под обложкой ещё название, артист и бейджи — примерно 170 dp.
+  final byHeight = (availableHeight - 170).clamp(170.0, 340.0);
+  return (byWidth < byHeight ? byWidth : byHeight).toDouble();
+}
+
+/// Обложка соседнего трека, въезжающая следом за пальцем.
+class _NeighborArt extends StatelessWidget {
+  const _NeighborArt({required this.url, required this.artSize});
+
+  final String url;
+  final double artSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: TrackCover(
+          url: url,
+          size: artSize,
+          radius: _artworkRadius(context, artSize),
+        ),
+      ),
+    );
+  }
 }
 
 class _TopBar extends ConsumerWidget {
@@ -115,14 +266,14 @@ class _TopBar extends ConsumerWidget {
 }
 
 class _Artwork extends ConsumerWidget {
-  const _Artwork({required this.current});
+  const _Artwork({super.key, required this.current, required this.artSize});
 
   final NowPlaying current;
+  final double artSize;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final motion = Motion.of(context);
 
     return Center(
       child: Padding(
@@ -134,12 +285,8 @@ class _Artwork extends ConsumerWidget {
               tag: coverHeroTag(current.localTrackId),
               child: TrackCover(
                 url: current.coverUrl,
-                size: 300,
-                radius: switch (motion.prefs.artworkShape) {
-                  ArtworkShape.rounded => motion.prefs.corner.radius,
-                  ArtworkShape.soft => 10,
-                  ArtworkShape.circle => 150,
-                },
+                size: artSize,
+                radius: _artworkRadius(context, artSize),
               ),
             ),
             const SizedBox(height: 28),
@@ -188,6 +335,7 @@ class _DownloadButton extends ConsumerWidget {
     final status = ref.watch(downloadStatusProvider(trackId));
     final stored = ref.watch(isDownloadedProvider(trackId)).value ?? false;
     final downloading = status?.phase == DownloadPhase.downloading;
+    final paused = status?.phase == DownloadPhase.paused;
     final complete =
         status?.phase == DownloadPhase.complete ||
         (status?.phase == null && stored);
@@ -208,15 +356,27 @@ class _DownloadButton extends ConsumerWidget {
     }
 
     return IconButton(
-      tooltip: complete ? l.menuDownloaded : l.playerDownload,
+      tooltip: paused
+          ? l.downloadsResume
+          : complete
+          ? l.menuDownloaded
+          : l.playerDownload,
       visualDensity: VisualDensity.compact,
       iconSize: 22,
       color: complete ? scheme.primary : scheme.onSurfaceVariant,
-      icon: Icon(complete ? Icons.offline_pin_rounded : Icons.download_rounded),
+      icon: Icon(
+        paused
+            ? Icons.play_arrow_rounded
+            : complete
+            ? Icons.offline_pin_rounded
+            : Icons.download_rounded,
+      ),
       onPressed: () async {
         final downloader = ref.read(downloadControllerProvider.notifier);
         try {
-          if (complete) {
+          if (paused) {
+            await downloader.resume(trackId);
+          } else if (complete) {
             await downloader.remove(trackId);
             if (context.mounted) {
               ScaffoldMessenger.of(context)
@@ -388,13 +548,19 @@ class _Controls extends ConsumerWidget {
     final current = ref.read(playbackControllerProvider).snapshot.current;
     if (current == null) return;
     final services = ref.read(appServicesProvider);
+    final downloader = ref.read(downloadControllerProvider.notifier);
+    final controller = ref.read(playbackControllerProvider);
     final next = liked ? 0 : 1;
     await services.db.libraryDao.setLike(
       current.localTrackId,
       next,
       remoteSource: next == 1 ? SourceId.yandex : null,
     );
-    await ref.read(playbackControllerProvider).refreshLikedState();
+    if (next == 1) {
+      await downloader.trackLiked(current.localTrackId);
+    }
+    await controller.refreshLikedState();
+    if (!ref.context.mounted) return;
     ref.invalidate(collectionProvider);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -566,26 +732,32 @@ class _QueueSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final snapshot = ref.watch(playerSnapshotProviderValue);
+    final snapshot = ref.watch(
+      playerSnapshotProviderValue.select((s) => (s.queue, s.index)),
+    );
     final controller = ref.read(playbackControllerProvider);
     final l = AppLocalizations.of(context);
+    final queue = snapshot.$1;
+    final current = snapshot.$2;
 
-    if (snapshot.queue.isEmpty) {
+    if (queue.isEmpty) {
       return SafeArea(child: Center(child: Text(l.playerQueueEmpty)));
     }
 
     return SafeArea(
       child: ListView.builder(
         shrinkWrap: true,
-        itemCount: snapshot.queue.length,
+        itemCount: queue.length,
         itemBuilder: (context, index) {
-          final id = snapshot.queue[index];
+          final id = queue[index];
           return ListTile(
             leading: Text('${index + 1}'),
             title: _QueueTitle(trackId: id),
-            selected: index == snapshot.index,
+            selected: index == current,
             onTap: () {
-              controller.skipTo(id);
+              // Позиция, а не id: у повтора в плейлисте одна и та же строка
+              // стоит несколько раз, и поиск по id прыгал всегда на первую.
+              controller.skipToIndex(index);
               Navigator.of(context).pop();
             },
           );
@@ -613,6 +785,9 @@ Future<void> showSleepSheet(BuildContext context, WidgetRef ref) =>
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      // Без этого лист обрезался по 9/16 высоты и нижние пункты таймера
+      // оставались недоступны на низких экранах.
+      isScrollControlled: true,
       builder: (context) {
         final l = AppLocalizations.of(context);
         final controller = ref.read(playbackControllerProvider);

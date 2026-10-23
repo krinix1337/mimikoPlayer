@@ -95,13 +95,18 @@ class _YandexLoginSheetState extends ConsumerState<_YandexLoginSheet> {
       mode: LaunchMode.externalApplication,
     );
     if (!opened && mounted) {
-      setState(() => _error = AppLocalizations.of(context).authBrowserFailed('${login.verificationUri}'));
+      setState(
+        () =>
+            _error = AppLocalizations.of(context)
+                .authBrowserFailed('${login.verificationUri}'),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final auth = ref.watch(yandexAuthStateProvider).value ?? const AuthUnknown();
+    final auth =
+        ref.watch(yandexAuthStateProvider).value ?? const AuthUnknown();
     final l = AppLocalizations.of(context);
     final login = _login;
     final theme = Theme.of(context);

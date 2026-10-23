@@ -16,11 +16,7 @@ abstract interface class MusicSource {
   /// Ленивая инициализация: обновить токен до первого сетевого хопа.
   Future<void> warmUp();
 
-  Future<SearchResult> search(
-    String query, {
-    int page = 0,
-    int pageSize = 50,
-  });
+  Future<SearchResult> search(String query, {int page = 0, int pageSize = 50});
 
   Future<SourceTrack?> getTrack(RemoteTrackRef ref);
 

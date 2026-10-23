@@ -20,12 +20,6 @@
   "waveTitle": "Моя волна",
   "waveTune": "Настроить волну",
   "waveStart": "Запустить волну",
-  "waveMood": "Настроение",
-  "waveEnergy": "Энергия",
-  "waveDiversity": "Разнообразие",
-  "waveStation": "Станция",
-  "wavePresets": "Пресеты",
-  "waveLanguage": "Язык музыки",
   "waveSaved": "Настройки волны сохранены",
   "waveSaveFailed": "Яндекс не принял настройки волны",
   "waveNeedsLogin": "Войдите в Яндекс, чтобы включить волну",
@@ -47,7 +41,6 @@
   "sourceChart": "Чарт",
   "sourceAlbum": "Альбом",
   "sourceArtist": "Артист",
-  "switchToWave": "Включить мою волну",
   "waveStationsFailed": "Станции не загрузились: {error}",
   "@waveStationsFailed": {
     "placeholders": {
@@ -59,23 +52,8 @@
   "waveLikeAdded": "Добавлено в любимое",
   "waveLikeRemoved": "Убрано из любимого",
   "waveSettingsTitle": "Настройки волны",
-  "waveApply": "Применить",
   "waveClose": "Закрыть",
-  "waveSavedNote": "Настройки волны сохранены",
   "waveRejectedNote": "Яндекс не принял настройки — смотри лог",
-  "moodCalm": "спокойное",
-  "moodEven": "ровное",
-  "moodActive": "активное",
-  "energyLow": "низкая",
-  "energyMid": "средняя",
-  "energyHigh": "высокая",
-  "diversityMore": "побольше нового",
-  "diversityLess": "побольше знакомого",
-  "diversityUsual": "как обычно",
-  "langRu": "русское",
-  "langEn": "английское",
-  "langNonrank": "без приоритета",
-  "langAny": "любое",
   "collectionTitle": "Коллекция",
   "collectionLiked": "Любимое",
   "collectionDisliked": "Нелюбимое",
@@ -87,7 +65,13 @@
   "collectionArtists": "Артисты",
   "albumsTitle": "Альбомы",
   "chartTitle": "Чарт",
+  "chartSubtitle": "Популярное в России прямо сейчас",
   "artistOpen": "К исполнителю",
+  "artistAllTracks": "Все треки",
+  "artistPopularTracks": "Популярные треки",
+  "artistAllAlbums": "Все альбомы",
+  "artistPhoto": "Фото артиста",
+  "trackDownloaded": "Скачано",
   "albumOpen": "К альбому",
   "trackMenu": "Меню трека",
   "menuLike": "Нравится",
@@ -96,20 +80,6 @@
   "menuPlayNext": "Играть следующим",
   "menuAddQueue": "В очередь",
   "menuDetails": "Сведения о треке",
-  "menuDetailsBody": "Источник: {source}\nКачество: {quality}\nФормат: {codec}",
-  "@menuDetailsBody": {
-    "placeholders": {
-      "source": {
-        "type": "String"
-      },
-      "quality": {
-        "type": "String"
-      },
-      "codec": {
-        "type": "String"
-      }
-    }
-  },
   "chartOpen": "Чарт Яндекса",
   "collectionAlsoIn": "Ещё в коллекции",
   "listenedMinutes": "{count} мин",
@@ -145,6 +115,13 @@
     }
   },
   "collectionSort": "Сортировка",
+  "collectionDownloadAllLikes": "Скачать все треки",
+  "collectionDownloadQueued": "В очереди на загрузку: {count}",
+  "@collectionDownloadQueued": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
   "sortAdded": "Недавно добавленные",
   "sortTitle": "По названию",
   "sortArtist": "По исполнителю",
@@ -306,7 +283,9 @@
   "paletteBrand": "Фирменная",
   "paletteDynamic": "Material You",
   "paletteMono": "Монохром",
+  "paletteAmoled": "AMOLED",
   "paletteDynamicNote": "Material You доступно на Android 12 и новее",
+  "paletteAmoledNote": "Чистый чёрный фон: на OLED пиксели гаснут, батарея держит дольше",
   "settingsAccent": "Акцент",
   "accentAcid": "Кислота",
   "accentViolet": "Фиалка",
@@ -317,8 +296,8 @@
   "accentSky": "Небо",
   "accentRose": "Роза",
   "accentLeaf": "Лист",
+  "accentOrchid": "Орхидея",
   "launcherForest": "Лес",
-  "launcherCrimson": "Багровый",
   "settingsContrast": "Контраст",
   "contrastNormal": "Обычный",
   "contrastHigh": "Высокий",
@@ -498,6 +477,107 @@
       "error": {
         "type": "String"
       }
+    }
+  },
+  "navDiscover": "Обзор",
+  "discoverTitle": "Что послушать",
+  "discoverChart": "Чарт",
+  "discoverNewReleases": "Новые релизы",
+  "discoverStations": "Жанры и настроения",
+  "discoverArtists": "Твои артисты",
+  "discoverAll": "Все",
+  "searchHistoryTitle": "История поиска",
+  "searchHistoryClear": "Очистить",
+  "waveListen": "Слушать",
+  "waveWheelHint": "Крути и выбирай режим",
+  "waveBackToUsual": "Обычная волна",
+  "moodEnergyActive": "Бодрое",
+  "moodEnergyFun": "Весёлое",
+  "moodEnergyCalm": "Спокойное",
+  "moodEnergySad": "Грустное",
+  "diversityFavorite": "Любимое",
+  "diversityDiscover": "Незнакомое",
+  "diversityPopular": "Популярное",
+  "languageRussian": "Русский",
+  "languageForeign": "Иностранный",
+  "languageInstrumental": "Без слов",
+  "homeCoverTone": "Тон обложки",
+  "homeCoverDarker": "Темнее",
+  "homeCoverNormal": "Обычная",
+  "homeCoverLighter": "Светлее",
+  "homeCoverBlur": "Размытие обложки",
+  "homeCoverBlurNote": "Мягкий фон вместо детальной картинки",
+  "djInfo": "DJ-сведения",
+  "djInfoNote": "BPM и тональность в сведениях о треке",
+  "trackUnknownArtist": "Неизвестный исполнитель",
+  "sourceYandex": "Яндекс Музыка",
+  "sourceYoutube": "YouTube",
+  "sourceLocalFile": "Файл",
+  "detailsSource": "Источник",
+  "detailsSources": "Источники",
+  "detailsAlbum": "Альбом",
+  "detailsYear": "Год",
+  "detailsDuration": "Длительность",
+  "detailsIsrc": "ISRC",
+  "detailsQuality": "Качество",
+  "detailsCodec": "Кодек",
+  "detailsSize": "Размер",
+  "detailsFile": "Файл",
+  "detailsRemoteId": "ID источника",
+  "detailsLocalId": "Локальный ID",
+  "djBpm": "BPM",
+  "djGain": "Громкость",
+  "djKey": "Тональность",
+  "djNoKey": "Не указана",
+  "djSourceNote": "BPM и громкость — Deezer. Тональность можно указать вручную по Camelot.",
+  "downloadsPaused": "На паузе",
+  "downloadsPause": "Пауза",
+  "downloadsResume": "Продолжить",
+  "settingsDownloads": "Загрузки",
+  "downloadsSummary": "Скачано: {count} · {size}",
+  "@downloadsSummary": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "size": { "type": "String" }
+    }
+  },
+  "downloadsQueueSummary": "В очереди: {queued} · на паузе: {paused}",
+  "@downloadsQueueSummary": {
+    "placeholders": {
+      "queued": { "type": "int" },
+      "paused": { "type": "int" }
+    }
+  },
+  "downloadsSkipped": "Пропущено как недоступное офлайн: {count}",
+  "@downloadsSkipped": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "downloadsAutoLikes": "Качать любимое автоматически",
+  "downloadsAutoLikesNote": "По умолчанию выключено. Сначала пробные 20 треков, потом все.",
+  "downloadsDownloadAll": "Скачать все лайки",
+  "downloadsDownloadAllNote": "Поставит в очередь все лайки. Пауза и лимит продолжают работать.",
+  "downloadsWifiOnly": "Только Wi-Fi",
+  "downloadsWifiOnlyNote": "Автозагрузка ждёт Wi-Fi; ручные загрузки разрешены в любой сети.",
+  "downloadsLimit": "Лимит места",
+  "downloadsLimitNote": "При достижении очередь останавливается, файлы не удаляются.",
+  "downloadsUnlimited": "Без лимита",
+  "downloadsGb": "{value} ГБ",
+  "@downloadsGb": {
+    "placeholders": {
+      "value": { "type": "int" }
+    }
+  },
+  "downloadsQuality": "Качество автозагрузки",
+  "downloadsQualityNote": "Не меняет уже скачанные файлы.",
+  "downloadsDeleteAll": "Удалить все загрузки",
+  "downloadsDeleteAllQuestion": "Удалить все скачанные треки?",
+  "downloadsDeletedAll": "Все загрузки удалены",
+  "downloadsFreeSpace": "Свободно: {size}",
+  "@downloadsFreeSpace": {
+    "placeholders": {
+      "size": { "type": "String" }
     }
   }
 }

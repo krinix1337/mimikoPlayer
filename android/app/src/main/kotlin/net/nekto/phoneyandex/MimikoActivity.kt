@@ -2,7 +2,11 @@ package net.nekto.phoneyandex
 
 import android.content.ComponentName
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
+import android.os.Environment
+import android.os.StatFs
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.plugin.common.MethodChannel
 
@@ -58,6 +62,10 @@ class MimikoActivity : AudioServiceActivity() {
                             .onFailure { result.error("icon_failed", it.message, null) }
                     }
                 }
+
+                "freeBytes" -> result.success(freeBytes())
+
+                "networkStatus" -> result.success(networkStatus())
 
                 else -> result.notImplemented()
             }
@@ -147,6 +155,43 @@ class MimikoActivity : AudioServiceActivity() {
     private fun actualRefreshRate(): Float =
         runCatching { displayOrNull()?.refreshRate ?: 0f }.getOrDefault(0f)
 
+    /** Свободное место на разделе данных: нужно для лимита загрузок. */
+    private fun freeBytes(): Long =
+        runCatching {
+            StatFs(Environment.getDataDirectory().absolutePath).availableBytes
+        }.getOrDefault(0L)
+
+    /**
+     * Проверяем физическую Wi-Fi-сеть отдельно от активного VPN: иначе
+     * автозагрузка навсегда ждёт «Wi-Fi», которого не видно за туннелем.
+     */
+    private fun networkStatus(): Map<String, Boolean> {
+        val manager = getSystemService(ConnectivityManager::class.java)
+        val active = manager.activeNetwork
+        val activeCaps = active?.let { manager.getNetworkCapabilities(it) }
+        val all = manager.allNetworks.mapNotNull {
+            manager.getNetworkCapabilities(it)
+        }
+        val wifi = all.any {
+            it.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
+                it.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        }
+        val unmetered =
+            activeCaps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) == true ||
+                all.any {
+                    it.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) &&
+                        it.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                }
+        val connected =
+            activeCaps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        return mapOf(
+            "connected" to connected,
+            "wifi" to wifi,
+            "unmetered" to unmetered,
+            "vpn" to (activeCaps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true),
+        )
+    }
+
     /**
      * В лаунчере всегда ровно один включённый алиас: основной activity
      * стартового фильтра не имеет, иначе отключить «дефолтный» значок
@@ -181,7 +226,6 @@ class MimikoActivity : AudioServiceActivity() {
             "MimikoLauncherIce",
             "MimikoLauncherAmber",
             "MimikoLauncherForest",
-            "MimikoLauncherCrimson",
         )
     }
 }

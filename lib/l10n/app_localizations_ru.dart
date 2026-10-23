@@ -70,24 +70,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get waveStart => 'Запустить волну';
 
   @override
-  String get waveMood => 'Настроение';
-
-  @override
-  String get waveEnergy => 'Энергия';
-
-  @override
-  String get waveDiversity => 'Разнообразие';
-
-  @override
-  String get waveStation => 'Станция';
-
-  @override
-  String get wavePresets => 'Пресеты';
-
-  @override
-  String get waveLanguage => 'Язык музыки';
-
-  @override
   String get waveSaved => 'Настройки волны сохранены';
 
   @override
@@ -132,9 +114,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sourceArtist => 'Артист';
 
   @override
-  String get switchToWave => 'Включить мою волну';
-
-  @override
   String waveStationsFailed(String error) {
     return 'Станции не загрузились: $error';
   }
@@ -149,55 +128,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get waveSettingsTitle => 'Настройки волны';
 
   @override
-  String get waveApply => 'Применить';
-
-  @override
   String get waveClose => 'Закрыть';
 
   @override
-  String get waveSavedNote => 'Настройки волны сохранены';
-
-  @override
   String get waveRejectedNote => 'Яндекс не принял настройки — смотри лог';
-
-  @override
-  String get moodCalm => 'спокойное';
-
-  @override
-  String get moodEven => 'ровное';
-
-  @override
-  String get moodActive => 'активное';
-
-  @override
-  String get energyLow => 'низкая';
-
-  @override
-  String get energyMid => 'средняя';
-
-  @override
-  String get energyHigh => 'высокая';
-
-  @override
-  String get diversityMore => 'побольше нового';
-
-  @override
-  String get diversityLess => 'побольше знакомого';
-
-  @override
-  String get diversityUsual => 'как обычно';
-
-  @override
-  String get langRu => 'русское';
-
-  @override
-  String get langEn => 'английское';
-
-  @override
-  String get langNonrank => 'без приоритета';
-
-  @override
-  String get langAny => 'любое';
 
   @override
   String get collectionTitle => 'Коллекция';
@@ -234,7 +168,25 @@ class AppLocalizationsRu extends AppLocalizations {
   String get chartTitle => 'Чарт';
 
   @override
+  String get chartSubtitle => 'Популярное в России прямо сейчас';
+
+  @override
   String get artistOpen => 'К исполнителю';
+
+  @override
+  String get artistAllTracks => 'Все треки';
+
+  @override
+  String get artistPopularTracks => 'Популярные треки';
+
+  @override
+  String get artistAllAlbums => 'Все альбомы';
+
+  @override
+  String get artistPhoto => 'Фото артиста';
+
+  @override
+  String get trackDownloaded => 'Скачано';
 
   @override
   String get albumOpen => 'К альбому';
@@ -259,11 +211,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get menuDetails => 'Сведения о треке';
-
-  @override
-  String menuDetailsBody(String source, String quality, String codec) {
-    return 'Источник: $source\nКачество: $quality\nФормат: $codec';
-  }
 
   @override
   String get chartOpen => 'Чарт Яндекса';
@@ -293,6 +240,14 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get collectionSort => 'Сортировка';
+
+  @override
+  String get collectionDownloadAllLikes => 'Скачать все треки';
+
+  @override
+  String collectionDownloadQueued(int count) {
+    return 'В очереди на загрузку: $count';
+  }
 
   @override
   String get sortAdded => 'Недавно добавленные';
@@ -545,8 +500,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get paletteMono => 'Монохром';
 
   @override
+  String get paletteAmoled => 'AMOLED';
+
+  @override
   String get paletteDynamicNote =>
       'Material You доступно на Android 12 и новее';
+
+  @override
+  String get paletteAmoledNote =>
+      'Чистый чёрный фон: на OLED пиксели гаснут, батарея держит дольше';
 
   @override
   String get settingsAccent => 'Акцент';
@@ -579,10 +541,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get accentLeaf => 'Лист';
 
   @override
-  String get launcherForest => 'Лес';
+  String get accentOrchid => 'Орхидея';
 
   @override
-  String get launcherCrimson => 'Багровый';
+  String get launcherForest => 'Лес';
 
   @override
   String get settingsContrast => 'Контраст';
@@ -945,5 +907,242 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String dbError(String error) {
     return 'База не ответила: $error';
+  }
+
+  @override
+  String get navDiscover => 'Обзор';
+
+  @override
+  String get discoverTitle => 'Что послушать';
+
+  @override
+  String get discoverChart => 'Чарт';
+
+  @override
+  String get discoverNewReleases => 'Новые релизы';
+
+  @override
+  String get discoverStations => 'Жанры и настроения';
+
+  @override
+  String get discoverArtists => 'Твои артисты';
+
+  @override
+  String get discoverAll => 'Все';
+
+  @override
+  String get searchHistoryTitle => 'История поиска';
+
+  @override
+  String get searchHistoryClear => 'Очистить';
+
+  @override
+  String get waveListen => 'Слушать';
+
+  @override
+  String get waveWheelHint => 'Крути и выбирай режим';
+
+  @override
+  String get waveBackToUsual => 'Обычная волна';
+
+  @override
+  String get moodEnergyActive => 'Бодрое';
+
+  @override
+  String get moodEnergyFun => 'Весёлое';
+
+  @override
+  String get moodEnergyCalm => 'Спокойное';
+
+  @override
+  String get moodEnergySad => 'Грустное';
+
+  @override
+  String get diversityFavorite => 'Любимое';
+
+  @override
+  String get diversityDiscover => 'Незнакомое';
+
+  @override
+  String get diversityPopular => 'Популярное';
+
+  @override
+  String get languageRussian => 'Русский';
+
+  @override
+  String get languageForeign => 'Иностранный';
+
+  @override
+  String get languageInstrumental => 'Без слов';
+
+  @override
+  String get homeCoverTone => 'Тон обложки';
+
+  @override
+  String get homeCoverDarker => 'Темнее';
+
+  @override
+  String get homeCoverNormal => 'Обычная';
+
+  @override
+  String get homeCoverLighter => 'Светлее';
+
+  @override
+  String get homeCoverBlur => 'Размытие обложки';
+
+  @override
+  String get homeCoverBlurNote => 'Мягкий фон вместо детальной картинки';
+
+  @override
+  String get djInfo => 'DJ-сведения';
+
+  @override
+  String get djInfoNote => 'BPM и тональность в сведениях о треке';
+
+  @override
+  String get trackUnknownArtist => 'Неизвестный исполнитель';
+
+  @override
+  String get sourceYandex => 'Яндекс Музыка';
+
+  @override
+  String get sourceYoutube => 'YouTube';
+
+  @override
+  String get sourceLocalFile => 'Файл';
+
+  @override
+  String get detailsSource => 'Источник';
+
+  @override
+  String get detailsSources => 'Источники';
+
+  @override
+  String get detailsAlbum => 'Альбом';
+
+  @override
+  String get detailsYear => 'Год';
+
+  @override
+  String get detailsDuration => 'Длительность';
+
+  @override
+  String get detailsIsrc => 'ISRC';
+
+  @override
+  String get detailsQuality => 'Качество';
+
+  @override
+  String get detailsCodec => 'Кодек';
+
+  @override
+  String get detailsSize => 'Размер';
+
+  @override
+  String get detailsFile => 'Файл';
+
+  @override
+  String get detailsRemoteId => 'ID источника';
+
+  @override
+  String get detailsLocalId => 'Локальный ID';
+
+  @override
+  String get djBpm => 'BPM';
+
+  @override
+  String get djGain => 'Громкость';
+
+  @override
+  String get djKey => 'Тональность';
+
+  @override
+  String get djNoKey => 'Не указана';
+
+  @override
+  String get djSourceNote =>
+      'BPM и громкость — Deezer. Тональность можно указать вручную по Camelot.';
+
+  @override
+  String get downloadsPaused => 'На паузе';
+
+  @override
+  String get downloadsPause => 'Пауза';
+
+  @override
+  String get downloadsResume => 'Продолжить';
+
+  @override
+  String get settingsDownloads => 'Загрузки';
+
+  @override
+  String downloadsSummary(int count, String size) {
+    return 'Скачано: $count · $size';
+  }
+
+  @override
+  String downloadsQueueSummary(int queued, int paused) {
+    return 'В очереди: $queued · на паузе: $paused';
+  }
+
+  @override
+  String downloadsSkipped(int count) {
+    return 'Пропущено как недоступное офлайн: $count';
+  }
+
+  @override
+  String get downloadsAutoLikes => 'Качать любимое автоматически';
+
+  @override
+  String get downloadsAutoLikesNote =>
+      'По умолчанию выключено. Сначала пробные 20 треков, потом все.';
+
+  @override
+  String get downloadsDownloadAll => 'Скачать все лайки';
+
+  @override
+  String get downloadsDownloadAllNote =>
+      'Поставит в очередь все лайки. Пауза и лимит продолжают работать.';
+
+  @override
+  String get downloadsWifiOnly => 'Только Wi-Fi';
+
+  @override
+  String get downloadsWifiOnlyNote =>
+      'Автозагрузка ждёт Wi-Fi; ручные загрузки разрешены в любой сети.';
+
+  @override
+  String get downloadsLimit => 'Лимит места';
+
+  @override
+  String get downloadsLimitNote =>
+      'При достижении очередь останавливается, файлы не удаляются.';
+
+  @override
+  String get downloadsUnlimited => 'Без лимита';
+
+  @override
+  String downloadsGb(int value) {
+    return '$value ГБ';
+  }
+
+  @override
+  String get downloadsQuality => 'Качество автозагрузки';
+
+  @override
+  String get downloadsQualityNote => 'Не меняет уже скачанные файлы.';
+
+  @override
+  String get downloadsDeleteAll => 'Удалить все загрузки';
+
+  @override
+  String get downloadsDeleteAllQuestion => 'Удалить все скачанные треки?';
+
+  @override
+  String get downloadsDeletedAll => 'Все загрузки удалены';
+
+  @override
+  String downloadsFreeSpace(String size) {
+    return 'Свободно: $size';
   }
 }

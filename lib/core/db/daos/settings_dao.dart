@@ -39,14 +39,15 @@ class SettingsDao {
       _put(key, jsonEncode(value));
 
   Future<String?> _value(String key) async {
-    final row = await (_db.select(_db.appSettings)
-          ..where((t) => t.key.equals(key)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.appSettings,
+    )..where((t) => t.key.equals(key))).getSingleOrNull();
     return row?.valueJson;
   }
 
-  Future<void> _put(String key, String valueJson) =>
-      _db.into(_db.appSettings).insertOnConflictUpdate(
+  Future<void> _put(String key, String valueJson) => _db
+      .into(_db.appSettings)
+      .insertOnConflictUpdate(
         AppSettingsCompanion.insert(
           key: key,
           valueJson: valueJson,

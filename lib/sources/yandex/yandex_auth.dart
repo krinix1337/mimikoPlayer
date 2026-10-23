@@ -24,7 +24,13 @@ class YandexAuthException implements Exception {
 enum _PollKind { token, pending, retryLater, failed }
 
 final class _PollResult {
-  const _PollResult(this.kind, {this.token, this.refreshToken, this.expiresInSeconds, this.message});
+  const _PollResult(
+    this.kind, {
+    this.token,
+    this.refreshToken,
+    this.expiresInSeconds,
+    this.message,
+  });
 
   final _PollKind kind;
   final String? token;
@@ -137,12 +143,10 @@ class YandexAuth {
     final Response<dynamic> response;
     try {
       response = await _oauth.post<dynamic>(
-      '${AppConfig.yandexOAuthHost}/device/code',
-      options: Options(
-        headers: const {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      ),
+        '${AppConfig.yandexOAuthHost}/device/code',
+        options: Options(
+          headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
+        ),
         data: Uri(
           queryParameters: {
             'client_id': AppConfig.yandexClientId,
@@ -160,7 +164,9 @@ class YandexAuth {
     final json = _asMap(response.data);
     final error = json['error'];
     if (error != null || response.statusCode != 200) {
-      throw YandexAuthException('Яндекс не выдал код: ${error ?? response.statusCode}');
+      throw YandexAuthException(
+        'Яндекс не выдал код: ${error ?? response.statusCode}',
+      );
     }
 
     // Код короткоживущий и всё равно показывается на экране — он нужен в логе,
@@ -174,7 +180,9 @@ class YandexAuth {
       userCode: '${json['user_code']}',
       verificationUrl: '${json['verification_url'] ?? 'https://ya.ru/device'}',
       interval: Duration(seconds: (json['interval'] as num?)?.toInt() ?? 5),
-      expiresIn: Duration(seconds: (json['expires_in'] as num?)?.toInt() ?? 300),
+      expiresIn: Duration(
+        seconds: (json['expires_in'] as num?)?.toInt() ?? 300,
+      ),
     );
   }
 
@@ -185,8 +193,9 @@ class YandexAuth {
     DeviceLogin login, {
     Duration? timeout,
   }) async {
-    final deadline =
-        DateTime.now().add(timeout ?? login.expiresIn + const Duration(seconds: 30));
+    final deadline = DateTime.now().add(
+      timeout ?? login.expiresIn + const Duration(seconds: 30),
+    );
     var lastError = 'время подтверждения истекло';
 
     while (DateTime.now().isBefore(deadline)) {
@@ -211,7 +220,9 @@ class YandexAuth {
           continue;
 
         case _PollKind.failed:
-          _emit(AuthFailed(attempt.message ?? 'Яндекс отказал в выдаче токена'));
+          _emit(
+            AuthFailed(attempt.message ?? 'Яндекс отказал в выдаче токена'),
+          );
           return false;
       }
     }
@@ -225,9 +236,7 @@ class YandexAuth {
       final response = await _oauth.post<dynamic>(
         '${AppConfig.yandexOAuthHost}/token',
         options: Options(
-          headers: const {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
+          headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
         ),
         data: Uri(
           queryParameters: {
@@ -252,13 +261,19 @@ class YandexAuth {
 
       final error = json['error']?.toString();
       if (error == null) {
-        return _PollResult(_PollKind.retryLater, message: 'Яндекс вернул пустой ответ');
+        return _PollResult(
+          _PollKind.retryLater,
+          message: 'Яндекс вернул пустой ответ',
+        );
       }
       if (error == 'authorization_pending' || error == 'slow_down') {
         return const _PollResult(_PollKind.pending);
       }
       if (error == 'expired_token' || error == 'access_denied') {
-        return _PollResult(_PollKind.failed, message: json['error_description']?.toString() ?? error);
+        return _PollResult(
+          _PollKind.failed,
+          message: json['error_description']?.toString() ?? error,
+        );
       }
       return _PollResult(_PollKind.retryLater, message: error);
     } on Object catch (e) {
@@ -336,12 +351,18 @@ class YandexAuth {
     );
   }
 
-  Future<void> _loadAccount(String? knownUid, String? knownLogin, bool knownPlus) async {
+  Future<void> _loadAccount(
+    String? knownUid,
+    String? knownLogin,
+    bool knownPlus,
+  ) async {
     final result = await _api.get('/account/status');
     if (!result.isOk) {
-      _emit(result.failure?.reason == SourceFailReason.authExpired
-          ? const AuthExpired()
-          : AuthFailed(result.failure?.message ?? 'нет ответа'));
+      _emit(
+        result.failure?.reason == SourceFailReason.authExpired
+            ? const AuthExpired()
+            : AuthFailed(result.failure?.message ?? 'нет ответа'),
+      );
       return;
     }
 
@@ -352,8 +373,8 @@ class YandexAuth {
     final login = '${account['login'] ?? knownLogin ?? ''}';
     final hasPlus = plus['hasPlus'] == true || knownPlus;
 
-    final expiresAt = _tokenExpiresAt ??
-        DateTime.now().add(const Duration(days: 365));
+    final expiresAt =
+        _tokenExpiresAt ?? DateTime.now().add(const Duration(days: 365));
 
     _emit(
       AuthReady(

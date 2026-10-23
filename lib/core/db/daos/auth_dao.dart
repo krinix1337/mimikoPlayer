@@ -11,9 +11,9 @@ class AuthDao {
 
   final AppDatabase _db;
 
-  Future<AuthToken?> load(String provider) =>
-      (_db.select(_db.authTokens)..where((t) => t.provider.equals(provider)))
-          .getSingleOrNull();
+  Future<AuthToken?> load(String provider) => (_db.select(
+    _db.authTokens,
+  )..where((t) => t.provider.equals(provider))).getSingleOrNull();
 
   Future<void> save({
     required String provider,
@@ -26,23 +26,25 @@ class AuthDao {
     String? displayName,
     bool hasPlus = false,
     Map<String, Object?>? extra,
-  }) => _db.into(_db.authTokens).insertOnConflictUpdate(
-    AuthTokensCompanion.insert(
-      provider: provider,
-      accessToken: accessToken,
-      refreshToken: Value(refreshToken),
-      tokenType: Value(tokenType),
-      expiresAt: Value(expiresAtEpochMs),
-      uid: Value(uid),
-      login: Value(login),
-      displayName: Value(displayName),
-      hasPlus: Value(hasPlus),
-      extraJson: Value(extra == null ? null : jsonEncode(extra)),
-      updatedAt: Value(DateTime.now()),
-    ),
-  );
+  }) => _db
+      .into(_db.authTokens)
+      .insertOnConflictUpdate(
+        AuthTokensCompanion.insert(
+          provider: provider,
+          accessToken: accessToken,
+          refreshToken: Value(refreshToken),
+          tokenType: Value(tokenType),
+          expiresAt: Value(expiresAtEpochMs),
+          uid: Value(uid),
+          login: Value(login),
+          displayName: Value(displayName),
+          hasPlus: Value(hasPlus),
+          extraJson: Value(extra == null ? null : jsonEncode(extra)),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
 
-  Future<void> clear(String provider) =>
-      (_db.delete(_db.authTokens)..where((t) => t.provider.equals(provider)))
-          .go();
+  Future<void> clear(String provider) => (_db.delete(
+    _db.authTokens,
+  )..where((t) => t.provider.equals(provider))).go();
 }

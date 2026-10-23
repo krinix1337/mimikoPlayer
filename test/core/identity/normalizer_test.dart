@@ -17,18 +17,9 @@ void main() {
     });
 
     test('снимает feat и хвост после дефиса', () {
-      expect(
-        normalizeTitle('Тело (feat. Miyagi)'),
-        'тело',
-      );
-      expect(
-        normalizeTitle('Sunflower ft. Joy\n'),
-        'sunflower joy',
-      );
-      expect(
-        normalizeTitle('Intro - Official Audio'),
-        'intro',
-      );
+      expect(normalizeTitle('Тело (feat. Miyagi)'), 'тело');
+      expect(normalizeTitle('Sunflower ft. Joy\n'), 'sunflower joy');
+      expect(normalizeTitle('Intro - Official Audio'), 'intro');
     });
 
     test('кириллица не транслитерируется', () {
@@ -36,11 +27,14 @@ void main() {
       expect(normalizeTitle('Ёлка — Городские цветы'), 'ёлка городские цветы');
     });
 
-    test('диакритика латиницы сводится к базе, апостроф становится разделителем', () {
-      expect(normalizeTitle('Björk'), 'bjork');
-      expect(normalizeTitle('L’Amour'), 'l amour');
-      expect(normalizeTitle("L'Amour"), 'l amour');
-    });
+    test(
+      'диакритика латиницы сводится к базе, апостроф становится разделителем',
+      () {
+        expect(normalizeTitle('Björk'), 'bjork');
+        expect(normalizeTitle('L’Amour'), 'l amour');
+        expect(normalizeTitle("L'Amour"), 'l amour');
+      },
+    );
 
     test('& читается как and, × как x', () {
       expect(normalizeTitle('Jay-Z & Kanye West'), 'jay z and kanye west');
@@ -48,10 +42,7 @@ void main() {
     });
 
     test('пунктуация и повторные пробелы схлопываются', () {
-      expect(
-        normalizeTitle('  All..Star__2020!!  '),
-        'all star 2020',
-      );
+      expect(normalizeTitle('  All..Star__2020!!  '), 'all star 2020');
     });
   });
 

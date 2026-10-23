@@ -16,6 +16,13 @@ class StreamsDao implements ResolutionStore {
 
   final AppDatabase _db;
 
+  Future<DownloadedFile?> downloadedFile(String localTrackId) =>
+      (_db.select(_db.downloadedFiles)
+            ..where((t) => t.localTrackId.equals(localTrackId))
+            ..where((t) => t.state.equals('complete'))
+            ..limit(1))
+          .getSingleOrNull();
+
   @override
   Future<String?> downloadedFilePath(String localTrackId) async {
     final row =
@@ -25,7 +32,19 @@ class StreamsDao implements ResolutionStore {
               ..limit(1))
             .getSingleOrNull();
     if (row == null) return null;
-    return await File(row.filePath).exists() ? row.filePath : null;
+    final file = File(row.filePath);
+    if (!await file.exists()) {
+      await removeDownload(localTrackId);
+      return null;
+    }
+    final size = await file.length();
+    // Обрезанный файл не должен перекрывать сеть: удаляем строку и уходим
+    // в обычную цепочку источников.
+    if (size < 64 * 1024 || (row.sizeBytes > 0 && size != row.sizeBytes)) {
+      await removeDownload(localTrackId);
+      return null;
+    }
+    return row.filePath;
   }
 
   Future<void> markDownloading({
@@ -33,12 +52,14 @@ class StreamsDao implements ResolutionStore {
     required SourceId source,
     required String filePath,
     required Quality quality,
+    String origin = 'manual',
   }) => _replaceDownload(
     DownloadedFilesCompanion.insert(
       localTrackId: localTrackId,
       filePath: filePath,
       source: source.wire,
       quality: Value(quality.wire),
+      origin: Value(origin),
       state: const Value('downloading'),
     ),
   );
@@ -50,6 +71,8 @@ class StreamsDao implements ResolutionStore {
     required Quality quality,
     required int sizeBytes,
     String? codec,
+    String origin = 'manual',
+    String? coverPath,
   }) => _replaceDownload(
     DownloadedFilesCompanion.insert(
       localTrackId: localTrackId,
@@ -57,6 +80,8 @@ class StreamsDao implements ResolutionStore {
       source: source.wire,
       quality: Value(quality.wire),
       codec: Value(codec),
+      origin: Value(origin),
+      coverPath: Value(coverPath),
       sizeBytes: Value(sizeBytes),
       state: const Value('complete'),
       errorText: const Value(null),
@@ -88,6 +113,20 @@ class StreamsDao implements ResolutionStore {
   Future<void> removeDownload(String localTrackId) => (_db.delete(
     _db.downloadedFiles,
   )..where((t) => t.localTrackId.equals(localTrackId))).go();
+
+  /// Треки, скачанные до появления локальных обложек: их картинки ещё не
+  /// лежат на диске, и без интернета «Скачанное» показывало бы заглушки.
+  Future<List<DownloadedFile>> completeWithoutCover({int limit = 200}) =>
+      (_db.select(_db.downloadedFiles)
+            ..where((t) => t.state.equals('complete'))
+            ..where((t) => t.coverPath.isNull())
+            ..limit(limit))
+          .get();
+
+  Future<void> setCoverPath(String localTrackId, String? path) =>
+      (_db.update(_db.downloadedFiles)
+            ..where((t) => t.localTrackId.equals(localTrackId)))
+          .write(DownloadedFilesCompanion(coverPath: Value(path)));
 
   Future<int> downloadedBytes() async {
     final rows = await _db.select(_db.downloadedFiles).get();

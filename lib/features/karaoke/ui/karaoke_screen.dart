@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app_providers.dart';
@@ -28,18 +31,28 @@ class _KaraokeScreenState extends ConsumerState<KaraokeScreen> {
   /// прокрутка у него под пальцем прыгает обратно.
   bool _userScrolling = false;
 
+  Timer? _scrollResume;
+
   @override
   void initState() {
     super.initState();
     _scroll.addListener(() {
-      if (_scroll.position.isScrollingNotifier.value) {
-        _userScrolling = true;
-      }
+      // Программный ensureVisible тоже поднимает isScrollingNotifier, поэтому
+      // смотрим именно жест пользователя.
+      if (_scroll.position.userScrollDirection == ScrollDirection.idle) return;
+      _userScrolling = true;
+      _scrollResume?.cancel();
+      // Через несколько секунд после ручного листания автоскролл включается
+      // снова, иначе текст навсегда оставался там, куда его увели.
+      _scrollResume = Timer(const Duration(seconds: 4), () {
+        if (mounted) _userScrolling = false;
+      });
     });
   }
 
   @override
   void dispose() {
+    _scrollResume?.cancel();
     _scroll.dispose();
     super.dispose();
   }
@@ -49,7 +62,9 @@ class _KaraokeScreenState extends ConsumerState<KaraokeScreen> {
     final l = AppLocalizations.of(context);
     final lyrics = ref.watch(trackLyricsProvider(widget.trackId));
     final position = ref.watch(
-      playerSnapshotProviderValue.select((s) => (s.position, s.current?.coverUrl)),
+      playerSnapshotProviderValue.select(
+        (s) => (s.position, s.current?.coverUrl),
+      ),
     );
 
     return Scaffold(
@@ -79,7 +94,10 @@ class _KaraokeScreenState extends ConsumerState<KaraokeScreen> {
                     children: [
                       IconButton(
                         tooltip: l.playerBack,
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
+                        icon: const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 30,
+                        ),
                         onPressed: () => Navigator.of(context).maybePop(),
                       ),
                       Expanded(
@@ -94,8 +112,9 @@ class _KaraokeScreenState extends ConsumerState<KaraokeScreen> {
                 Expanded(
                   child: switch (lyrics) {
                     AsyncValue(:final error?) => _Notice(text: '$error'),
-                    AsyncValue(:final value?) when value.isEmpty =>
-                      _Notice(text: l.playerLyricsMissing),
+                    AsyncValue(:final value?) when value.isEmpty => _Notice(
+                      text: l.playerLyricsMissing,
+                    ),
                     AsyncValue(:final value?) => _LyricsBody(
                       lyrics: value,
                       at: position.$1,
@@ -207,10 +226,8 @@ class _LyricLineView extends StatelessWidget {
     final prefs = motion.prefs;
     final scheme = Theme.of(context).colorScheme;
     final scale = prefs.lyricsSize.scale;
-    final base = Theme.of(context).textTheme.headlineSmall!.copyWith(
-      fontWeight: FontWeight.w700,
-      height: 1.25,
-    );
+    final base = Theme.of(context).textTheme.headlineSmall!
+        .copyWith(fontWeight: FontWeight.w700, height: 1.25);
 
     final dimAlpha = prefs.lyricsDimOthers ? 0.38 : 0.72;
     final color = active
@@ -219,10 +236,7 @@ class _LyricLineView extends StatelessWidget {
         ? scheme.onSurface.withValues(alpha: dimAlpha)
         : scheme.onSurface.withValues(alpha: 0.8);
 
-    final text = Text(
-      line.text,
-      style: base.copyWith(color: color),
-    );
+    final text = Text(line.text, style: base.copyWith(color: color));
 
     return GestureDetector(
       onTap: onTap,
@@ -232,31 +246,48 @@ class _LyricLineView extends StatelessWidget {
         curve: Curves.easeOut,
         style: base.copyWith(
           color: color,
-          fontSize: (active ? 30 : dimmed ? 24 : 26) * scale,
+          fontSize:
+              (active
+                  ? 30
+                  : dimmed
+                  ? 24
+                  : 26) *
+              scale,
         ),
         child: AnimatedPadding(
           duration: motion.micro(280),
           padding: EdgeInsets.symmetric(vertical: active ? 12 : 8),
-          // Маска прогресса — ClipRect с шириной, а не шейдер: на дешёвом
-          // Mali это дешевле, а выглядит так же.
-          child: active
-              ? Stack(
-                  children: [
-                    Opacity(opacity: 0.32, child: text),
-                    ClipRect(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: progress.clamp(0.0, 1.0),
-                        child: text,
-                      ),
-                    ),
-                  ],
-                )
-              : text,
+          // Подсветка пословная: источник отдаёт тайминг строки, поэтому
+          // внутри строки слова идут равномерно по длине. Клип по ширине
+          // выглядел как «буква за буквой», здесь слогается целое слово.
+          child: active ? _wordProgress(line.text, progress, scheme) : text,
         ),
       ),
     );
   }
+}
+
+/// Слова строки, подсвеченные по прогрессу: спетое — полным цветом акцента,
+/// остальное — тем же цветом, но приглушённо.
+Widget _wordProgress(String line, double progress, ColorScheme scheme) {
+  final words = line.split(' ');
+  if (words.isEmpty) return Text(line);
+  final lit = (progress.clamp(0.0, 1.0) * words.length).floor();
+  return Text.rich(
+    TextSpan(
+      children: [
+        for (var i = 0; i < words.length; i++)
+          TextSpan(
+            text: i == 0 ? words[i] : ' ${words[i]}',
+            style: TextStyle(
+              color: i < lit
+                  ? scheme.primary
+                  : scheme.primary.withValues(alpha: 0.34),
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 class _Notice extends StatelessWidget {
@@ -271,9 +302,8 @@ class _Notice extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
+        style: Theme.of(context).textTheme.bodyLarge
+            ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
     ),
   );

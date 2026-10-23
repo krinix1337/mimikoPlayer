@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,8 +9,8 @@ import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../sources/yandex/yandex_source.dart';
 import '../../../widgets/pressable.dart';
+import '../../../widgets/remote_track_actions.dart';
 import '../../../widgets/track_cover.dart';
-import 'track_menu.dart';
 
 /// Проигрывание пачки удалённых треков: свести в базу, поставить очередь,
 /// открыть плеер. Одно место на все карточки каталога.
@@ -23,8 +24,9 @@ Future<void> playRemoteTracks(
   if (tracks.isEmpty) return;
   final router = GoRouter.of(context);
   final services = ref.read(appServicesProvider);
+  final controller = ref.read(playbackControllerProvider);
   final ids = await services.db.tracksDao.ingestAll(tracks);
-  await ref.read(playbackControllerProvider).playQueue(
+  await controller.playQueue(
     ids,
     startIndex: startIndex,
     sourceHint: {'kind': kind},
@@ -61,6 +63,18 @@ class ArtistScreen extends ConsumerWidget {
                   icon: const Icon(Icons.arrow_back_rounded),
                   onPressed: () => Navigator.of(context).maybePop(),
                 ),
+                actions: [
+                  if (artist.coverUrl != null)
+                    IconButton(
+                      tooltip: l.artistPhoto,
+                      icon: const Icon(Icons.open_in_full_rounded),
+                      onPressed: () => _showArtistPhoto(
+                        context,
+                        artist.coverUrl!,
+                        artist.name,
+                      ),
+                    ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   titlePadding: const EdgeInsets.fromLTRB(56, 0, 16, 14),
                   title: Text(
@@ -68,7 +82,17 @@ class ArtistScreen extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  background: _ArtistBackdrop(coverUrl: artist.coverUrl),                ),
+                  background: _ArtistBackdrop(
+                    coverUrl: artist.coverUrl,
+                    onAvatarTap: artist.coverUrl == null
+                        ? null
+                        : () => _showArtistPhoto(
+                            context,
+                            artist.coverUrl!,
+                            artist.name,
+                          ),
+                  ),
+                ),
               ),
               SliverToBoxAdapter(
                 child: Padding(
@@ -105,6 +129,26 @@ class ArtistScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l.artistPopularTracks,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () =>
+                            context.push(Routes.artistTracksFor(artistId)),
+                        child: Text(l.artistAllTracks),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               SliverList.builder(
                 itemCount: artist.popular.length,
                 itemBuilder: (context, index) => _RemoteTrackTile(
@@ -114,13 +158,24 @@ class ArtistScreen extends ConsumerWidget {
                   kind: 'artist',
                 ),
               ),
-              if (artist.albums.isNotEmpty)
+              if (artist.albums.isNotEmpty || (artist.albumCount ?? 0) > 0)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                    child: Text(
-                      l.albumsTitle,
-                      style: Theme.of(context).textTheme.headlineSmall,
+                    padding: const EdgeInsets.fromLTRB(16, 20, 8, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l.albumsTitle,
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () =>
+                              context.push(Routes.artistAlbumsFor(artistId)),
+                          child: Text(l.artistAllAlbums),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -154,9 +209,10 @@ class ArtistScreen extends ConsumerWidget {
 }
 
 class _ArtistBackdrop extends StatelessWidget {
-  const _ArtistBackdrop({this.coverUrl});
+  const _ArtistBackdrop({this.coverUrl, this.onAvatarTap});
 
   final String? coverUrl;
+  final VoidCallback? onAvatarTap;
 
   @override
   Widget build(BuildContext context) {
@@ -173,23 +229,27 @@ class _ArtistBackdrop extends StatelessWidget {
             left: 0,
             right: 0,
             child: Center(
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: scheme.surface.withValues(alpha: 0.55),
-                  border: Border.all(
-                    color: scheme.onSurface.withValues(alpha: 0.18),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      blurRadius: 24,
-                      offset: const Offset(0, 10),
+              child: PressableScale(
+                minScale: 0.96,
+                onTap: onAvatarTap,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: scheme.surface.withValues(alpha: 0.55),
+                    border: Border.all(
+                      color: scheme.onSurface.withValues(alpha: 0.18),
                     ),
-                  ],
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        blurRadius: 24,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: TrackCover(url: coverUrl, size: 132, radius: 66),
                 ),
-                child: TrackCover(url: coverUrl, size: 132, radius: 66),
               ),
             ),
           ),
@@ -243,6 +303,226 @@ class _AlbumCard extends StatelessWidget {
     );
   }
 }
+
+/// Все треки артиста отдельным экраном: полный список вместо популярной
+/// пятёрки на карточке.
+class ArtistTracksScreen extends ConsumerWidget {
+  const ArtistTracksScreen({super.key, required this.artistId});
+
+  final String artistId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final tracks = ref.watch(artistTracksProvider(artistId));
+
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            leading: IconButton(
+              tooltip: l.playerBack,
+              icon: const Icon(Icons.arrow_back_rounded),
+              onPressed: () => context.pop(),
+            ),
+            title: Text(l.artistAllTracks),
+            titleTextStyle: Theme.of(context).textTheme.headlineSmall,
+          ),
+          tracks.when(
+            loading: () => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (error, _) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: Text(l.dbError('$error'))),
+            ),
+            data: (list) => list.isEmpty
+                ? SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: Text(l.searchNoResults)),
+                  )
+                : SliverList.builder(
+                    itemCount: list.length,
+                    itemBuilder: (context, index) => _RemoteTrackTile(
+                      track: list[index],
+                      queue: list,
+                      index: index,
+                      kind: 'artist',
+                    ),
+                  ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Вся дискография артиста: сетка обложек, а не обрезанная лента на карточке.
+class ArtistAlbumsScreen extends ConsumerWidget {
+  const ArtistAlbumsScreen({super.key, required this.artistId});
+
+  final String artistId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final albums = ref.watch(artistAlbumsProvider(artistId));
+
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            leading: IconButton(
+              tooltip: l.playerBack,
+              icon: const Icon(Icons.arrow_back_rounded),
+              onPressed: () => context.pop(),
+            ),
+            title: Text(l.artistAllAlbums),
+            titleTextStyle: Theme.of(context).textTheme.headlineSmall,
+          ),
+          albums.when(
+            loading: () => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (error, _) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: Text(l.dbError('$error'))),
+            ),
+            data: (list) => list.isEmpty
+                ? SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: Text(l.searchNoResults)),
+                  )
+                : SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    sliver: SliverGrid(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 14,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 0.72,
+                          ),
+                      delegate: SliverChildBuilderDelegate(
+                        childCount: list.length,
+                        (context, index) =>
+                            _ArtistAlbumTile(album: list[index]),
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ArtistAlbumTile extends StatelessWidget {
+  const _ArtistAlbumTile({required this.album});
+
+  final AlbumBrief album;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return PressableScale(
+      onTap: () => context.push(Routes.albumFor(album.remoteId)),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TrackCover(url: album.coverUrl, size: constraints.maxWidth),
+            const SizedBox(height: 8),
+            Text(
+              album.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium,
+            ),
+            Text(
+              [
+                if (album.year != null) '${album.year}',
+                if (album.trackCount != null) '${album.trackCount}',
+              ].join(' · '),
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _showArtistPhoto(BuildContext context, String url, String name) =>
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (dialogContext) => Dialog.fullscreen(
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: InteractiveViewer(
+                minScale: 1,
+                maxScale: 5,
+                child: Center(
+                  child: CachedNetworkImage(
+                    imageUrl: url,
+                    width: double.infinity,
+                    height: double.infinity,
+                    fit: BoxFit.contain,
+                    placeholder: (_, _) => const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    ),
+                    errorWidget: (_, _, _) => const Center(
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: Colors.white54,
+                        size: 52,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: IconButton(
+                  tooltip: AppLocalizations.of(dialogContext).playerBack,
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    name,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
 
 class AlbumScreen extends ConsumerWidget {
   const AlbumScreen({super.key, required this.albumId});
@@ -348,11 +628,7 @@ class _AlbumBackdrop extends StatelessWidget {
         Center(
           child: Padding(
             padding: const EdgeInsets.only(bottom: 28),
-            child: TrackCover(
-              url: album.coverUrl,
-              size: 168,
-              radius: 18,
-            ),
+            child: TrackCover(url: album.coverUrl, size: 168, radius: 18),
           ),
         ),
         DecoratedBox(
@@ -383,30 +659,59 @@ class ChartScreen extends ConsumerWidget {
         error: (error, _) => Center(child: Text(l.dbError('$error'))),
         data: (entries) => CustomScrollView(
           slivers: [
-            SliverAppBar.large(
+            SliverAppBar(
               pinned: true,
               backgroundColor: Theme.of(context).colorScheme.surface,
               leading: IconButton(
                 tooltip: l.playerBack,
                 icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: () => Navigator.of(context).maybePop(),
+                onPressed: () => context.pop(),
               ),
               title: Text(l.chartTitle),
+              titleTextStyle: Theme.of(context).textTheme.headlineSmall,
             ),
             if (entries.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(child: Text(l.searchNoResults)),
               )
-            else
+            else ...[
+              SliverToBoxAdapter(child: _ChartHero(entries: entries)),
               SliverList.builder(
                 itemCount: entries.length,
                 itemBuilder: (context, index) => ListTile(
                   leading: SizedBox(
-                    width: 28,
-                    child: Text(
-                      '${entries[index].position}',
-                      style: Theme.of(context).textTheme.titleMedium,
+                    width: 56,
+                    height: 56,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: TrackCover(
+                            url: entries[index].track.coverUrl,
+                            size: 56,
+                            radius: 10,
+                          ),
+                        ),
+                        Positioned(
+                          left: 2,
+                          top: 2,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.62),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${entries[index].position}',
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   title: Text(
@@ -419,10 +724,7 @@ class ChartScreen extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  trailing: TrackCover(
-                    url: entries[index].track.coverUrl,
-                    size: 46,
-                  ),
+                  trailing: RemoteTrackActions(track: entries[index].track),
                   onTap: () => playRemoteTracks(
                     context,
                     ref,
@@ -432,10 +734,114 @@ class ChartScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+            ],
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Шапка чарта с обложкой-мозаикой: не просто список без контекста.
+class _ChartHero extends ConsumerWidget {
+  const _ChartHero({required this.entries});
+
+  final List<ChartEntry> entries;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final covers = [
+      for (final entry in entries)
+        if (entry.track.coverUrl != null) entry.track.coverUrl!,
+    ].take(4).toList();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Row(
+        children: [
+          Container(
+            width: 108,
+            height: 108,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.28),
+                  blurRadius: 22,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: covers.isEmpty
+                ? Icon(
+                    Icons.trending_up_rounded,
+                    color: scheme.primary,
+                    size: 44,
+                  )
+                : _ChartMosaic(covers: covers),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${l.discoverChart} · ${entries.length}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleLarge,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  l.chartSubtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: () => playRemoteTracks(context, ref, [
+                    for (final entry in entries) entry.track,
+                  ], kind: 'chart'),
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: Text(l.collectionPlayAll),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChartMosaic extends StatelessWidget {
+  const _ChartMosaic({required this.covers});
+
+  final List<String> covers;
+
+  @override
+  Widget build(BuildContext context) {
+    if (covers.length == 1) {
+      return TrackCover(url: covers.first, size: double.infinity, radius: 0);
+    }
+    final empty = Theme.of(context).colorScheme.surfaceContainerHighest;
+    Widget cell(int index) => Expanded(
+      child: covers.length > index
+          ? TrackCover(url: covers[index], size: double.infinity, radius: 0)
+          : ColoredBox(color: empty),
+    );
+    return Column(
+      children: [
+        Expanded(child: Row(children: [cell(0), cell(1)])),
+        Expanded(child: Row(children: [cell(2), cell(3)])),
+      ],
     );
   }
 }
@@ -456,15 +862,9 @@ class _RemoteTrackTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final services = ref.read(appServicesProvider);
     return ListTile(
-      onTap: () => playRemoteTracks(
-        context,
-        ref,
-        queue,
-        startIndex: index,
-        kind: kind,
-      ),
+      onTap: () =>
+          playRemoteTracks(context, ref, queue, startIndex: index, kind: kind),
       leading: TrackCover(url: track.coverUrl, size: 52),
       title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
@@ -472,14 +872,7 @@ class _RemoteTrackTile extends ConsumerWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: IconButton(
-        icon: const Icon(Icons.more_vert_rounded),
-        onPressed: () async {
-          final ingested = await services.db.tracksDao.ingest(track);
-          if (!context.mounted) return;
-          showTrackMenu(context, ref, ingested.localTrackId);
-        },
-      ),
+      trailing: RemoteTrackActions(track: track),
     );
   }
 }

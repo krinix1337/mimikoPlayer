@@ -2,6 +2,7 @@ class Routes {
   const Routes._();
 
   static const home = '/';
+  static const discover = '/discover';
   static const search = '/search';
   static const library = '/library';
   static const player = '/player';
@@ -9,11 +10,19 @@ class Routes {
   static const logs = '/logs';
   static const karaoke = '/karaoke';
   static const artist = '/artist';
+  static const artistTracks = '/artist-tracks';
+  static const artistAlbums = '/artist-albums';
   static const album = '/album';
   static const chart = '/chart';
+  static const newReleases = '/new-releases';
 
-  static String artistFor(String id) =>
-      '$artist?id=${Uri.encodeComponent(id)}';
+  static String artistFor(String id) => '$artist?id=${Uri.encodeComponent(id)}';
+
+  static String artistTracksFor(String id) =>
+      '$artistTracks?id=${Uri.encodeComponent(id)}';
+
+  static String artistAlbumsFor(String id) =>
+      '$artistAlbums?id=${Uri.encodeComponent(id)}';
 
   static String albumFor(String id) => '$album?id=${Uri.encodeComponent(id)}';
 

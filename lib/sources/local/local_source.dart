@@ -17,7 +17,13 @@ import '../../core/sources/stream_target.dart';
 /// работает по тем же правилам, что и сетевые.
 class LocalSource implements MusicSource {
   static const Set<String> _audioExtensions = {
-    '.mp3', '.m4a', '.aac', '.flac', '.ogg', '.opus', '.wav',
+    '.mp3',
+    '.m4a',
+    '.aac',
+    '.flac',
+    '.ogg',
+    '.opus',
+    '.wav',
   };
 
   @override
@@ -71,7 +77,9 @@ class LocalSource implements MusicSource {
   @override
   Future<List<SourceTrack>> getTracksByIds(List<RemoteTrackRef> refs) async {
     final wanted = refs.map((r) => r.remoteId).toSet();
-    return (await _scan()).where((t) => wanted.contains(t.ref.remoteId)).toList();
+    return (await _scan())
+        .where((t) => wanted.contains(t.ref.remoteId))
+        .toList();
   }
 
   @override
@@ -140,7 +148,9 @@ class LocalSource implements MusicSource {
         ),
       );
     }
-    tracks.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    tracks.sort(
+      (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+    );
     return tracks;
   }
 
@@ -181,8 +191,9 @@ class LocalSource implements MusicSource {
     }
   }
 
-  static String _stableKey(String path) =>
-      base64Url.encode(utf8.encode(path)).replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+  static String _stableKey(String path) => base64Url
+      .encode(utf8.encode(path))
+      .replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
 }
 
 /// Каталог, куда ложатся локальные и скачанные файлы.

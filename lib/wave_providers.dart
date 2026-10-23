@@ -62,25 +62,29 @@ final waveTracksProvider = FutureProvider<List<WaveTrack>>((ref) async {
   ];
 });
 
+/// Настройки всегда относятся к «Моей волне»: у жанровых станций Яндекс
+/// их не сохраняет, а лист настроек больше не переключает станции.
 final waveSettingsProvider = FutureProvider<WaveSettings?>((ref) async {
   final source = ref.watch(yandexSourceProvider);
   if (source == null) return null;
   if (!ref.watch(yandexReadyProvider)) return null;
   await source.warmUp();
-  return source.station.settings(ref.watch(stationProvider));
+  return source.station.settings(WaveStationIds.myVibe);
 });
 
 /// Запуск выбранной волны: берёт треки станции и кладёт их в очередь радио.
 /// Общая для главной и баннера в коллекции, чтобы логика старта не дублировалась.
 Future<bool> startWave(WidgetRef ref) async {
+  // Плеер и станция берутся до await: виджет (а вместе с ним ref) может
+  // исчезнуть, пока грузится пачка треков.
+  final controller = ref.read(playbackControllerProvider);
+  final station = ref.read(stationProvider);
   final tracks = await ref.read(waveTracksProvider.future);
   if (tracks.isEmpty) return false;
-  await ref
-      .read(playbackControllerProvider)
-      .playQueue(
-        [for (final track in tracks) track.localTrackId],
-        sourceHint: {'kind': 'radio', 'station': ref.read(stationProvider)},
-      );
+  await controller.playQueue(
+    [for (final track in tracks) track.localTrackId],
+    sourceHint: {'kind': 'radio', 'station': station},
+  );
   return true;
 }
 

@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
 import 'daos/auth_dao.dart';
+import 'daos/downloads_dao.dart';
 import 'daos/history_dao.dart';
 import 'daos/library_dao.dart';
 import 'daos/queue_dao.dart';
@@ -33,6 +34,7 @@ part 'database.g.dart';
     StreamResolutions,
     TrackFailures,
     DownloadedFiles,
+    DownloadTasks,
     AuthTokens,
     AppSettings,
   ],
@@ -44,6 +46,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   TracksDao get tracksDao => TracksDao(this);
+  DownloadsDao get downloadsDao => DownloadsDao(this);
   StreamsDao get streamsDao => StreamsDao(this);
   HistoryDao get historyDao => HistoryDao(this);
   QueueDao get queueDao => QueueDao(this);
@@ -54,12 +57,36 @@ class AppDatabase extends _$AppDatabase {
   @override
   int get schemaVersion => latestSchemaVersion;
 
+  /// Шаги живут здесь, а не в `schema_versions.dart`: им нужны геттеры
+  /// таблиц, и импорт этого файла туда создал бы цикл.
+  late final Map<int, MigrationStep> _migrationSteps = {
+    1: MigrationStep(
+      description:
+          'базовая схема: треки, плейлисты, лайки, история, кэш потоков',
+      up: (m) => m.createAll(),
+    ),
+    2: MigrationStep(
+      description: 'очередь загрузок, источник и локальная обложка',
+      up: (m) async {
+        await m.createTable(downloadTasks);
+        await m.addColumn(downloadedFiles, downloadedFiles.origin);
+        await m.addColumn(downloadedFiles, downloadedFiles.coverPath);
+      },
+    ),
+    3: MigrationStep(
+      description: 'дубли треков в плейлисте: ключ по позиции',
+      up: (m) => m.alterTable(TableMigration(playlistTracks)),
+    ),
+  };
+
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (m) => migrationSteps[latestSchemaVersion]!.up(m),
+    // Не запускаем последний шаг на чистой установке: шаг 2 добавляет
+    // колонки к уже существующей таблице и без createAll не создаст базу.
+    onCreate: (m) => m.createAll(),
     onUpgrade: (m, from, to) async {
       for (var version = from + 1; version <= to; version++) {
-        final step = migrationSteps[version];
+        final step = _migrationSteps[version];
         if (step == null) {
           throw StateError('нет миграции для версии $version');
         }
@@ -86,11 +113,15 @@ class AppDatabase extends _$AppDatabase {
     'stream_resolutions': await _count(streamResolutions, 'stream_resolutions'),
     'track_failures': await _count(trackFailures, 'track_failures'),
     'downloaded_files': await _count(downloadedFiles, 'downloaded_files'),
+    'download_tasks': await _count(downloadTasks, 'download_tasks'),
     'queue_snapshots': await _count(queueSnapshots, 'queue_snapshots'),
     'app_settings': await _count(appSettings, 'app_settings'),
   };
 
-  Future<int> _count(ResultSetImplementation<dynamic, dynamic> table, String tableName) async {
+  Future<int> _count(
+    ResultSetImplementation<dynamic, dynamic> table,
+    String tableName,
+  ) async {
     final row = await customSelect(
       'SELECT COUNT(*) AS c FROM "$tableName"',
       readsFrom: {table},

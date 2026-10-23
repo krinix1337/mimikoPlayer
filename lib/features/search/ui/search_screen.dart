@@ -9,6 +9,7 @@ import '../../../core/sources/source_dto.dart';
 import '../../../features/auth/ui/yandex_login.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
+import '../../../widgets/remote_track_actions.dart';
 import '../../../widgets/track_cover.dart';
 import '../../../widgets/track_tile.dart';
 
@@ -42,13 +43,31 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
   }
 
+  void _submit(String value) {
+    _debounce?.cancel();
+    final query = value.trim();
+    if (query.isEmpty) return;
+    setState(() => _query = query);
+    ref.read(prefsProvider.notifier).rememberSearch(query);
+  }
+
+  void _applyQuery(String query) {
+    _debounce?.cancel();
+    _controller.text = query;
+    _controller.selection = TextSelection.collapsed(offset: query.length);
+    setState(() => _query = query);
+    ref.read(prefsProvider.notifier).rememberSearch(query);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final hits = _query.isEmpty
         ? const AsyncValue<List<SourceSearchHit>>.data([])
         : ref.watch(combinedSearchProvider(_query));
-    final auth = ref.watch(yandexAuthStateProvider).value ?? const AuthUnknown();
+    final auth =
+        ref.watch(yandexAuthStateProvider).value ?? const AuthUnknown();
+    final history = ref.watch(prefsProvider.select((p) => p.searchHistory));
 
     final scheme = Theme.of(context).colorScheme;
 
@@ -58,28 +77,40 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: SearchBar(
-                controller: _controller,
-                autoFocus: true,
-                textInputAction: TextInputAction.search,
-                hintText: l.searchHint,
-                onChanged: _onChanged,
-                elevation: const WidgetStatePropertyAll(0),
-                backgroundColor: WidgetStatePropertyAll(
-                  scheme.surfaceContainerHigh,
-                ),
-                leading: const Icon(Icons.search_rounded),
-                trailing: [
-                  if (_query.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: () {
-                        _controller.clear();
-                        _onChanged('');
-                        setState(() => _query = '');
-                      },
+              padding: const EdgeInsets.fromLTRB(4, 8, 16, 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: l.playerBack,
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    onPressed: () => Navigator.of(context).maybePop(),
+                  ),
+                  Expanded(
+                    child: SearchBar(
+                      controller: _controller,
+                      autoFocus: true,
+                      textInputAction: TextInputAction.search,
+                      hintText: l.searchHint,
+                      onChanged: _onChanged,
+                      onSubmitted: _submit,
+                      elevation: const WidgetStatePropertyAll(0),
+                      backgroundColor: WidgetStatePropertyAll(
+                        scheme.surfaceContainerHigh,
+                      ),
+                      leading: const Icon(Icons.search_rounded),
+                      trailing: [
+                        if (_query.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () {
+                              _controller.clear();
+                              _onChanged('');
+                              setState(() => _query = '');
+                            },
+                          ),
+                      ],
                     ),
+                  ),
                 ],
               ),
             ),
@@ -87,7 +118,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           if (!auth.isReady)
             MaterialBanner(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+              backgroundColor: Theme.of(context)
+                  .colorScheme
+                  .surfaceContainerHighest,
               leading: const Icon(Icons.account_circle_outlined),
               content: Text(l.authNotSignedIn),
               actions: [
@@ -99,18 +132,27 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ),
           Expanded(
             child: _query.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(28),
-                      child: Text(
-                        l.searchEmpty,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                    ),
-                  )
+                ? history.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(28),
+                            child: Text(
+                              l.searchEmpty,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ),
+                        )
+                      : _SearchHistory(
+                          items: history,
+                          onPick: _applyQuery,
+                          onClear: () => ref
+                              .read(prefsProvider.notifier)
+                              .clearSearchHistory(),
+                        )
                 : hits.when(
-                    loading: () => const Center(child: CircularProgressIndicator()),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
                     error: (error, _) => Center(child: Text(l.searchFailed)),
                     data: (list) => list.isEmpty
                         ? Center(child: Text(l.searchNoResults))
@@ -120,6 +162,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                               hit: list[index],
                               all: list,
                               index: index,
+                              query: _query,
                             ),
                           ),
                   ),
@@ -131,11 +174,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 }
 
 class _HitTile extends ConsumerWidget {
-  const _HitTile({required this.hit, required this.all, required this.index});
+  const _HitTile({
+    required this.hit,
+    required this.all,
+    required this.index,
+    required this.query,
+  });
 
   final SourceSearchHit hit;
   final List<SourceSearchHit> all;
   final int index;
+  final String query;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -156,7 +205,7 @@ class _HitTile extends ConsumerWidget {
         overflow: TextOverflow.ellipsis,
       ),
       trailing: track.available
-          ? null
+          ? RemoteTrackActions(track: track)
           : Icon(
               Icons.block_rounded,
               size: 18,
@@ -170,14 +219,59 @@ class _HitTile extends ConsumerWidget {
     // моменту старта к этому элементу уже нельзя обращаться.
     final router = GoRouter.of(context);
     final services = ref.read(appServicesProvider);
+    final prefs = ref.read(prefsProvider.notifier);
+    final controller = ref.read(playbackControllerProvider);
+    await prefs.rememberSearch(query);
     final ids = await services.db.tracksDao.ingestAll([
       for (final hit in all) hit.track,
     ]);
-    await ref.read(playbackControllerProvider).playQueue(
+    await controller.playQueue(
       ids,
       startIndex: index,
       sourceHint: {'kind': 'search', 'query': hit.track.title},
     );
     router.push(Routes.player);
+  }
+}
+
+class _SearchHistory extends StatelessWidget {
+  const _SearchHistory({
+    required this.items,
+    required this.onPick,
+    required this.onClear,
+  });
+
+  final List<String> items;
+  final ValueChanged<String> onPick;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                l.searchHistoryTitle,
+                style: theme.textTheme.titleMedium,
+              ),
+            ),
+            TextButton(onPressed: onClear, child: Text(l.searchHistoryClear)),
+          ],
+        ),
+        for (final item in items)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.history_rounded),
+            title: Text(item, maxLines: 1, overflow: TextOverflow.ellipsis),
+            trailing: const Icon(Icons.north_west_rounded, size: 18),
+            onTap: () => onPick(item),
+          ),
+      ],
+    );
   }
 }

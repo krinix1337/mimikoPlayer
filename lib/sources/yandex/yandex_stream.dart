@@ -20,14 +20,15 @@ class YandexStream {
   Future<StreamResult> resolve(
     String trackId, {
     required SourceId source,
+    Quality preferred = Quality.auto,
   }) async {
     final info = await _api.get('/tracks/$trackId/download-info');
     if (!info.isOk) {
       return StreamFailed(info.failure!);
     }
 
-    final variants = _bestFirst(info.asList);
-    if (variants.isEmpty) {
+    final variant = pickVariant(info.asList, preferred);
+    if (variant == null) {
       return StreamFailed(
         SourceFailure(
           source: source,
@@ -36,8 +37,6 @@ class YandexStream {
         ),
       );
     }
-
-    final variant = variants.first;
     final infoUrl = variant['downloadInfoUrl']?.toString();
     if (infoUrl == null) {
       return StreamFailed(
@@ -83,24 +82,58 @@ class YandexStream {
     );
   }
 
-  String _sign(String path, String s) =>
-      md5
-          .convert(
-            utf8.encode('${AppConfig.yandexGetMp3Salt}${path.substring(1)}$s'),
-          )
-          .toString();
+  String _sign(String path, String s) => md5
+      .convert(
+        utf8.encode('${AppConfig.yandexGetMp3Salt}${path.substring(1)}$s'),
+      )
+      .toString();
 
-  List<Map<String, dynamic>> _bestFirst(List<Map<String, dynamic>> variants) {
+  static Map<String, dynamic>? pickVariant(
+    List<Map<String, dynamic>> variants,
+    Quality preferred,
+  ) {
     final usable = [
       for (final variant in variants)
         if (variant['downloadInfoUrl'] != null) variant,
     ];
-    usable.sort((a, b) {
-      final left = (a['bitrateInKbps'] as num?)?.toInt() ?? 0;
-      final right = (b['bitrateInKbps'] as num?)?.toInt() ?? 0;
-      return right.compareTo(left);
-    });
-    return usable;
+    if (usable.isEmpty) return null;
+
+    int bitrate(Map<String, dynamic> variant) =>
+        (variant['bitrateInKbps'] as num?)?.toInt() ?? 0;
+
+    if (preferred == Quality.lossless) {
+      final flac = [
+        for (final variant in usable)
+          if ('${variant['codec']}'.toLowerCase() == 'flac') variant,
+      ];
+      if (flac.isNotEmpty) {
+        flac.sort((a, b) => bitrate(b).compareTo(bitrate(a)));
+        return flac.first;
+      }
+    }
+
+    if (preferred == Quality.auto) {
+      usable.sort((a, b) => bitrate(b).compareTo(bitrate(a)));
+      return usable.first;
+    }
+
+    final target = switch (preferred) {
+      Quality.low => 96,
+      Quality.normal => 192,
+      Quality.high => 320,
+      _ => 320,
+    };
+    final below = [
+      for (final variant in usable)
+        if (bitrate(variant) <= target) variant,
+    ]..sort((a, b) => bitrate(b).compareTo(bitrate(a)));
+    if (below.isNotEmpty) return below.first;
+
+    final above = [
+      for (final variant in usable)
+        if (bitrate(variant) > target) variant,
+    ]..sort((a, b) => bitrate(a).compareTo(bitrate(b)));
+    return above.isEmpty ? usable.first : above.first;
   }
 
   static Quality _qualityOf(Map<String, dynamic> variant) {

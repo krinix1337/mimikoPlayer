@@ -33,6 +33,9 @@ final class PlayerSnapshot {
 
   /// localTrackId'и в порядке воспроизведения.
   final List<String> queue;
+
+  /// Позиция текущего трека в [queue], а не исходный индекс: при shuffle и
+  /// повторах они расходятся, и подсветка/соседи свайпа должны брать эту.
   final int index;
 
   final bool playing;
@@ -126,7 +129,8 @@ final class PlayerIssue {
   String get headline {
     if (needsUserAction) {
       final auth = failures.firstWhere(
-        (f) => f.reason == SourceFailReason.authRequired ||
+        (f) =>
+            f.reason == SourceFailReason.authRequired ||
             f.reason == SourceFailReason.authExpired,
         orElse: () => failures.first,
       );

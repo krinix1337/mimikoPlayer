@@ -106,11 +106,7 @@ class RiseIn extends StatelessWidget {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: total,
-      curve: Interval(
-        start.clamp(0.0, 0.9),
-        1,
-        curve: Curves.easeOutCubic,
-      ),
+      curve: Interval(start.clamp(0.0, 0.9), 1, curve: Curves.easeOutCubic),
       builder: (context, value, child) => Opacity(
         opacity: value.clamp(0.0, 1.0),
         child: Transform.translate(

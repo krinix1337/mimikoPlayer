@@ -38,31 +38,40 @@ class YandexStation {
     return found;
   }
 
-  /// Настройки волны: настроение, энергия, разнообразие, язык.
+  /// Текущие настройки станции. Старый `/settings` отдаёт mood/energy,
+  /// которыми новый клиент уже не пользуется — читаем `settings2` из info.
   Future<WaveSettings?> settings(String station) async {
-    final json = (await _api.get('/rotor/station/$station/settings')).asMap;
-    if (json == null) return null;
+    final result = await _api.get('/rotor/station/$station/info');
+    if (!result.isOk) return null;
+    final stations = result.asList;
+    if (stations.isEmpty) return null;
+    return parseSettings2(stations.first['settings2']);
+  }
+
+  static WaveSettings? parseSettings2(Object? raw) {
+    if (raw is! Map) return null;
     return WaveSettings(
-      mood: (json['mood'] as num?)?.toInt(),
-      energy: (json['energy'] as num?)?.toInt(),
-      diversity: json['diversity']?.toString(),
-      language: json['language']?.toString(),
+      moodEnergy: '${raw['moodEnergy'] ?? 'all'}',
+      diversity: '${raw['diversity'] ?? 'default'}',
+      language: '${raw['language'] ?? 'any'}',
     );
   }
 
-  /// Меняет рекомендации реальной станции — то есть трогает аккаунт.
+  static Map<String, Object?> settingsBody(WaveSettings settings) => {
+    'moodEnergy': settings.moodEnergy,
+    'diversity': settings.diversity,
+    'language': settings.language,
+    'type': 'rotor',
+  };
+
+  /// Меняет настройки «Моей волны». У жанровых станций эндпоинт отвечает
+  /// «ok», но значения не сохраняет, поэтому UI показывает их только для
+  /// личной волны.
   Future<bool> saveSettings(String station, WaveSettings settings) async =>
       (await _api.post(
-        '/rotor/station/$station/settings',
-        body: {
-          'language': settings.language ?? 'any',
-          'mood': settings.mood ?? 2,
-          'energy': settings.energy ?? 2,
-          'diversity': settings.diversity ?? 'default',
-          'signal': DateTime.now().millisecondsSinceEpoch,
-        },
-      ))
-          .isOk;
+        '/rotor/station/$station/settings3',
+        body: settingsBody(settings),
+      )).isOk;
 
   Future<List<SourceTrack>> wave({String station = defaultStation}) async {
     final result = await _api.get('/rotor/station/$station/tracks', {
@@ -122,7 +131,6 @@ class YandexStation {
   );
 }
 
-
 final class WaveStation {
   const WaveStation({required this.id, required this.title, this.iconUrl});
 
@@ -132,30 +140,49 @@ final class WaveStation {
 }
 
 final class WaveSettings {
-  const WaveSettings({this.mood, this.energy, this.diversity, this.language});
+  const WaveSettings({
+    this.moodEnergy = 'all',
+    this.diversity = 'default',
+    this.language = 'any',
+  });
 
-  /// 0..4, середина — 2: спокойное ↔ активное.
-  final int? mood;
-  final int? energy;
-  final String? diversity;
-  final String? language;
+  /// `active`, `fun`, `calm`, `sad`, `all`.
+  final String moodEnergy;
 
-  static const List<String> diversityValues = [
-    'default',
-    'maximum_diversity',
-    'minimum_diversity',
+  /// `favorite`, `discover`, `popular`, `default`.
+  final String diversity;
+
+  /// `russian`, `not-russian`, `without-words`, `any`.
+  final String language;
+
+  static const List<String> moodEnergyValues = [
+    'active',
+    'fun',
+    'calm',
+    'sad',
+    'all',
   ];
 
-  static const List<String> languageValues = ['any', 'ru', 'en', 'nonrank'];
+  static const List<String> diversityValues = [
+    'favorite',
+    'discover',
+    'popular',
+    'default',
+  ];
+
+  static const List<String> languageValues = [
+    'russian',
+    'not-russian',
+    'without-words',
+    'any',
+  ];
 
   WaveSettings copyWith({
-    int? mood,
-    int? energy,
+    String? moodEnergy,
     String? diversity,
     String? language,
   }) => WaveSettings(
-    mood: mood ?? this.mood,
-    energy: energy ?? this.energy,
+    moodEnergy: moodEnergy ?? this.moodEnergy,
     diversity: diversity ?? this.diversity,
     language: language ?? this.language,
   );

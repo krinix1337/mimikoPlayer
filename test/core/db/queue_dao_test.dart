@@ -66,10 +66,7 @@ void main() {
     );
 
     expect(await rowCount(), 2);
-    expect(
-      QueueDao.itemsOf((await dao.load(QueueDao.kindRadio))!),
-      ['t_9'],
-    );
+    expect(QueueDao.itemsOf((await dao.load(QueueDao.kindRadio))!), ['t_9']);
   });
 
   test('пустой hint читается как null', () async {

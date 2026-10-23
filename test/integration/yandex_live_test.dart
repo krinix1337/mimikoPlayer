@@ -14,6 +14,7 @@ import 'package:phoneyandex/core/sources/source_id.dart';
 import 'package:phoneyandex/core/sources/stream_target.dart';
 import 'package:phoneyandex/sources/yandex/yandex_api.dart';
 import 'package:phoneyandex/sources/yandex/yandex_source.dart';
+import 'package:phoneyandex/sources/yandex/yandex_station.dart';
 
 final _tokenFile = File('C:/project/musor/yandex_token.txt');
 
@@ -99,6 +100,22 @@ void main() {
     final fetched = await api.get('/users/$uid/playlists', {'kinds': kind});
     final playlist = fetched.asList.first;
     expect((playlist['tracks'] as List?) ?? const [], isNotEmpty);
+
+    // /playlists отдаёт короткие ссылки: полные треки добираются батчем,
+    // иначе все строки плейлиста сходятся в один пустой отпечаток.
+    final refs = YandexSource.playlistTrackRefs(playlist['tracks']);
+    final full = await source.getTracksByIds(refs);
+    final ordered = YandexSource.orderPlaylistTracks(refs, full);
+    expect(refs, isNotEmpty);
+    expect(ordered, hasLength(refs.length));
+    expect(ordered.every((track) => track.title.isNotEmpty), isTrue);
+    // У недоступного трека Яндекс может не отдать длительность — это норма.
+    expect(
+      ordered
+          .where((track) => track.available)
+          .every((track) => track.duration.inMilliseconds > 0),
+      isTrue,
+    );
   });
 
   test('лайки резолвятся в полные треки', () async {
@@ -139,5 +156,22 @@ void main() {
 
     final result = await source.resolveStream(match!);
     expect(result, isA<StreamReady>(), reason: '$result');
+  });
+
+  test('новые релизы лендинга отдаются с обложками', () async {
+    final albums = await source.newReleases(limit: 5);
+
+    expect(albums, isNotEmpty);
+    expect(albums.first.title, isNotEmpty);
+    expect(albums.first.artistIds, isNotEmpty);
+  });
+
+  test('настройки волны читаются из settings2', () async {
+    final settings = await source.station.settings('user:onyourwave');
+
+    expect(settings, isNotNull);
+    expect(WaveSettings.moodEnergyValues, contains(settings!.moodEnergy));
+    expect(WaveSettings.diversityValues, contains(settings.diversity));
+    expect(WaveSettings.languageValues, contains(settings.language));
   });
 }

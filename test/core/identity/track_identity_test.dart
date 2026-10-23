@@ -21,8 +21,19 @@ SourceTrack track({
 void main() {
   group('fingerprint', () {
     test('один и тот же трек из разных каталогов даёт один отпечаток', () {
-      final a = track(title: 'Ветер', artists: ['Ария'], seconds: 213, source: SourceId.yandex);
-      final b = track(title: 'Ветер', artists: ['Ария'], seconds: 213, source: SourceId.youtube, remoteId: 'x1');
+      final a = track(
+        title: 'Ветер',
+        artists: ['Ария'],
+        seconds: 213,
+        source: SourceId.yandex,
+      );
+      final b = track(
+        title: 'Ветер',
+        artists: ['Ария'],
+        seconds: 213,
+        source: SourceId.youtube,
+        remoteId: 'x1',
+      );
       expect(trackFingerprint(a), trackFingerprint(b));
       expect(localTrackIdFor(a), localTrackIdFor(b));
     });
@@ -35,12 +46,18 @@ void main() {
 
     test('remaster в скобках не создаёт дубль', () {
       final clean = track(title: 'Wind', artists: ['Aria'], seconds: 213);
-      final remastered = track(title: 'Wind (Remastered 2011)', artists: ['Aria'], seconds: 213);
+      final remastered = track(
+        title: 'Wind (Remastered 2011)',
+        artists: ['Aria'],
+        seconds: 213,
+      );
       expect(localTrackIdFor(clean), localTrackIdFor(remastered));
     });
 
     test('локальный id стабилен по формату', () {
-      final id = localTrackIdFor(track(title: 'Wind', artists: ['Aria'], seconds: 213));
+      final id = localTrackIdFor(
+        track(title: 'Wind', artists: ['Aria'], seconds: 213),
+      );
       expect(id, matches(RegExp(r'^t_[0-9a-f]{24}$')));
     });
   });
@@ -76,9 +93,21 @@ void main() {
     });
 
     test('опечатка в названии допускается, другая песня — нет', () {
-      final a = track(title: 'Wind Of Change', artists: ['Scorpions'], seconds: 213);
-      final typo = track(title: 'Wind Of Chnage', artists: ['Scorpions'], seconds: 213);
-      final other = track(title: 'Wind Of Hate', artists: ['Scorpions'], seconds: 213);
+      final a = track(
+        title: 'Wind Of Change',
+        artists: ['Scorpions'],
+        seconds: 213,
+      );
+      final typo = track(
+        title: 'Wind Of Chnage',
+        artists: ['Scorpions'],
+        seconds: 213,
+      );
+      final other = track(
+        title: 'Wind Of Hate',
+        artists: ['Scorpions'],
+        seconds: 213,
+      );
       expect(isFuzzyMatch(a, typo), isTrue);
       expect(isFuzzyMatch(a, other), isFalse);
     });

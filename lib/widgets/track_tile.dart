@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../app_providers.dart';
 import '../core/db/daos/library_dao.dart';
+import '../core/sources/source_id.dart';
 import '../features/catalog/ui/track_menu.dart';
+import '../features/downloads/download_service.dart';
 import '../l10n/app_localizations.dart';
 import '../router/routes.dart';
 import 'track_cover.dart';
@@ -42,16 +44,21 @@ class TrackTile extends ConsumerWidget {
       playerSnapshotProviderValue.select((s) => s.current?.localTrackId),
     );
     final isCurrent = playing == row.localTrackId;
+    // Повтор трека в плейлисте даёт два одинаковых Hero-тега и падение при
+    // переходе. Анимацию оставляем первой копии, остальным — обычную обложку.
+    final heroTag =
+        queue.indexWhere((item) => item.localTrackId == row.localTrackId) ==
+            index
+        ? coverHeroTag(row.localTrackId)
+        : null;
+    final cover = TrackCover(url: row.coverPath ?? row.coverUrl, size: 52);
 
     return ListTile(
       onTap: () => _play(context, ref),
       onLongPress: () => _toggleLike(ref),
       leading: Stack(
         children: [
-          Hero(
-            tag: coverHeroTag(row.localTrackId),
-            child: TrackCover(url: row.coverUrl, size: 52),
-          ),
+          if (heroTag == null) cover else Hero(tag: heroTag, child: cover),
           if (isCurrent)
             Positioned(
               right: -2,
@@ -83,10 +90,22 @@ class TrackTile extends ConsumerWidget {
             trailing!
           else if (showDuration && row.durationSec > 0)
             Text(_duration(row.durationSec), style: theme.textTheme.bodyMedium),
+          if (row.source != SourceId.local)
+            kind == 'liked'
+                ? _DownloadAction(trackId: row.localTrackId)
+                : _DownloadedMark(trackId: row.localTrackId),
           IconButton(
             icon: const Icon(Icons.more_vert_rounded),
             tooltip: AppLocalizations.of(context).trackMenu,
-            onPressed: () => showTrackMenu(context, ref, row.localTrackId),
+            onPressed: () => showTrackMenu(
+              context,
+              ref,
+              row.localTrackId,
+              title: row.title,
+              artistName: row.artist,
+              coverUrl: row.coverUrl,
+              durationSec: row.durationSec,
+            ),
           ),
         ],
       ),
@@ -109,9 +128,16 @@ class TrackTile extends ConsumerWidget {
 
   Future<void> _toggleLike(WidgetRef ref) async {
     final db = ref.read(appServicesProvider).db;
+    final downloader = ref.read(downloadControllerProvider.notifier);
+    final controller = ref.read(playbackControllerProvider);
     final current = await db.libraryDao.likeState(row.localTrackId);
-    await db.libraryDao.setLike(row.localTrackId, current == 1 ? 0 : 1);
-    await ref.read(playbackControllerProvider).refreshLikedState();
+    final next = current == 1 ? 0 : 1;
+    await db.libraryDao.setLike(row.localTrackId, next);
+    if (next == 1) {
+      await downloader.trackLiked(row.localTrackId);
+    }
+    await controller.refreshLikedState();
+    if (!ref.context.mounted) return;
     ref.invalidate(collectionProvider);
   }
 
@@ -124,6 +150,127 @@ class TrackTile extends ConsumerWidget {
     final minutes = seconds ~/ 60;
     final rest = seconds % 60;
     return '$minutes:${rest.toString().padLeft(2, '0')}';
+  }
+}
+
+/// Тихая метка «трек уже на устройстве» для списков, где нет кнопки
+/// скачивания: плейлисты, недавние, загрузки.
+class _DownloadedMark extends ConsumerWidget {
+  const _DownloadedMark({required this.trackId});
+
+  final String trackId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stored = ref.watch(isDownloadedProvider(trackId)).value ?? false;
+    if (!stored) return const SizedBox.shrink();
+    return Tooltip(
+      message: AppLocalizations.of(context).trackDownloaded,
+      child: SizedBox(
+        width: 30,
+        height: 40,
+        child: Center(
+          child: Icon(
+            Icons.offline_pin_rounded,
+            size: 18,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Загрузка офлайн прямо из строки: та же кнопка, что в меню, но без
+/// открытия шторки. Скачанный трек показывает офлайн-пин, как в Я.Музыке.
+class _DownloadAction extends ConsumerWidget {
+  const _DownloadAction({required this.trackId});
+
+  final String trackId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final status = ref.watch(downloadStatusProvider(trackId));
+    final stored = ref.watch(isDownloadedProvider(trackId)).value ?? false;
+    final downloading = status?.phase == DownloadPhase.downloading;
+    final paused = status?.phase == DownloadPhase.paused;
+    final complete =
+        status?.phase == DownloadPhase.complete ||
+        (status?.phase == null && stored);
+
+    if (downloading) {
+      return SizedBox(
+        width: 36,
+        height: 40,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              value: status?.progress,
+              strokeWidth: 2.2,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (complete) {
+      return Tooltip(
+        message: l.trackDownloaded,
+        child: SizedBox(
+          width: 36,
+          height: 40,
+          child: Center(
+            child: Icon(
+              Icons.offline_pin_rounded,
+              size: 20,
+              color: scheme.primary,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final failed =
+        status?.phase == DownloadPhase.failed ||
+        status?.phase == DownloadPhase.skipped;
+    return IconButton(
+      tooltip: paused
+          ? l.downloadsResume
+          : failed
+          ? l.menuDownloadRetry
+          : l.playerDownload,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 36, height: 40),
+      padding: EdgeInsets.zero,
+      icon: Icon(
+        paused
+            ? Icons.play_arrow_rounded
+            : failed
+            ? Icons.refresh_rounded
+            : Icons.download_rounded,
+        size: 20,
+      ),
+      onPressed: () async {
+        try {
+          final downloader = ref.read(downloadControllerProvider.notifier);
+          if (paused) {
+            await downloader.resume(trackId);
+          } else {
+            await downloader.start(trackId);
+          }
+        } on Object catch (error) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(l.downloadFailed('$error'))));
+          }
+        }
+      },
+    );
   }
 }
 

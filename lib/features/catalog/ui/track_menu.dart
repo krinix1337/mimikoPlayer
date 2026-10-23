@@ -9,14 +9,19 @@ import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/track_cover.dart';
+import 'track_details_sheet.dart';
 
 /// Меню трека по образцу Я.Музыки: шапка с обложкой, круглые действия и
 /// список. Только то, что действительно работает.
 Future<void> showTrackMenu(
   BuildContext context,
   WidgetRef ref,
-  String localTrackId,
-) {
+  String localTrackId, {
+  String? title,
+  String? artistName,
+  String? coverUrl,
+  int? durationSec,
+}) {
   final l = AppLocalizations.of(context);
   final services = ref.read(appServicesProvider);
   final controller = ref.read(playbackControllerProvider);
@@ -49,6 +54,13 @@ Future<void> showTrackMenu(
           final albumId = data?.$4;
           final hasRemote = data?.$5 ?? false;
           final wasDownloaded = data?.$6 ?? false;
+          final shownTitle = track?.title.isNotEmpty == true
+              ? track!.title
+              : (title?.isNotEmpty == true ? title! : localTrackId);
+          final shownArtist = artist?.name.isNotEmpty == true
+              ? artist!.name
+              : (artistName ?? '');
+          final shownDuration = track?.durationSec ?? durationSec ?? 0;
 
           return SingleChildScrollView(
             child: Column(
@@ -59,22 +71,26 @@ Future<void> showTrackMenu(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                   child: Row(
                     children: [
-                      TrackCover(url: track?.coverUrl, size: 56, radius: 12),
+                      TrackCover(
+                        url: track?.coverUrl ?? coverUrl,
+                        size: 56,
+                        radius: 12,
+                      ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              track?.title ?? localTrackId,
+                              shownTitle,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                             Text(
                               [
-                                if (artist != null) artist.name,
-                                if (track != null) _duration(track.durationSec),
+                                if (shownArtist.isNotEmpty) shownArtist,
+                                if (shownDuration > 0) _duration(shownDuration),
                               ].join(' · '),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -160,6 +176,7 @@ Future<void> showTrackMenu(
                     );
                     final downloading =
                         status?.phase == DownloadPhase.downloading;
+                    final paused = status?.phase == DownloadPhase.paused;
                     final complete =
                         status?.phase == DownloadPhase.complete ||
                         (status == null && wasDownloaded);
@@ -174,10 +191,16 @@ Future<void> showTrackMenu(
                             : l.downloadProgress(percent),
                       DownloadPhase.complete => l.menuDownloaded,
                       DownloadPhase.failed => l.menuDownloadRetry,
+                      // Пропущенный трек всё равно можно попробовать вручную,
+                      // а причину показывает подзаголовок.
+                      DownloadPhase.skipped => l.playerDownload,
+                      DownloadPhase.paused => l.downloadsPaused,
                       null => complete ? l.menuDownloaded : l.playerDownload,
                     };
                     final icon = downloading
                         ? Icons.downloading_rounded
+                        : paused
+                        ? Icons.pause_circle_outline_rounded
                         : complete
                         ? Icons.offline_pin_rounded
                         : Icons.download_rounded;
@@ -194,7 +217,8 @@ Future<void> showTrackMenu(
                                   value: status?.progress,
                                   minHeight: 3,
                                 )
-                              : status?.phase == DownloadPhase.failed
+                              : status?.phase == DownloadPhase.failed ||
+                                    status?.phase == DownloadPhase.skipped
                               ? Text(
                                   status?.error ?? '',
                                   maxLines: 2,
@@ -220,7 +244,11 @@ Future<void> showTrackMenu(
                                     }
                                   } else {
                                     try {
-                                      await downloader.start(localTrackId);
+                                      if (paused) {
+                                        await downloader.resume(localTrackId);
+                                      } else {
+                                        await downloader.start(localTrackId);
+                                      }
                                     } on Object catch (error) {
                                       if (context.mounted) {
                                         ScaffoldMessenger.of(context)
@@ -263,25 +291,7 @@ Future<void> showTrackMenu(
                   title: Text(l.menuDetails),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    showDialog<void>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text(l.menuDetails),
-                        content: Text(
-                          l.menuDetailsBody(
-                            track?.metadataSource ?? '—',
-                            '—',
-                            '—',
-                          ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: Text(l.waveClose),
-                          ),
-                        ],
-                      ),
-                    );
+                    showTrackDetails(context, ref, localTrackId);
                   },
                 ),
               ],

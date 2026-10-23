@@ -76,6 +76,7 @@ final class RemoteTrackRef {
   const RemoteTrackRef(this.source, this.remoteId, {this.albumId});
 
   final SourceId source;
+
   /// Идентификатор ровно в терминах источника: Яндекс, например, принимает
   /// только числовой `id`, но не `id-albumId`.
   final String remoteId;

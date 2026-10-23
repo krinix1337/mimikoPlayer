@@ -19,10 +19,7 @@ double _contrast(Color a, Color b) {
 void main() {
   test('скругление из настроек доходит до карточек', () {
     for (final corner in CornerRadius.values) {
-      final theme = AppTheme.build(
-        Brightness.dark,
-        Prefs(corner: corner),
-      );
+      final theme = AppTheme.build(Brightness.dark, Prefs(corner: corner));
       expect(_cardRadius(theme).topLeft.x, corner.radius);
     }
   });
@@ -57,7 +54,9 @@ void main() {
     expect(normal.textTheme.bodyMedium!.fontWeight, FontWeight.w400);
     expect(
       _contrast(high.colorScheme.onSurface, high.colorScheme.surface),
-      greaterThan(_contrast(normal.colorScheme.onSurface, normal.colorScheme.surface)),
+      greaterThan(
+        _contrast(normal.colorScheme.onSurface, normal.colorScheme.surface),
+      ),
     );
   });
 
@@ -73,12 +72,25 @@ void main() {
     );
   });
 
+  test('AMOLED держит поверхности чёрными, акцент остаётся пользователя', () {
+    final theme = AppTheme.build(
+      Brightness.dark,
+      const Prefs(palette: AppPalette.amoled, accent: AccentColor.orchid),
+    );
+    expect(theme.colorScheme.surface, const Color(0xFF000000));
+    expect(theme.colorScheme.surfaceContainerLowest, const Color(0xFF000000));
+    expect(theme.scaffoldBackgroundColor, const Color(0xFF000000));
+    // Контейнеры чуть светлеют, иначе карточки сливаются с фоном.
+    expect(
+      theme.colorScheme.surfaceContainerHigh,
+      isNot(const Color(0xFF000000)),
+    );
+    expect(theme.colorScheme.primary, AccentColor.orchid.color);
+  });
+
   test('светлая тема остаётся светлой при любом акценте', () {
     for (final accent in AccentColor.values) {
-      final theme = AppTheme.build(
-        Brightness.light,
-        Prefs(accent: accent),
-      );
+      final theme = AppTheme.build(Brightness.light, Prefs(accent: accent));
       expect(theme.brightness, Brightness.light);
       // Текст по поверхности тоже не должен сливаться: это и есть типичная
       // поломка при светлом акценте.

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app_providers.dart';
 import '../../../core/prefs/prefs.dart';
 import '../../../core/sources/source_id.dart';
+import '../../../features/downloads/download_service.dart';
 import '../../../features/player/player_snapshot.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../router/routes.dart';
 import '../../../sources/yandex/yandex_station.dart';
 import '../../../theme/app_motion.dart';
 import '../../../wave_providers.dart';
@@ -24,25 +27,27 @@ class HomeScreen extends ConsumerWidget {
     final title = ref.watch(waveStationTitleProvider);
     final stationTitle = title.isEmpty ? l.waveTitle : title;
     final station = ref.watch(stationProvider);
+    final modeLabel = station == WaveStationIds.myVibe
+        ? _waveModeLabel(ref.watch(waveSettingsProvider).value, l)
+        : null;
     final wave = ref.watch(waveTracksProvider);
     // select: без него весь экран перестраивался на каждый тик позиции.
-    final radio = ref.watch(
+    final nowPlaying = ref.watch(
       playerSnapshotProviderValue.select(
-        (s) => (s.isRadio, s.current?.localTrackId, s.current?.coverUrl),
+        (s) => (s.current?.localTrackId, s.current?.coverUrl),
       ),
     );
-    final radioPlaying = radio.$1 && radio.$2 != null;
+    final hasTrack = nowPlaying.$1 != null;
     final motion = Motion.of(context);
     final prefs = ref.watch(prefsProvider);
     final scheme = theme.colorScheme;
 
     final upcoming = wave.value ?? const <WaveTrack>[];
-    String? cover;
-    if (radioPlaying) {
-      cover = radio.$3;
-    } else if (upcoming.isNotEmpty) {
-      cover = upcoming.first.source.coverUrl;
-    }
+    // Фон ведётся за тем, что играет сейчас, — трек могли включить и из
+    // коллекции. Пока играть нечего, берём ближайший трек волны.
+    final cover = hasTrack
+        ? nowPlaying.$2
+        : (upcoming.isEmpty ? null : upcoming.first.source.coverUrl);
 
     return Scaffold(
       body: Stack(
@@ -57,16 +62,39 @@ class HomeScreen extends ConsumerWidget {
               speed: motion.enabled ? 1 : 0,
             ),
           if (prefs.homeBackground != HomeBackground.blobs)
-            BlurredCover(url: cover, opacity: 0.42),
+            BlurredCover(
+              url: cover,
+              opacity: switch (prefs.homeCoverTone) {
+                HomeCoverTone.darker => 0.32,
+                HomeCoverTone.normal => 0.42,
+                HomeCoverTone.lighter => 0.55,
+              },
+              blur: prefs.homeCoverBlur,
+            ),
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  scheme.surface.withValues(alpha: 0.35),
+                  scheme.surface.withValues(
+                    alpha: switch (prefs.homeCoverTone) {
+                      HomeCoverTone.darker => 0.55,
+                      HomeCoverTone.normal => 0.35,
+                      HomeCoverTone.lighter => 0.18,
+                    },
+                  ),
                   Colors.transparent,
-                  scheme.surface.withValues(alpha: 0.88),
+                  scheme.surface.withValues(
+                    alpha: switch (prefs.homeCoverTone) {
+                      // Низ раньше уходил почти в чёрный и обрезал обложку
+                      // чёрной полосой у навигации. Панель и так на своей
+                      // подложке, поэтому хватает лёгкого затемнения.
+                      HomeCoverTone.darker => 0.30,
+                      HomeCoverTone.normal => 0.18,
+                      HomeCoverTone.lighter => 0.10,
+                    },
+                  ),
                 ],
                 stops: const [0, 0.45, 1],
               ),
@@ -75,8 +103,6 @@ class HomeScreen extends ConsumerWidget {
           SafeArea(
             child: Column(
               children: [
-                // Заголовок ниже кромки экрана и с крестиком возврата на
-                // «мою волну»: у выбранной станции крестик виден, у волны — нет.
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 20, 8, 0),
                   child: Row(
@@ -88,34 +114,41 @@ class HomeScreen extends ConsumerWidget {
                         tooltip: l.waveTune,
                       ),
                       Expanded(
-                        child: Text(
-                          stationTitle,
-                          style: theme.textTheme.displaySmall,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                        ),
+                        child: modeLabel == null
+                            ? Text(
+                                stationTitle,
+                                style: theme.textTheme.displaySmall,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              )
+                            : Center(
+                                child: _WaveModePill(
+                                  label: modeLabel,
+                                  onClear: () => _resetWaveMode(context, ref),
+                                ),
+                              ),
                       ),
-                      if (station != WaveStationIds.myVibe)
-                        IconButton(
-                          tooltip: l.switchToWave,
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: () => _backToMyWave(ref),
-                        )
-                      else
-                        const SizedBox(width: 48),
+                      IconButton(
+                        tooltip: l.navSearch,
+                        icon: const Icon(Icons.search_rounded),
+                        onPressed: () => context.push(Routes.search),
+                      ),
                     ],
                   ),
                 ),
                 const Spacer(),
-                _PlayButton(busy: wave.isLoading, onPlay: () => startWave(ref)),
+                _WaveStage(
+                  busy: wave.isLoading,
+                  cover: cover,
+                  onStart: () => startWave(ref),
+                ),
                 const SizedBox(height: 16),
-                _NowPlayingPill(
+                _WaveControls(
                   wave: wave.value ?? const [],
                   failed: wave.hasError,
                 ),
                 const Spacer(),
-                const _StationStrip(),
                 const SizedBox(height: 8),
               ],
             ),
@@ -125,214 +158,304 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _backToMyWave(WidgetRef ref) async {
-    final wasRadio = ref.read(playerSnapshotProviderValue).isRadio;
-    ref.read(stationProvider.notifier).select(WaveStationIds.myVibe);
-    ref.invalidate(waveTracksProvider);
+  static String? _waveModeLabel(WaveSettings? settings, AppLocalizations l) {
+    if (settings == null) return null;
+    final parts = <String>[];
+    final mood = switch (settings.moodEnergy) {
+      'active' => l.moodEnergyActive,
+      'fun' => l.moodEnergyFun,
+      'calm' => l.moodEnergyCalm,
+      'sad' => l.moodEnergySad,
+      _ => null,
+    };
+    if (mood != null) parts.add(mood);
+    final character = switch (settings.diversity) {
+      'favorite' => l.diversityFavorite,
+      'discover' => l.diversityDiscover,
+      'popular' => l.diversityPopular,
+      _ => null,
+    };
+    if (character != null) parts.add(character);
+    final language = switch (settings.language) {
+      'russian' => l.languageRussian,
+      'not-russian' => l.languageForeign,
+      'without-words' => l.languageInstrumental,
+      _ => null,
+    };
+    if (language != null) parts.add(language);
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  static Future<void> _resetWaveMode(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final source = ref.read(yandexSourceProvider);
+    if (source == null) return;
+    final ok = await source.station.saveSettings(
+      WaveStationIds.myVibe,
+      const WaveSettings(),
+    );
+    if (!context.mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).waveRejectedNote)),
+      );
+      return;
+    }
     ref.invalidate(waveSettingsProvider);
-    if (wasRadio) await startWave(ref);
+    ref.invalidate(waveTracksProvider);
+    if (ref.read(playerSnapshotProviderValue).isRadio) {
+      await startWave(ref);
+    }
   }
 }
 
-class _PlayButton extends ConsumerWidget {
-  const _PlayButton({required this.busy, required this.onPlay});
+class _WaveModePill extends StatelessWidget {
+  const _WaveModePill({required this.label, required this.onClear});
 
+  final String label;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 280),
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: scheme.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onClear,
+            child: Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: scheme.primary,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.close_rounded,
+                size: 16,
+                color: scheme.onPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WaveStage extends ConsumerWidget {
+  const _WaveStage({
+    required this.cover,
+    required this.busy,
+    required this.onStart,
+  });
+
+  final String? cover;
   final bool busy;
-  final VoidCallback onPlay;
+  final VoidCallback onStart;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final motion = Motion.of(context);
-    final playing = ref.watch(
-      playerSnapshotProviderValue.select(
-        (s) => s.isRadio && s.playing && s.current != null,
-      ),
+    // Пока трека нет — большая кнопка запуска, как на волне в Яндекс Музыке.
+    // Когда трек пошёл — обложка без наложенных кнопок: пауза живёт отдельным
+    // кругом рядом с плашкой, а не поверх картинки.
+    final hasTrack = ref.watch(
+      playerSnapshotProviderValue.select((s) => s.current != null),
     );
 
-    return Tooltip(
-      message: playing ? l.commonPause : l.waveStart,
-      child: SizedBox(
-        width: 116,
-        height: 116,
-        child: PressableScale(
-          minScale: 0.9,
-          onTap: busy
-              ? null
-              : () => playing
-                    ? ref.read(playbackControllerProvider).togglePlay()
-                    : onPlay(),
-          child: AnimatedContainer(
-            duration: motion.morph,
-            curve: Curves.easeOutBack,
-            decoration: BoxDecoration(
-              color: busy ? scheme.surfaceContainerHigh : scheme.primary,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: scheme.primary.withValues(alpha: busy ? 0 : 0.35),
-                  blurRadius: 34,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: busy
-                ? Padding(
-                    padding: const EdgeInsets.all(34),
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      color: scheme.onPrimary,
-                    ),
-                  )
-                : AnimatedSwitcher(
-                    duration: motion.micro(220),
-                    child: Icon(
-                      playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      key: ValueKey(playing),
+    if (!hasTrack) {
+      return Tooltip(
+        message: busy ? l.commonLoading : l.waveStart,
+        child: SizedBox(
+          width: 116,
+          height: 116,
+          child: PressableScale(
+            minScale: 0.9,
+            onTap: busy ? null : onStart,
+            child: AnimatedContainer(
+              duration: motion.morph,
+              curve: Curves.easeOutBack,
+              decoration: BoxDecoration(
+                color: busy ? scheme.surfaceContainerHigh : scheme.primary,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: busy ? 0 : 0.35),
+                    blurRadius: 34,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: busy
+                  ? Padding(
+                      padding: const EdgeInsets.all(34),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: scheme.onPrimary,
+                      ),
+                    )
+                  : Icon(
+                      Icons.play_arrow_rounded,
                       size: 58,
                       color: scheme.onPrimary,
                     ),
-                  ),
+            ),
           ),
         ),
+      );
+    }
+
+    // Вся обложка ведёт в плеер: отдельной кнопки поверх картинки нет.
+    return GestureDetector(
+      onTap: () => context.push(Routes.player),
+      child: ClipOval(
+        child: cover == null
+            ? Container(
+                width: 116,
+                height: 116,
+                color: scheme.surfaceContainerHigh,
+                child: Icon(
+                  Icons.music_note_rounded,
+                  size: 44,
+                  color: scheme.onSurfaceVariant,
+                ),
+              )
+            : TrackCover(url: cover, size: 116, radius: 58),
       ),
     );
   }
 }
 
-class _NowPlayingPill extends ConsumerWidget {
-  const _NowPlayingPill({required this.wave, required this.failed});
+class _WaveControls extends ConsumerWidget {
+  const _WaveControls({required this.wave, required this.failed});
 
   final List<WaveTrack> wave;
   final bool failed;
-
-  /// Подпись источника: откуда пришла очередь. Волна подписана названием
-  /// станции, остальное — человеческим именем раздела.
-  static String _sourceLabel(
-    AppLocalizations l,
-    PlayerSnapshot snapshot,
-    String stationTitle,
-  ) {
-    if (snapshot.isRadio) return stationTitle;
-    return switch (snapshot.sourceKind) {
-      'library' => l.sourceLibrary,
-      'playlist' => l.sourcePlaylist,
-      'search' => l.sourceSearch,
-      'chart' => l.sourceChart,
-      'album' => l.sourceAlbum,
-      'artist' => l.sourceArtist,
-      '' => l.sourceLibrary,
-      _ => l.sourceLibrary,
-    };
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final l = AppLocalizations.of(context);
-    final snapshot = ref.watch(playerSnapshotProviderValue);
-    final current = snapshot.current;
+    final motion = Motion.of(context);
+    final scheme = theme.colorScheme;
+    final state = ref.watch(
+      playerSnapshotProviderValue.select(
+        (s) => (s.current, s.playing, s.liked),
+      ),
+    );
+    final current = state.$1;
+    final playing = state.$2;
+    final liked = state.$3;
     final next = wave.isNotEmpty ? wave.first.source : null;
-    final stationTitle = ref.watch(waveStationTitleProvider);
 
     final text =
         current?.title ??
         next?.title ??
         (failed ? l.waveQueueFailed : l.waveNotStarted);
     final subtitle = current?.artist ?? next?.artists.join(', ');
-    final coverUrl = current?.coverUrl ?? next?.coverUrl;
+    final controller = ref.read(playbackControllerProvider);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.75,
-        ),
-        borderRadius: BorderRadius.circular(
-          Motion.of(context).prefs.corner.radius,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  current == null
-                      ? l.waveTitle
-                      : _sourceLabel(
-                          l,
-                          snapshot,
-                          stationTitle.isEmpty ? l.waveTitle : stationTitle,
-                        ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+          // Пока волна не запущена, единственный play — большая кнопка выше;
+          // маленький пульт появляется только у играющего трека, как в Яндексе.
+          if (current != null) ...[
+            _RoundAction(
+              icon: playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              tooltip: playing ? l.commonPause : l.commonPlay,
+              onTap: controller.togglePlay,
+            ),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 11, 20, 11),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: scheme.onSurface.withValues(alpha: 0.08),
                 ),
               ),
-            ],
-          ),
-          Row(
-            children: [
-              if (coverUrl != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: TrackCover(url: coverUrl, size: 44, radius: 10),
+              child: AnimatedSwitcher(
+                duration: motion.micro(240),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween(
+                      begin: const Offset(0, 0.12),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
                 ),
-              Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  key: ValueKey('${current?.localTrackId}:$text'),
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       text,
-                      maxLines: 2,
+                      maxLines: 1,
+                      textAlign: TextAlign.center,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    if (subtitle != null)
+                    if (subtitle != null && subtitle.isNotEmpty)
                       Text(
                         subtitle,
                         maxLines: 1,
+                        textAlign: TextAlign.center,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall,
                       ),
                   ],
                 ),
               ),
-              if (current != null)
-                IconButton(
-                  tooltip: snapshot.playing ? l.commonPause : l.commonPlay,
-                  visualDensity: VisualDensity.compact,
-                  icon: Icon(
-                    snapshot.playing
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                  ),
-                  onPressed: () =>
-                      ref.read(playbackControllerProvider).togglePlay(),
-                ),
-              IconButton(
-                tooltip: snapshot.liked ? l.commonUnlike : l.commonLike,
-                visualDensity: VisualDensity.compact,
-                onPressed: current == null
-                    ? null
-                    : () => _toggleLike(context, ref, current, snapshot.liked),
-                icon: Icon(
-                  snapshot.liked
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_outline_rounded,
-                ),
-                color: snapshot.liked ? theme.colorScheme.error : null,
-              ),
-            ],
+            ),
           ),
+          if (current != null) ...[
+            const SizedBox(width: 8),
+            _RoundAction(
+              icon: liked
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_outline_rounded,
+              tooltip: liked ? l.commonUnlike : l.commonLike,
+              active: liked,
+              onTap: () => _toggleLike(context, ref, current, liked),
+            ),
+          ],
         ],
       ),
     );
@@ -346,6 +469,8 @@ class _NowPlayingPill extends ConsumerWidget {
   ) async {
     final l = AppLocalizations.of(context);
     final services = ref.read(appServicesProvider);
+    final downloader = ref.read(downloadControllerProvider.notifier);
+    final controller = ref.read(playbackControllerProvider);
     final next = liked ? 0 : 1;
 
     await services.db.libraryDao.setLike(
@@ -353,7 +478,11 @@ class _NowPlayingPill extends ConsumerWidget {
       next,
       remoteSource: next == 1 ? SourceId.yandex : null,
     );
-    await ref.read(playbackControllerProvider).refreshLikedState();
+    if (next == 1) {
+      await downloader.trackLiked(current.localTrackId);
+    }
+    await controller.refreshLikedState();
+    if (!ref.context.mounted) return;
     ref.invalidate(collectionProvider);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -365,133 +494,41 @@ class _NowPlayingPill extends ConsumerWidget {
   }
 }
 
-class _StationStrip extends ConsumerWidget {
-  const _StationStrip();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l = AppLocalizations.of(context);
-    final stations = ref.watch(waveStationsProvider);
-    final selected = ref.watch(stationProvider);
-
-    return SizedBox(
-      height: 64,
-      child: stations.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        error: (error, _) => Center(
-          child: Text(
-            l.waveStationsFailed('$error'),
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
-        data: (list) => ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          itemCount: list.length + 1,
-          separatorBuilder: (context, _) => const SizedBox(width: 8),
-          itemBuilder: (context, index) {
-            if (index == 0) {
-              return _StationChip(
-                title: l.waveTitle,
-                selected: selected == WaveStationIds.myVibe,
-                onTap: () => ref
-                    .read(stationProvider.notifier)
-                    .select(WaveStationIds.myVibe),
-              );
-            }
-            final station = list[index - 1];
-            return _StationChip(
-              title: station.title,
-              iconUrl: station.iconUrl,
-              selected: selected == station.id,
-              onTap: () =>
-                  ref.read(stationProvider.notifier).select(station.id),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _StationChip extends StatelessWidget {
-  const _StationChip({
-    required this.title,
-    required this.selected,
+/// Круглая стеклянная кнопка пульта волны: play/pause и «любимое» стоят
+/// по бокам плашки трека.
+class _RoundAction extends StatelessWidget {
+  const _RoundAction({
+    required this.icon,
+    required this.tooltip,
     required this.onTap,
-    this.iconUrl,
+    this.active = false,
   });
 
-  final String title;
-  final String? iconUrl;
-  final bool selected;
+  final IconData icon;
+  final String tooltip;
   final VoidCallback onTap;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final motion = Motion.of(context);
-    return PressableScale(
-      minScale: 0.96,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: motion.micro(220),
-        curve: Curves.easeOutCubic,
+    return Tooltip(
+      message: tooltip,
+      child: SizedBox(
+        width: 52,
         height: 52,
-        constraints: const BoxConstraints(minWidth: 92, maxWidth: 168),
-        padding: const EdgeInsets.fromLTRB(6, 6, 12, 6),
-        decoration: BoxDecoration(
-          color: selected
-              ? scheme.primaryContainer
-              : scheme.surfaceContainer.withValues(alpha: 0.6),
-          borderRadius: BorderRadius.circular(motion.prefs.corner.radius * 0.8),
-          border: selected
-              ? Border.all(color: scheme.primary, width: 1.5)
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                width: 36,
-                height: 36,
-                child: iconUrl == null
-                    ? DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [scheme.primary, scheme.tertiary],
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.auto_awesome_rounded,
-                          size: 18,
-                          color: scheme.onPrimary,
-                        ),
-                      )
-                    : TrackCover(url: iconUrl, size: 36, radius: 10),
-              ),
+        child: Material(
+          color: scheme.surfaceContainerHighest.withValues(alpha: 0.72),
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Icon(
+              icon,
+              size: 26,
+              color: active ? scheme.primary : scheme.onSurface,
             ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  height: 1.15,
-                  color: selected
-                      ? scheme.onPrimaryContainer
-                      : scheme.onSurface,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -515,74 +552,195 @@ class _WaveSettingsSheet extends ConsumerStatefulWidget {
 }
 
 class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
-  WaveSettings? _draft;
+  bool _loaded = false;
   bool _saving = false;
   String? _note;
+
+  /// Абсолютная позиция в бесконечной ленте: остаток от числа режимов даёт
+  /// выбранный режим, поэтому крутить можно в обе стороны без упора.
+  int _page = _ring;
+  late final PageController _wheel = PageController(
+    viewportFraction: 0.4,
+    initialPage: _page,
+  );
+
+  /// Стартуем в середине ленты: первый свайп назад не должен упираться в край.
+  static const int _ring = 5000;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final loaded = await ref.read(waveSettingsProvider.future);
-      if (mounted) setState(() => _draft = loaded ?? const WaveSettings());
+      if (!mounted) return;
+      final modes = _modes(AppLocalizations.of(context));
+      final index = modes.indexWhere(
+        (mode) => _same(mode.settings, loaded ?? const WaveSettings()),
+      );
+      // Контроллер создаётся вместе с колесом (оно появляется только после
+      // _loaded), поэтому начальная страница берётся из _page без прыжка.
+      setState(() {
+        _page = _ring + (index < 0 ? 0 : index);
+        _loaded = true;
+      });
     });
   }
 
   @override
+  void dispose() {
+    _wheel.dispose();
+    super.dispose();
+  }
+
+  static bool _same(WaveSettings a, WaveSettings b) =>
+      a.moodEnergy == b.moodEnergy &&
+      a.diversity == b.diversity &&
+      a.language == b.language;
+
+  List<_WaveModeOption> _modes(AppLocalizations l) => [
+    _WaveModeOption(
+      label: l.waveBackToUsual,
+      icon: Icons.restart_alt_rounded,
+      color: const Color(0xFF8E8E93),
+      settings: const WaveSettings(),
+    ),
+    _WaveModeOption(
+      label: l.diversityFavorite,
+      icon: Icons.favorite_rounded,
+      color: const Color(0xFFE85D75),
+      settings: const WaveSettings(diversity: 'favorite'),
+    ),
+    _WaveModeOption(
+      label: l.diversityDiscover,
+      icon: Icons.explore_rounded,
+      color: const Color(0xFF5B7CFA),
+      settings: const WaveSettings(diversity: 'discover'),
+    ),
+    _WaveModeOption(
+      label: l.diversityPopular,
+      icon: Icons.trending_up_rounded,
+      color: const Color(0xFFF08A3C),
+      settings: const WaveSettings(diversity: 'popular'),
+    ),
+    _WaveModeOption(
+      label: l.moodEnergyActive,
+      icon: Icons.bolt_rounded,
+      color: const Color(0xFFE3A21A),
+      settings: const WaveSettings(moodEnergy: 'active'),
+    ),
+    _WaveModeOption(
+      label: l.moodEnergyFun,
+      icon: Icons.sentiment_very_satisfied_rounded,
+      color: const Color(0xFFF3C344),
+      settings: const WaveSettings(moodEnergy: 'fun'),
+    ),
+    _WaveModeOption(
+      label: l.moodEnergyCalm,
+      icon: Icons.self_improvement_rounded,
+      color: const Color(0xFF3FAE9A),
+      settings: const WaveSettings(moodEnergy: 'calm'),
+    ),
+    _WaveModeOption(
+      label: l.moodEnergySad,
+      icon: Icons.water_drop_rounded,
+      color: const Color(0xFF6C86B8),
+      settings: const WaveSettings(moodEnergy: 'sad'),
+    ),
+    _WaveModeOption(
+      label: l.languageRussian,
+      icon: Icons.translate_rounded,
+      color: const Color(0xFFD65A5A),
+      settings: const WaveSettings(language: 'russian'),
+    ),
+    _WaveModeOption(
+      label: l.languageForeign,
+      icon: Icons.public_rounded,
+      color: const Color(0xFF7A6CE0),
+      settings: const WaveSettings(language: 'not-russian'),
+    ),
+    _WaveModeOption(
+      label: l.languageInstrumental,
+      icon: Icons.music_off_rounded,
+      color: const Color(0xFF6E8A8A),
+      settings: const WaveSettings(language: 'without-words'),
+    ),
+  ];
+
+  @override
   Widget build(BuildContext context) {
-    final draft = _draft;
     final theme = Theme.of(context);
     final l = AppLocalizations.of(context);
-    final station = ref.watch(waveStationTitleProvider);
+    final modes = _modes(l);
+    final selected = modes[_page % modes.length];
 
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(l.waveSettingsTitle, style: theme.textTheme.titleLarge),
+            const SizedBox(height: 2),
             Text(
-              station.isEmpty ? l.waveTitle : station,
+              '${l.waveTitle} · ${selected.label}',
               style: theme.textTheme.bodySmall,
             ),
-            const SizedBox(height: 12),
-            Text(l.waveStation, style: theme.textTheme.labelLarge),
-            const SizedBox(height: 6),
-            _StationPicker(
-              current: ref.watch(stationProvider),
-              onPick: (id) {
-                ref.read(stationProvider.notifier).select(id);
-                // Настройки у каждой станции свои — перечитываем черновик.
-                setState(() => _draft = null);
-                ref.read(waveSettingsProvider.future).then((loaded) {
-                  if (mounted) {
-                    setState(() => _draft = loaded ?? const WaveSettings());
-                  }
-                });
-              },
-            ),
-            const SizedBox(height: 14),
-            if (draft == null)
-              const Padding(
-                padding: EdgeInsets.all(24),
+            const SizedBox(height: 10),
+            if (!_loaded)
+              const SizedBox(
+                height: 160,
                 child: Center(child: CircularProgressIndicator()),
               )
             else
-              _levels(draft),
+              SizedBox(
+                height: 160,
+                child: PageView.builder(
+                  controller: _wheel,
+                  // itemCount: null — лента бесконечная в обе стороны.
+                  onPageChanged: (index) => setState(() => _page = index),
+                  itemBuilder: (context, index) => _ModeCard(
+                    controller: _wheel,
+                    index: index,
+                    option: modes[index % modes.length],
+                    onTap: () => _wheel.animateToPage(
+                      index,
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            Text(
+              l.waveWheelHint,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
             if (_note != null) ...[
               const SizedBox(height: 8),
               Text(_note!, style: theme.textTheme.bodySmall),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             Row(
               children: [
-                FilledButton(
-                  onPressed: draft == null || _saving ? null : _save,
-                  child: Text(l.waveApply),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _loaded && !_saving
+                        ? () => _start(selected)
+                        : null,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.play_arrow_rounded),
+                    label: Text(l.waveListen),
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: Text(l.waveClose),
@@ -595,163 +753,138 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
     );
   }
 
-  Widget _levels(WaveSettings draft) {
-    final l = AppLocalizations.of(context);
-    String mood(int value) => switch (value) {
-      <= 1 => l.moodCalm,
-      2 => l.moodEven,
-      _ => l.moodActive,
-    };
-    String energy(int value) => switch (value) {
-      <= 1 => l.energyLow,
-      2 => l.energyMid,
-      _ => l.energyHigh,
-    };
-    String diversity(String value) => switch (value) {
-      'maximum_diversity' => l.diversityMore,
-      'minimum_diversity' => l.diversityLess,
-      _ => l.diversityUsual,
-    };
-    String language(String value) => switch (value) {
-      'ru' => l.langRu,
-      'en' => l.langEn,
-      'nonrank' => l.langNonrank,
-      _ => l.langAny,
-    };
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(l.wavePresets, style: _labelStyle),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 8,
-          children: [
-            for (final preset in const [
-              (label: 'Спокойная', mood: 1, energy: 1),
-              (label: 'Обычная', mood: 2, energy: 2),
-              (label: 'Активная', mood: 3, energy: 3),
-            ])
-              ChoiceChip(
-                label: Text(preset.label),
-                selected:
-                    (draft.mood ?? 2) == preset.mood &&
-                    (draft.energy ?? 2) == preset.energy,
-                onSelected: (_) => setState(
-                  () => _draft = draft.copyWith(
-                    mood: preset.mood,
-                    energy: preset.energy,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(l.waveMood, style: _labelStyle),
-        Slider(
-          value: (draft.mood ?? 2).toDouble(),
-          max: 4,
-          divisions: 4,
-          label: mood(draft.mood ?? 2),
-          onChanged: (v) =>
-              setState(() => _draft = draft.copyWith(mood: v.round())),
-        ),
-        Text(l.waveEnergy, style: _labelStyle),
-        Slider(
-          value: (draft.energy ?? 2).toDouble(),
-          max: 4,
-          divisions: 4,
-          label: energy(draft.energy ?? 2),
-          onChanged: (v) =>
-              setState(() => _draft = draft.copyWith(energy: v.round())),
-        ),
-        const SizedBox(height: 8),
-        Text(l.waveDiversity, style: _labelStyle),
-        Wrap(
-          spacing: 8,
-          children: [
-            for (final value in WaveSettings.diversityValues)
-              ChoiceChip(
-                label: Text(diversity(value)),
-                selected: (draft.diversity ?? 'default') == value,
-                onSelected: (_) =>
-                    setState(() => _draft = draft.copyWith(diversity: value)),
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Text(l.waveLanguage, style: _labelStyle),
-        Wrap(
-          spacing: 8,
-          children: [
-            for (final value in WaveSettings.languageValues)
-              ChoiceChip(
-                label: Text(language(value)),
-                selected: (draft.language ?? 'any') == value,
-                onSelected: (_) =>
-                    setState(() => _draft = draft.copyWith(language: value)),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  TextStyle? get _labelStyle => Theme.of(context).textTheme.labelLarge;
-
-  Future<void> _save() async {
+  Future<void> _start(_WaveModeOption option) async {
     final l = AppLocalizations.of(context);
     final source = ref.read(yandexSourceProvider);
-    final draft = _draft;
-    if (source == null || draft == null) return;
+    if (source == null) return;
 
     setState(() {
       _saving = true;
       _note = null;
     });
     final ok = await source.station.saveSettings(
-      ref.read(stationProvider),
-      draft,
+      WaveStationIds.myVibe,
+      option.settings,
     );
     if (!mounted) return;
-    setState(() {
-      _saving = false;
-      _note = ok ? l.waveSavedNote : l.waveRejectedNote;
-    });
+    if (!ok) {
+      setState(() {
+        _saving = false;
+        _note = l.waveRejectedNote;
+      });
+      return;
+    }
+    ref.read(stationProvider.notifier).select(WaveStationIds.myVibe);
     ref.invalidate(waveSettingsProvider);
     ref.invalidate(waveTracksProvider);
+    final started = await startWave(ref);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (started) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() => _note = l.waveNotStarted);
+    }
   }
 }
 
-/// Выбор станции прямо в настройках волны: у каждой станции свой набор
-/// настроек, и переключать её из листа удобнее, чем закрывать лист.
-class _StationPicker extends ConsumerWidget {
-  const _StationPicker({required this.current, required this.onPick});
+class _WaveModeOption {
+  const _WaveModeOption({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.settings,
+  });
 
-  final String current;
-  final ValueChanged<String> onPick;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final WaveSettings settings;
+}
+
+class _ModeCard extends StatelessWidget {
+  const _ModeCard({
+    required this.controller,
+    required this.index,
+    required this.option,
+    required this.onTap,
+  });
+
+  final PageController controller;
+  final int index;
+  final _WaveModeOption option;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l = AppLocalizations.of(context);
-    final stations =
-        ref.watch(waveStationsProvider).value ?? const <WaveStation>[];
-    return Wrap(
-      spacing: 8,
-      runSpacing: 6,
-      children: [
-        ChoiceChip(
-          label: Text(l.waveTitle),
-          selected: current == WaveStationIds.myVibe,
-          onSelected: (_) => onPick(WaveStationIds.myVibe),
-        ),
-        for (final station in stations.take(8))
-          ChoiceChip(
-            label: Text(station.title),
-            selected: current == station.id,
-            onSelected: (_) => onPick(station.id),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        final page = controller.hasClients
+            ? (controller.page ?? controller.initialPage.toDouble())
+            : controller.initialPage.toDouble();
+        final delta = (page - index).abs().clamp(0.0, 1.0);
+        return Transform.scale(
+          scale: 1 - 0.14 * delta,
+          child: Opacity(opacity: 1 - 0.38 * delta, child: child),
+        );
+      },
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                option.color.withValues(alpha: 0.55),
+                option.color.withValues(alpha: 0.16),
+                scheme.surfaceContainerHigh,
+              ],
+            ),
+            border: Border.all(color: option.color.withValues(alpha: 0.45)),
+            boxShadow: [
+              BoxShadow(
+                color: option.color.withValues(alpha: 0.18),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-      ],
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(option.icon, size: 30, color: Colors.white),
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text(
+                  option.label,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

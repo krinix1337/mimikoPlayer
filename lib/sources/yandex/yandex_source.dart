@@ -126,6 +126,10 @@ class YandexSource implements MusicSource {
   /// `limit: null` — сколько отдал Я.Музыка: страница `/likes/tracks`
   /// не пагинируется и приносит всю коллекцию целиком (на аккаунте
   /// владельца это 1028 пары), поэтому резать её по умолчанию нельзя.
+  /// Сколько лайков пришло в последнем ответе: сравнение с числом
+  /// разрезолвленных показывает, потерялись ли треки в пачках.
+  int lastLikesExpected = 0;
+
   Future<List<LikedTrack>> likedTracks({int? limit}) async {
     final uid = auth is AuthReady ? (auth as AuthReady).uid : null;
     if (uid == null) return const [];
@@ -157,6 +161,7 @@ class YandexSource implements MusicSource {
       refs.add(ref);
     }
 
+    lastLikesExpected = refs.length;
     final liked = <LikedTrack>[];
     for (var i = 0; i < refs.length; i += 50) {
       final batch = await getTracksByIds(
@@ -190,23 +195,62 @@ class YandexSource implements MusicSource {
     ];
   }
 
+  /// Плейлисты, которые пользователь лайкнул у других авторов.
+  Future<List<PlaylistSummary>> likedPlaylists() async {
+    final uid = auth is AuthReady ? (auth as AuthReady).uid : null;
+    if (uid == null) return const [];
+    final result = await _api.get('/users/$uid/likes/playlists');
+    if (!result.isOk) return const [];
+    final out = <PlaylistSummary>[];
+    for (final item in result.asList) {
+      final playlist = item['playlist'];
+      if (playlist is! Map) continue;
+      final owner = (playlist['owner'] as Map?)?['uid'];
+      final kind = playlist['kind'];
+      if (owner == null || kind == null) continue;
+      out.add(
+        PlaylistSummary(
+          remotePlaylistId: '$owner:$kind',
+          title: (playlist['title'] ?? 'Плейлист').toString(),
+          trackCount: (playlist['trackCount'] as num?)?.toInt(),
+          coverUrl:
+              YandexDto.coverFrom(playlist['cover']) ??
+              YandexDto.coverUrl(playlist['coverUri']),
+          isSystem: true,
+        ),
+      );
+    }
+    return out;
+  }
+
   @override
   Future<PlaylistSnapshot?> getPlaylist(String remotePlaylistId) async {
     final uid = auth is AuthReady ? (auth as AuthReady).uid : null;
     if (uid == null) return null;
 
-    final result = await _api.get('/users/$uid/playlists', {
-      'kinds': remotePlaylistId,
-    });
+    // Понравившийся чужой плейлист приходит как «ownerUid:kind»: запрашивать
+    // его надо у владельца, а не у себя.
+    final parts = remotePlaylistId.split(':');
+    final owner = parts.length == 2 ? parts.first : uid;
+    final kind = parts.length == 2 ? parts.last : remotePlaylistId;
+    final result = await _api.get('/users/$owner/playlists', {'kinds': kind});
     if (!result.isOk) return null;
 
     final fetched = result.asList.where(
-      (item) => item['kind'].toString() == remotePlaylistId,
+      (item) => item['kind'].toString() == kind,
     );
     final first = fetched.isEmpty ? null : fetched.first;
     if (first == null) return null;
 
-    final tracks = YandexDto.tracks(first['tracks']);
+    // `/playlists` отдаёт только короткие ссылки `{id, albumId}` — без
+    // названий, артистов и длительности. Если скормить их ingest напрямую,
+    // у всех треков оказывается один и тот же пустой отпечаток, и плейлист
+    // схлопывается в одну случайную песню. Поэтому добираем полные объекты.
+    final refs = playlistTrackRefs(first['tracks']);
+    final tracks = await _resolvePlaylistTracks(refs);
+    // Частично разрешённый плейлист не импортируем: импорт заменяет связи
+    // целиком, и обрезанный список стёр бы то, что уже есть.
+    if (tracks == null) return null;
 
     return PlaylistSnapshot(
       remotePlaylistId: remotePlaylistId,
@@ -222,6 +266,69 @@ class YandexSource implements MusicSource {
       total: (first['trackCount'] as num?)?.toInt(),
       tracks: tracks,
     );
+  }
+
+  /// Короткие ссылки из ответа `/playlists`: `{timestamp, id, albumId}`.
+  static List<RemoteTrackRef> playlistTrackRefs(Object? value) => [
+    for (final item in (value is List ? value : const <Object>[]))
+      if (item is Map && item['id'] != null)
+        RemoteTrackRef(
+          SourceId.yandex,
+          '${item['id']}',
+          albumId: item['albumId'] == null ? null : '${item['albumId']}',
+        ),
+  ];
+
+  /// Восстанавливает порядок и повторы плейлиста по загруженным трекам:
+  /// батч `/tracks` дедуплицирует ответ, а плейлист — нет.
+  static List<SourceTrack> orderPlaylistTracks(
+    List<RemoteTrackRef> refs,
+    Iterable<SourceTrack> full,
+  ) {
+    final byRemote = {for (final track in full) track.ref.remoteId: track};
+    return [for (final ref in refs) ?byRemote[ref.remoteId]];
+  }
+
+  Future<List<SourceTrack>?> _resolvePlaylistTracks(
+    List<RemoteTrackRef> refs,
+  ) async {
+    if (refs.isEmpty) return const [];
+    // Тот же размер пачки, что у лайков: длинный query Яндекс не любит.
+    final batches = <List<RemoteTrackRef>>[
+      for (var i = 0; i < refs.length; i += 50)
+        refs.sublist(i, (i + 50).clamp(0, refs.length)),
+    ];
+    final full = <SourceTrack>[];
+    // Пачки идут последовательно: залп из десятка запросов Яндекс режет,
+    // и тогда часть плейлистов молча не импортируется. Одну неудачную
+    // пачку повторяем, прежде чем отдать null.
+    for (final batch in batches) {
+      var part = await _fetchTrackBatch(batch);
+      part ??= await _fetchTrackBatch(batch);
+      if (part == null) {
+        AppLogger.instance.warn('плейлист: полные треки не загрузились');
+        return null;
+      }
+      full.addAll(part);
+    }
+    final ordered = orderPlaylistTracks(refs, full);
+    if (ordered.length != refs.length) {
+      AppLogger.instance.warn(
+        'плейлист: разрешилось ${ordered.length} из ${refs.length} треков',
+      );
+      return null;
+    }
+    return ordered;
+  }
+
+  Future<List<SourceTrack>?> _fetchTrackBatch(
+    List<RemoteTrackRef> batch,
+  ) async {
+    final result = await _api.get('/tracks', {
+      'track-ids': [for (final ref in batch) ref.remoteId].join(','),
+    });
+    if (!result.isOk) return null;
+    return YandexDto.tracks(result.data);
   }
 
   /// Карточка исполнителя: фото, счётчики, популярные треки и альбомы
@@ -240,8 +347,8 @@ class YandexSource implements MusicSource {
       remoteId: artistId,
       name: '${artist['name'] ?? ''}',
       coverUrl:
-          YandexDto.coverFrom(artist['cover'], size: '600x600') ??
-          YandexDto.coverUrl(artist['ogImage'], size: '600x600'),
+          YandexDto.coverFrom(artist['cover'], size: '1000x1000') ??
+          YandexDto.coverUrl(artist['ogImage'], size: '1000x1000'),
       trackCount: counts is Map ? (counts['tracks'] as num?)?.toInt() : null,
       albumCount: counts is Map
           ? (counts['directAlbums'] as num?)?.toInt()
@@ -262,6 +369,49 @@ class YandexSource implements MusicSource {
             ),
       ],
     );
+  }
+
+  /// Полный список треков артиста, а не только популярная пятёрка из
+  /// `brief-info`. Яндекс отдаёт его постранично.
+  Future<List<SourceTrack>> artistTracks(
+    String artistId, {
+    int page = 0,
+    int pageSize = 100,
+  }) async {
+    final result = await _api.get('/artists/$artistId/tracks', {
+      'page': page,
+      'page-size': pageSize,
+    });
+    if (!result.isOk) return const [];
+    return YandexDto.tracks(result.asMap?['tracks']);
+  }
+
+  /// Полная дискография артиста. В `brief-info` приходит только несколько
+  /// альбомов, а здесь — все прямые альбомы.
+  Future<List<AlbumBrief>> artistAlbums(
+    String artistId, {
+    int page = 0,
+    int pageSize = 100,
+  }) async {
+    final result = await _api.get('/artists/$artistId/direct-albums', {
+      'page': page,
+      'page-size': pageSize,
+    });
+    if (!result.isOk) return const [];
+    final items = result.asMap?['albums'];
+    return [
+      for (final item in (items as List? ?? const []))
+        if (item is Map)
+          AlbumBrief(
+            remoteId: '${item['id']}',
+            title: '${item['title'] ?? ''}',
+            coverUrl:
+                YandexDto.coverFrom(item['cover']) ??
+                YandexDto.coverUrl(item['coverUri']),
+            year: (item['year'] as num?)?.toInt(),
+            trackCount: (item['trackCount'] as num?)?.toInt(),
+          ),
+    ];
   }
 
   /// Чарт Яндекса: позиция + трек. Полный чарт (100 позиций) отдаёт
@@ -320,6 +470,43 @@ class YandexSource implements MusicSource {
     };
     if (text == null || text.trim().isEmpty) return null;
     return Lyrics.fromPlain(text);
+  }
+
+  /// Новинки лендинга Яндекса. Лендинг отдаёт только id — детали добираем
+  /// одним пакетным запросом, чтобы не дёргать альбомы по одному.
+  Future<List<AlbumBrief>> newReleases({int limit = 10}) async {
+    final landing = await _api.get('/landing3/new-releases');
+    if (!landing.isOk) return const [];
+    final raw = landing.asMap?['newReleases'];
+    if (raw is! List) return const [];
+    final ids = [
+      for (final item in raw.take(limit))
+        if (item != null) '$item',
+    ];
+    if (ids.isEmpty) return const [];
+
+    final albums = await _api.get('/albums', {'album-ids': ids.join(',')});
+    if (!albums.isOk) return const [];
+    return [
+      for (final item in albums.asList)
+        AlbumBrief(
+          remoteId: '${item['id'] ?? ''}',
+          title: '${item['title'] ?? ''}',
+          artists: [
+            for (final artist in (item['artists'] as List? ?? const []))
+              if (artist is Map) '${artist['name'] ?? ''}',
+          ],
+          artistIds: [
+            for (final artist in (item['artists'] as List? ?? const []))
+              if (artist is Map) '${artist['id'] ?? ''}',
+          ],
+          coverUrl:
+              YandexDto.coverFrom(item['cover'], size: '400x400') ??
+              YandexDto.coverUrl(item['coverUri'], size: '400x400'),
+          year: (item['year'] as num?)?.toInt(),
+          trackCount: (item['trackCount'] as num?)?.toInt(),
+        ),
+    ];
   }
 
   /// Альбом целиком: метаданные и треки в порядке диска.
@@ -399,7 +586,11 @@ class YandexSource implements MusicSource {
     }
 
     await warmUp();
-    final result = await _stream.resolve(track.ref.remoteId, source: id);
+    final result = await _stream.resolve(
+      track.ref.remoteId,
+      source: id,
+      preferred: preferred,
+    );
 
     // 403 с пометкой not-allowed у Я.Музыки означает «нужен Плюс», а не «нет
     // доступа к аккаунту».
@@ -504,6 +695,8 @@ final class AlbumBrief {
     this.coverUrl,
     this.year,
     this.trackCount,
+    this.artists = const [],
+    this.artistIds = const [],
   });
 
   final String remoteId;
@@ -511,6 +704,8 @@ final class AlbumBrief {
   final String? coverUrl;
   final int? year;
   final int? trackCount;
+  final List<String> artists;
+  final List<String> artistIds;
 }
 
 final class AlbumSnapshot {

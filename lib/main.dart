@@ -2,17 +2,26 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:workmanager/workmanager.dart';
 
 import 'app.dart';
 import 'app_providers.dart';
 import 'app_services.dart';
 import 'core/logging/app_logger.dart';
 import 'core/prefs/prefs_store.dart';
+import 'features/downloads/download_worker.dart';
 import 'features/player/audio_handler.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  try {
+    await Workmanager().initialize(downloadCallbackDispatcher);
+  } on Object catch (error) {
+    AppLogger.instance.warn('WorkManager не инициализирован: $error');
+  }
 
   final services = AppServices.ensure();
   await services.applyPreferences();
@@ -28,6 +37,7 @@ Future<void> main() async {
       androidNotificationChannelDescription: _channelDescription(
         initialPrefs.localeCode,
       ),
+      androidNotificationIcon: 'drawable/ic_stat_mimiko',
       // Пауза короче 10 минут не должна ронять foreground-сервис: иначе
       // на Android 17 теряется while-in-use и resume играет в тишину.
       // Ongoing-флаг с этим сочетанием запрещён ассертом плагина.

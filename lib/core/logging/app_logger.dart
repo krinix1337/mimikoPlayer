@@ -29,7 +29,9 @@ class AppLogger {
   void _add(String level, String message) {
     final stamp = DateTime.now().toIso8601String().substring(11, 23);
     _lines.add('$stamp $level $message');
-    if (_lines.length > _capacity) _lines.removeRange(0, _lines.length - _capacity);
+    if (_lines.length > _capacity) {
+      _lines.removeRange(0, _lines.length - _capacity);
+    }
     // Заодно в logcat: на телефоне без подключения к IDE это единственный
     // способ увидеть, что решило делать плеер.
     debugPrint('phoneyandex $level $stamp $message');

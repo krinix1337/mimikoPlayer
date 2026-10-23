@@ -75,4 +75,5 @@ class MorphShape extends StatelessWidget {
   }
 }
 
-double lerpDouble(double a, double b, double t) => a + (b - a) * t.clamp(0.0, 1.0);
+double lerpDouble(double a, double b, double t) =>
+    a + (b - a) * t.clamp(0.0, 1.0);

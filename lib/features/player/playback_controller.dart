@@ -22,7 +22,9 @@ abstract interface class PlaybackController {
 
   Future<void> skipPrevious();
 
-  Future<void> skipTo(String localTrackId);
+  /// Переход по позиции в отображаемой очереди: у повторов один и тот же
+  /// localTrackId занимает несколько строк.
+  Future<void> skipToIndex(int displayIndex);
 
   Future<void> setRepeat(PlaybackRepeat value);
 

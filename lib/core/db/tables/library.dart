@@ -1,6 +1,10 @@
 import 'package:drift/drift.dart';
 
-@TableIndex(name: 'artists_by_source', columns: {#source, #remoteArtistId}, unique: true)
+@TableIndex(
+  name: 'artists_by_source',
+  columns: {#source, #remoteArtistId},
+  unique: true,
+)
 @TableIndex(name: 'artists_by_name_norm', columns: {#nameNorm})
 class Artists extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -14,7 +18,11 @@ class Artists extends Table {
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 }
 
-@TableIndex(name: 'albums_by_source', columns: {#source, #remoteAlbumId}, unique: true)
+@TableIndex(
+  name: 'albums_by_source',
+  columns: {#source, #remoteAlbumId},
+  unique: true,
+)
 class Albums extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get title => text()();
@@ -29,7 +37,11 @@ class Albums extends Table {
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 }
 
-@TableIndex(name: 'tracks_by_fingerprint', columns: {#fingerprint}, unique: true)
+@TableIndex(
+  name: 'tracks_by_fingerprint',
+  columns: {#fingerprint},
+  unique: true,
+)
 @TableIndex(name: 'tracks_by_title_norm', columns: {#titleNorm})
 @TableIndex(name: 'tracks_by_isrc', columns: {#isrc})
 @TableIndex(name: 'tracks_by_last_seen', columns: {#lastSeenAt})
@@ -41,16 +53,23 @@ class Tracks extends Table {
   TextColumn get title => text()();
   TextColumn get titleNorm => text()();
   IntColumn get durationSec => integer()();
-  IntColumn get mainArtistId =>
-      integer().nullable().references(Artists, #id, onDelete: KeyAction.setNull)();
-  IntColumn get albumId =>
-      integer().nullable().references(Albums, #id, onDelete: KeyAction.setNull)();
+  IntColumn get mainArtistId => integer().nullable().references(
+    Artists,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
+  IntColumn get albumId => integer().nullable().references(
+    Albums,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
   TextColumn get coverUrl => text().nullable()();
 
   /// Мост между каталогами. Пустая строка = источника без ISRC, а не «нет ISRC».
   TextColumn get isrc => text().nullable()();
   BoolColumn get explicitFlag => boolean().withDefault(const Constant(false))();
-  BoolColumn get lyricsAvailable => boolean().withDefault(const Constant(false))();
+  BoolColumn get lyricsAvailable =>
+      boolean().withDefault(const Constant(false))();
 
   TextColumn get fingerprint => text()();
   IntColumn get popularity => integer().nullable()();
@@ -96,12 +115,14 @@ class RemoteIdMappings extends Table {
       text().references(Tracks, #id, onDelete: KeyAction.cascade)();
 
   /// exact | isrc | fuzzy | manual — по нечёткому совпадению строки не сливаются.
-  TextColumn get mappingConfidence => text().withDefault(const Constant('exact'))();
+  TextColumn get mappingConfidence =>
+      text().withDefault(const Constant('exact'))();
 
   /// Сырой JSON: новый метаданный поле можно добавить без сетевого рефетча.
   TextColumn get remoteJson => text().nullable()();
 
-  DateTimeColumn get firstSeenAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get firstSeenAt =>
+      dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get lastSeenAt => dateTime().withDefault(currentDateAndTime)();
 
   @override

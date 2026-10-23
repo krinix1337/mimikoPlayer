@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -27,12 +28,42 @@ class TrackCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final value = url;
     return ClipRRect(
       borderRadius: BorderRadius.circular(
         radius ?? _defaultRadius(context, size),
       ),
-      child: SizedBox(width: size, height: size, child: _image(scheme)),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: _image(
+          scheme,
+          value == null || value.isEmpty ? value : _sizedUrl(context, value),
+        ),
+      ),
     );
+  }
+
+  /// Яндекс отдаёт обложку любого размера: 400×400 в плеере на 340 dp — это
+  /// почти трёхкратное растяжение и мыло. Просим размер под то, как обложка
+  /// реально рисуется (с учётом плотности экрана).
+  String _sizedUrl(BuildContext context, String value) {
+    if (!value.startsWith('http') ||
+        !value.contains('avatars.yandex.net') ||
+        !RegExp(r'\d+x\d+$').hasMatch(value)) {
+      return value;
+    }
+    final px = size.isFinite
+        ? (size * MediaQuery.devicePixelRatioOf(context)).round()
+        : 700;
+    final target = px <= 200
+        ? '200x200'
+        : px <= 400
+        ? '400x400'
+        : px <= 700
+        ? '700x700'
+        : '1000x1000';
+    return value.replaceFirst(RegExp(r'\d+x\d+$'), target);
   }
 
   static double _defaultRadius(BuildContext context, double size) {
@@ -42,12 +73,15 @@ class TrackCover extends StatelessWidget {
         : 12.0;
     // Маленькие обложки в списках не должны превращаться в мыло из-за
     // карточного радиуса.
-    return size < 56 ? (base * 0.45).clamp(6.0, 14.0) : (base * 0.55).clamp(8.0, 24.0);
+    return size < 56
+        ? (base * 0.45).clamp(6.0, 14.0)
+        : (base * 0.55).clamp(8.0, 24.0);
   }
 
-  Widget _image(ColorScheme scheme) {
-    final value = url;
-    if (value == null || value.isEmpty) return _Fallback(scheme: scheme, size: size);
+  Widget _image(ColorScheme scheme, String? value) {
+    if (value == null || value.isEmpty) {
+      return _Fallback(scheme: scheme, size: size);
+    }
 
     if (value.startsWith('data:')) {
       final comma = value.indexOf(',');
@@ -110,14 +144,22 @@ class _Fallback extends StatelessWidget {
   );
 }
 
-/// Фон из обложки. Реального блюра нет: картинка берётся в 24 пикселя и
-/// растягивается — на дешёвом железе это дешевле ImageFilter в разы, а
-/// выглядит как тот же размытый цветной фон.
+/// Фон из обложки. Реального блюра нет: картинка декодируется мелкой и
+/// растягивается на весь экран — это дешевле `ImageFilter` в разы, а выглядит
+/// как тот же размытый цветной фон.
 class BlurredCover extends StatelessWidget {
-  const BlurredCover({super.key, this.url, this.opacity = 0.55});
+  const BlurredCover({
+    super.key,
+    this.url,
+    this.opacity = 0.55,
+    this.blur = true,
+  });
 
   final String? url;
   final double opacity;
+
+  /// true — сильно растянутая мягкая картинка; false — резкая обложка.
+  final bool blur;
 
   @override
   Widget build(BuildContext context) {
@@ -127,22 +169,71 @@ class BlurredCover extends StatelessWidget {
       return ColoredBox(color: scheme.surface);
     }
 
+    // Раньше «размытием» было растяжение картинки 168 px на весь экран:
+    // на большой обложке это давало видимые квадраты. Теперь картинка
+    // декодируется крупнее, а мягкость даёт настоящий blur; слой кэшируется
+    // в RepaintBoundary и не перерисовывается на каждом кадре.
+    final content = blur
+        ? Transform.scale(
+            // Чуть крупнее экрана, чтобы прозрачные края после blur не
+            // проступали полосами у границ.
+            scale: 1.2,
+            child: ImageFiltered(
+              imageFilter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+              child: _image(value, scheme),
+            ),
+          )
+        : _image(value, scheme);
+
     return RepaintBoundary(
-      child: Opacity(
-        opacity: opacity,
-        child: CachedNetworkImage(
-          imageUrl: value,
-          width: double.infinity,
-          height: double.infinity,
-          fit: BoxFit.cover,
-          // 32 пикселя на всю ширину: растянутая картинка и есть «размытие»,
-          // только без дорогого ImageFilter на каждый кадр.
-          memCacheWidth: 32,
-          filterQuality: FilterQuality.low,
-          placeholder: (context, _) => ColoredBox(color: scheme.surface),
-          errorWidget: (context, _, _) => ColoredBox(color: scheme.surface),
-        ),
-      ),
+      child: Opacity(opacity: opacity, child: content),
+    );
+  }
+
+  Widget _image(String value, ColorScheme scheme) {
+    final fallback = ColoredBox(color: scheme.surface);
+    const width = 512;
+    const quality = FilterQuality.medium;
+
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return CachedNetworkImage(
+        imageUrl: value,
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        memCacheWidth: width,
+        filterQuality: quality,
+        placeholder: (context, _) => fallback,
+        errorWidget: (context, _, _) => fallback,
+      );
+    }
+
+    // Локальные файлы и офлайн-обложки: у них нет http-адреса, а фон нужен.
+    final Image image;
+    if (value.startsWith('data:')) {
+      final comma = value.indexOf(',');
+      if (comma == -1) return fallback;
+      image = Image.memory(
+        base64Decode(value.substring(comma + 1)),
+        fit: BoxFit.cover,
+        cacheWidth: width,
+        filterQuality: quality,
+        gaplessPlayback: true,
+      );
+    } else {
+      image = Image.file(
+        File(Uri.parse(value).toFilePath()),
+        fit: BoxFit.cover,
+        cacheWidth: width,
+        filterQuality: quality,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    }
+    return SizedBox(
+      width: double.infinity,
+      height: double.infinity,
+      child: image,
     );
   }
 }
@@ -157,12 +248,16 @@ class ColorBlobs extends StatefulWidget {
     super.key,
     required this.colors,
     this.speed = 1,
+    this.strength = 0.5,
   });
 
   final List<Color> colors;
 
   /// 0 = неподвижно (пользователь выключил анимации).
   final double speed;
+
+  /// Плотность пятен: 0.5 — как на главной, 0.38 — деликатный фон стекла.
+  final double strength;
 
   @override
   State<ColorBlobs> createState() => _ColorBlobsState();
@@ -214,6 +309,7 @@ class _ColorBlobsState extends State<ColorBlobs>
                     color: widget.colors[i],
                     size: size,
                     index: i,
+                    strength: widget.strength,
                     dx: 60 * _sin(t + i * 2.1),
                     dy: 70 * _cos((t + i * 2.1) * 0.8),
                   ),
@@ -241,6 +337,7 @@ class _Blob extends StatelessWidget {
     required this.index,
     required this.dx,
     required this.dy,
+    this.strength = 0.5,
   });
 
   final Color color;
@@ -248,6 +345,7 @@ class _Blob extends StatelessWidget {
   final int index;
   final double dx;
   final double dy;
+  final double strength;
 
   @override
   Widget build(BuildContext context) {
@@ -264,7 +362,10 @@ class _Blob extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: RadialGradient(
-              colors: [color.withValues(alpha: 0.5), color.withValues(alpha: 0)],
+              colors: [
+                color.withValues(alpha: strength),
+                color.withValues(alpha: 0),
+              ],
               stops: const [0.0, 1.0],
             ),
           ),

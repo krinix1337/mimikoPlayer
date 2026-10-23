@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -6,19 +7,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../app_providers.dart';
+import '../../../core/db/daos/downloads_dao.dart';
 import '../../../core/prefs/prefs.dart';
 import '../../../core/platform/mimiko_platform.dart';
 import '../../../core/sources/music_source.dart';
 import '../../../core/sources/source_dto.dart';
 import '../../../core/sources/source_id.dart';
 import '../../../features/auth/ui/yandex_login.dart';
+import '../../../features/downloads/download_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_motion.dart';
 import '../../../widgets/pressable.dart';
 
 /// Карточка-секция настроек: заголовок и группа строк в общей оболочке.
 class SettingsSection extends StatelessWidget {
-  const SettingsSection({super.key, required this.title, required this.children});
+  const SettingsSection({
+    super.key,
+    required this.title,
+    required this.children,
+  });
 
   final String title;
   final List<Widget> children;
@@ -47,6 +54,7 @@ class SettingsSection extends StatelessWidget {
                 Motion.of(context).prefs.corner.radius * 0.7,
               ),
             ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: children,
@@ -58,7 +66,8 @@ class SettingsSection extends StatelessWidget {
   }
 }
 
-/// Строка с набором вариантов: подписанный чип на каждый.
+/// Строка с набором вариантов. Ячейки одинаковой ширины и высоты, поэтому
+/// подписи не скачут от строки к строке, а короткие наборы влезают в один ряд.
 class ChoiceRow<T> extends StatelessWidget {
   const ChoiceRow({
     super.key,
@@ -68,6 +77,7 @@ class ChoiceRow<T> extends StatelessWidget {
     required this.labelOf,
     required this.onPick,
     this.note,
+    this.columns,
   });
 
   final String label;
@@ -76,10 +86,12 @@ class ChoiceRow<T> extends StatelessWidget {
   final String Function(T) labelOf;
   final ValueChanged<T> onPick;
   final String? note;
+  final int? columns;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final count = columns ?? values.length.clamp(1, 4);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
@@ -87,18 +99,24 @@ class ChoiceRow<T> extends StatelessWidget {
         children: [
           Text(label, style: theme.textTheme.titleMedium),
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final value in values)
-                ChoiceChip(
-                  label: Text(labelOf(value)),
-                  selected: value == current,
-                  showCheckmark: false,
-                  onSelected: (_) => onPick(value),
-                ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const gap = 8.0;
+              final width = (constraints.maxWidth - gap * (count - 1)) / count;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  for (final value in values)
+                    _ChoicePill(
+                      width: width,
+                      label: labelOf(value),
+                      selected: value == current,
+                      onTap: () => onPick(value),
+                    ),
+                ],
+              );
+            },
           ),
           if (note != null) ...[
             const SizedBox(height: 8),
@@ -110,6 +128,56 @@ class ChoiceRow<T> extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _ChoicePill extends StatelessWidget {
+  const _ChoicePill({
+    required this.width,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final double width;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final radius = Motion.of(context).prefs.corner.radius * 0.7;
+    return SizedBox(
+      width: width,
+      height: 46,
+      child: Material(
+        color: selected ? scheme.primaryContainer : scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(radius),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: selected
+                      ? scheme.onPrimaryContainer
+                      : scheme.onSurfaceVariant,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -134,14 +202,101 @@ class SwitchRow extends StatelessWidget {
     final theme = Theme.of(context);
     return ListTile(
       title: Text(label, style: theme.textTheme.titleMedium),
-      subtitle: note == null ? null : Text(note!, style: theme.textTheme.bodySmall),
+      subtitle: note == null
+          ? null
+          : Text(note!, style: theme.textTheme.bodySmall),
       trailing: Switch(value: value, onChanged: onChanged),
     );
   }
 }
 
-/// Палитра акцентов: шесть кругляшей в горизонтальной ленте — на узком
-/// экране рядом они влезали бы с переполнением.
+class SliderRow extends StatefulWidget {
+  const SliderRow({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.display,
+    required this.onChangedEnd,
+    this.divisions,
+    this.note,
+  });
+
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final int? divisions;
+  final String Function(double value) display;
+  final ValueChanged<double> onChangedEnd;
+  final String? note;
+
+  @override
+  State<SliderRow> createState() => _SliderRowState();
+}
+
+class _SliderRowState extends State<SliderRow> {
+  late double _value = widget.value;
+  bool _dragging = false;
+
+  @override
+  void didUpdateWidget(SliderRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_dragging && oldWidget.value != widget.value) {
+      _value = widget.value;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(widget.label, style: theme.textTheme.titleMedium),
+              ),
+              Text(
+                widget.display(_value),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          Slider(
+            value: _value.clamp(widget.min, widget.max),
+            min: widget.min,
+            max: widget.max,
+            divisions: widget.divisions,
+            onChanged: (value) => setState(() {
+              _dragging = true;
+              _value = value;
+            }),
+            onChangeEnd: (value) {
+              _dragging = false;
+              widget.onChangedEnd(value);
+            },
+          ),
+          if (widget.note != null)
+            Text(
+              widget.note!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Палитра акцентов: по пять кругляшей в ряд, как иконки лаунчера.
 class AccentRow extends StatelessWidget {
   const AccentRow({
     super.key,
@@ -166,94 +321,58 @@ class AccentRow extends StatelessWidget {
         children: [
           Text(label, style: theme.textTheme.titleMedium),
           const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final accent in AccentColor.values)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: PressableScale(
-                      onTap: () => onPick(accent),
-                      child: Column(
-                        children: [
-                          AnimatedContainer(
-                            duration: Motion.of(context).micro(180),
-                            width: 34,
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: accent.color,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: accent == current
-                                    ? theme.colorScheme.onSurface
-                                    : Colors.transparent,
-                                width: 3,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const gap = 8.0;
+              final width = (constraints.maxWidth - gap * 4) / 5;
+              return Wrap(
+                spacing: gap,
+                runSpacing: 10,
+                children: [
+                  for (final accent in AccentColor.values)
+                    SizedBox(
+                      width: width,
+                      child: PressableScale(
+                        onTap: () => onPick(accent),
+                        child: Column(
+                          children: [
+                            AnimatedContainer(
+                              duration: Motion.of(context).micro(180),
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: accent.color,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: accent == current
+                                      ? theme.colorScheme.onSurface
+                                      : Colors.transparent,
+                                  width: 3,
+                                ),
                               ),
+                              child: accent == current
+                                  ? const Icon(
+                                      Icons.check_rounded,
+                                      size: 18,
+                                      color: Colors.black87,
+                                    )
+                                  : null,
                             ),
-                            child: accent == current
-                                ? const Icon(
-                                    Icons.check_rounded,
-                                    size: 18,
-                                    color: Colors.black87,
-                                  )
-                                : null,
-                          ),
-                          const SizedBox(height: 4),
-                          SizedBox(
-                            width: 56,
-                            child: Text(
+                            const SizedBox(height: 4),
+                            Text(
                               labelOf(accent),
                               textAlign: TextAlign.center,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelSmall,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class LanguageRow extends ConsumerWidget {
-  const LanguageRow({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l = AppLocalizations.of(context);
-    final code = ref.watch(prefsProvider.select((p) => p.localeCode));
-    final controller = ref.read(prefsProvider.notifier);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Wrap(
-        spacing: 8,
-        children: [
-          ChoiceChip(
-            label: Text(l.languageSystem),
-            selected: code == null,
-            showCheckmark: false,
-            onSelected: (_) => controller.setLocaleCode(null),
-          ),
-          ChoiceChip(
-            label: const Text('Русский'),
-            selected: code == 'ru',
-            showCheckmark: false,
-            onSelected: (_) => controller.setLocaleCode('ru'),
-          ),
-          ChoiceChip(
-            label: const Text('English'),
-            selected: code == 'en',
-            showCheckmark: false,
-            onSelected: (_) => controller.setLocaleCode('en'),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -275,7 +394,6 @@ class LauncherIconRow extends ConsumerWidget {
     LauncherIcon.ice: 'assets/icon/variants/ice.png',
     LauncherIcon.amber: 'assets/icon/variants/amber.png',
     LauncherIcon.forest: 'assets/icon/variants/forest.png',
-    LauncherIcon.crimson: 'assets/icon/variants/crimson.png',
   };
 
   @override
@@ -295,51 +413,60 @@ class LauncherIconRow extends ConsumerWidget {
       LauncherIcon.ice => l.accentIce,
       LauncherIcon.amber => l.accentAmber,
       LauncherIcon.forest => l.launcherForest,
-      LauncherIcon.crimson => l.launcherCrimson,
     };
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      // Одиннадцать значков в строку не влезают — лента по горизонтали.
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-        children: [
-          for (final icon in LauncherIcon.values)
-            Padding(
-              padding: const EdgeInsets.only(right: 14),
-              child: PressableScale(
-                onTap: () => _apply(context, ref, icon),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: icon == current
-                              ? theme.colorScheme.primary
-                              : Colors.transparent,
-                          width: 3,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const gap = 8.0;
+          final width = (constraints.maxWidth - gap * 4) / 5;
+          return Wrap(
+            spacing: gap,
+            runSpacing: 12,
+            children: [
+              for (final icon in LauncherIcon.values)
+                SizedBox(
+                  width: width,
+                  child: PressableScale(
+                    onTap: () => _apply(context, ref, icon),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: icon == current
+                                  ? theme.colorScheme.primary
+                                  : Colors.transparent,
+                              width: 3,
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: Image.asset(
+                              _assetFor[icon]!,
+                              width: 46,
+                              height: 46,
+                            ),
+                          ),
                         ),
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          _assetFor[icon]!,
-                          width: 46,
-                          height: 46,
+                        const SizedBox(height: 4),
+                        Text(
+                          name(icon),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall,
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(name(icon), style: theme.textTheme.labelSmall),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          ],
-        ),
-        ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -433,7 +560,10 @@ class PriorityTile extends ConsumerWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-            child: Text(l.settingsPriorityNote, style: Theme.of(context).textTheme.bodySmall),
+            child: Text(
+              l.settingsPriorityNote,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ),
           _ReorderList(
             order: order,
@@ -517,6 +647,135 @@ class _ReorderListState extends State<_ReorderList> {
   );
 }
 
+class DownloadsTile extends ConsumerWidget {
+  const DownloadsTile({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final stats =
+        ref.watch(downloadQueueStatsProvider).value ??
+        const DownloadQueueStats();
+    final summary =
+        ref.watch(downloadedFilesSummaryProvider).value ??
+        const DownloadedFilesSummary(count: 0, bytes: 0);
+    final active = stats.downloading + stats.queued;
+    final canPause = stats.downloading > 0 || stats.queued > 0;
+    final canResume = stats.paused > 0;
+
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.download_done_rounded),
+          title: Text(
+            l.downloadsSummary(summary.count, _humanBytes(summary.bytes)),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l.downloadsQueueSummary(active, stats.paused)),
+              if (stats.skipped > 0) Text(l.downloadsSkipped(stats.skipped)),
+            ],
+          ),
+          trailing: canPause || canResume
+              ? IconButton(
+                  tooltip: canResume && !canPause
+                      ? l.downloadsResume
+                      : l.downloadsPause,
+                  icon: Icon(
+                    canResume && !canPause
+                        ? Icons.play_arrow_rounded
+                        : Icons.pause_rounded,
+                  ),
+                  onPressed: () {
+                    final controller = ref.read(
+                      downloadControllerProvider.notifier,
+                    );
+                    if (canResume && !canPause) {
+                      unawaited(controller.resumeAll());
+                    } else {
+                      unawaited(controller.pauseAll());
+                    }
+                  },
+                )
+              : null,
+        ),
+        FutureBuilder<int>(
+          future: MimikoPlatform.freeBytes(),
+          builder: (context, snapshot) {
+            final free = snapshot.data;
+            if (free == null || free <= 0) return const SizedBox.shrink();
+            return ListTile(
+              dense: true,
+              leading: const Icon(Icons.sd_storage_rounded, size: 20),
+              title: Text(l.downloadsFreeSpace(_humanBytes(free))),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class DeleteDownloadsTile extends ConsumerWidget {
+  const DeleteDownloadsTile({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final summary = ref.watch(downloadedFilesSummaryProvider).value;
+    final stats =
+        ref.watch(downloadQueueStatsProvider).value ??
+        const DownloadQueueStats();
+    final count = summary?.count ?? 0;
+    final hasAnything = count > 0 || stats.pending > 0;
+
+    return ListTile(
+      leading: const Icon(Icons.delete_sweep_rounded),
+      title: Text(l.downloadsDeleteAll),
+      enabled: hasAnything,
+      textColor: Theme.of(context).colorScheme.error,
+      onTap: !hasAnything
+          ? null
+          : () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text(l.downloadsDeleteAll),
+                  content: Text(l.downloadsDeleteAllQuestion),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: Text(l.commonCancel),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: Text(l.downloadsDeleteAll),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed != true) return;
+              await ref.read(downloadControllerProvider.notifier).removeAll();
+              if (context.mounted) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(l.downloadsDeletedAll)));
+              }
+            },
+    );
+  }
+}
+
+String _humanBytes(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+  if (bytes < 1024 * 1024 * 1024) {
+    return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+  }
+  return '${(bytes / 1024 / 1024 / 1024).toStringAsFixed(1)} GB';
+}
+
 class CacheTile extends ConsumerStatefulWidget {
   const CacheTile({super.key});
 
@@ -558,26 +817,19 @@ class _CacheTileState extends ConsumerState<CacheTile> {
     final l = AppLocalizations.of(context);
     return ListTile(
       title: Text(l.settingsCache),
-      subtitle: Text(_bytes == null ? '—' : _human(_bytes!)),
+      subtitle: Text(_bytes == null ? '—' : _humanBytes(_bytes!)),
       trailing: TextButton(
         onPressed: () async {
           await DefaultCacheManager().emptyCache();
           await _measure();
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l.settingsCacheCleared)),
-            );
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text(l.settingsCacheCleared)));
           }
         },
         child: Text(l.settingsCacheClear),
       ),
     );
-  }
-
-  static String _human(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
-    return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
   }
 }
 
@@ -587,7 +839,8 @@ class AccountTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    final auth = ref.watch(yandexAuthStateProvider).value ?? const AuthUnknown();
+    final auth =
+        ref.watch(yandexAuthStateProvider).value ?? const AuthUnknown();
     final services = ref.read(appServicesProvider);
 
     if (auth case final AuthReady ready) {
@@ -600,9 +853,8 @@ class AccountTile extends ConsumerWidget {
             await services.yandexAuth?.logout();
             ref.invalidate(collectionProvider);
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l.settingsSignedOut)),
-              );
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text(l.settingsSignedOut)));
             }
           },
           child: Text(l.settingsSignOut),

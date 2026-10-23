@@ -39,8 +39,13 @@ void main() {
   test('вариант для источника несёт чистый id, а не `track-album`', () async {
     // Регресс: составной ключ попадал в download-info, и Яндекс отвечал 400.
     final ingested = await db.tracksDao.ingest(
-      track(SourceId.yandex, '147872699', title: 'Killer Queen', artists: ['Queen'], seconds: 181)
-          .copyWithLikeAlbum('5901220'),
+      track(
+        SourceId.yandex,
+        '147872699',
+        title: 'Killer Queen',
+        artists: ['Queen'],
+        seconds: 181,
+      ).copyWithLikeAlbum('5901220'),
     );
 
     final variants = await db.tracksDao.variantsOf(ingested.localTrackId);
@@ -61,6 +66,86 @@ void main() {
     expect(await db.rowCountSnapshot().then((r) => r['tracks']), 1);
   });
 
+  test('localIdForRemote находит уже сведённый трек', () async {
+    final ingested = await db.tracksDao.ingest(
+      track(SourceId.yandex, '501', title: 'Найдётся'),
+    );
+
+    expect(
+      await db.tracksDao.localIdForRemote(
+        const RemoteTrackRef(SourceId.yandex, '501'),
+      ),
+      ingested.localTrackId,
+    );
+    expect(
+      await db.tracksDao.localIdForRemote(
+        const RemoteTrackRef(SourceId.yandex, '999'),
+      ),
+      isNull,
+    );
+  });
+
+  test(
+    'короткая ссылка не удерживает полноценный трек в общей строке',
+    () async {
+      const short = SourceTrack(
+        ref: RemoteTrackRef(SourceId.yandex, '42', albumId: '7'),
+        title: '',
+        artists: [],
+        duration: Duration.zero,
+        raw: {'id': 42, 'albumId': 7, 'timestamp': '2026-10-01T00:00:00'},
+      );
+      final empty = await db.tracksDao.ingest(short);
+
+      const full = SourceTrack(
+        ref: RemoteTrackRef(SourceId.yandex, '42', albumId: '7'),
+        title: 'Настоящий',
+        artists: ['Артист'],
+        duration: Duration(minutes: 3),
+        raw: {'id': 42, 'title': 'Настоящий', 'durationMs': 180000},
+      );
+      final ingested = await db.tracksDao.ingest(full);
+
+      expect(ingested.localTrackId, isNot(empty.localTrackId));
+      expect(
+        (await db.tracksDao.byId(ingested.localTrackId))!.title,
+        'Настоящий',
+      );
+      // Отравленная связь перезаписана на нормальную строку, а не осталась
+      // указывать на общий пустой трек.
+      final mapping = await db.select(db.remoteIdMappings).getSingle();
+      expect(mapping.localTrackId, ingested.localTrackId);
+    },
+  );
+
+  test('повторный ingest заполняет пустые метаданные старой строки', () async {
+    const empty = SourceTrack(
+      ref: RemoteTrackRef(SourceId.yandex, '777'),
+      title: '',
+      artists: [],
+      duration: Duration.zero,
+    );
+    final first = await db.tracksDao.ingest(empty);
+    final second = await db.tracksDao.ingest(
+      track(
+        SourceId.yandex,
+        '777',
+        title: 'Контракт',
+        artists: ['Пошлая Молли'],
+        seconds: 154,
+      ),
+    );
+
+    expect(second.localTrackId, first.localTrackId);
+    expect(second.tier, MatchTier.exactRemote);
+    final row = await db.tracksDao.byId(first.localTrackId);
+    expect(row?.title, 'Контракт');
+    expect(row?.durationSec, 154);
+    expect(await db.tracksDao.artistNamesOf(first.localTrackId), [
+      'Пошлая Молли',
+    ]);
+  });
+
   test('тот же трек из другого источника сводится по отпечатку', () async {
     final yandex = await db.tracksDao.ingest(track(SourceId.yandex, '111'));
     final youtube = await db.tracksDao.ingest(
@@ -71,7 +156,10 @@ void main() {
     expect(youtube.tier, MatchTier.fingerprint);
 
     final variants = await db.tracksDao.variantsOf(yandex.localTrackId);
-    expect(variants.map((v) => v.ref.source), {SourceId.yandex, SourceId.youtube});
+    expect(variants.map((v) => v.ref.source), {
+      SourceId.yandex,
+      SourceId.youtube,
+    });
   });
 
   test('ISRC сводит треки с разной записью длительности', () async {
@@ -88,17 +176,29 @@ void main() {
 
   test('нечёткое совпадение крепит mapping, но не сливает строки', () async {
     final a = await db.tracksDao.ingest(
-      track(SourceId.youtube, 'yt1', title: 'Wind Of Change', artists: ['Scorpions'], seconds: 300),
+      track(
+        SourceId.youtube,
+        'yt1',
+        title: 'Wind Of Change',
+        artists: ['Scorpions'],
+        seconds: 300,
+      ),
     );
     final b = await db.tracksDao.ingest(
-      track(SourceId.soundcloud, 'sc1', title: 'Wind Of Change', artists: ['Scorpions'], seconds: 302),
+      track(
+        SourceId.soundcloud,
+        'sc1',
+        title: 'Wind Of Change',
+        artists: ['Scorpions'],
+        seconds: 302,
+      ),
     );
 
     expect(b.localTrackId, a.localTrackId);
     expect(b.tier, MatchTier.fuzzy);
-    final mapping = await (db.select(db.remoteIdMappings)
-          ..where((t) => t.remoteId.equals('sc1')))
-        .getSingle();
+    final mapping = await (db.select(
+      db.remoteIdMappings,
+    )..where((t) => t.remoteId.equals('sc1'))).getSingle();
     expect(mapping.mappingConfidence, 'fuzzy');
   });
 

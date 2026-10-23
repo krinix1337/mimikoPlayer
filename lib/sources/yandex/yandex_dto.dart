@@ -27,11 +27,14 @@ class YandexDto {
           if (artist['id'] != null) '${artist['id']}',
       ],
       artistCovers: [
-        for (final artist in artists) coverFrom(artist['cover'], size: '400x400'),
+        for (final artist in artists)
+          coverFrom(artist['cover'], size: '400x400'),
       ],
       album: album['title'] as String?,
       albumRemoteId: album['id'] == null ? null : '${album['id']}',
-      duration: Duration(milliseconds: (json['durationMs'] as num?)?.toInt() ?? 0),
+      duration: Duration(
+        milliseconds: (json['durationMs'] as num?)?.toInt() ?? 0,
+      ),
       coverUrl: coverUrl(json['coverUri'] ?? album['coverUri']),
       // Яндекс не отдаёт ISRC ни в поиске, ни в /tracks.
       isrc: json['isrc'] as String?,

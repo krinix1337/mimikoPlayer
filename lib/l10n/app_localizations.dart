@@ -218,42 +218,6 @@ abstract class AppLocalizations {
   /// **'Запустить волну'**
   String get waveStart;
 
-  /// No description provided for @waveMood.
-  ///
-  /// In ru, this message translates to:
-  /// **'Настроение'**
-  String get waveMood;
-
-  /// No description provided for @waveEnergy.
-  ///
-  /// In ru, this message translates to:
-  /// **'Энергия'**
-  String get waveEnergy;
-
-  /// No description provided for @waveDiversity.
-  ///
-  /// In ru, this message translates to:
-  /// **'Разнообразие'**
-  String get waveDiversity;
-
-  /// No description provided for @waveStation.
-  ///
-  /// In ru, this message translates to:
-  /// **'Станция'**
-  String get waveStation;
-
-  /// No description provided for @wavePresets.
-  ///
-  /// In ru, this message translates to:
-  /// **'Пресеты'**
-  String get wavePresets;
-
-  /// No description provided for @waveLanguage.
-  ///
-  /// In ru, this message translates to:
-  /// **'Язык музыки'**
-  String get waveLanguage;
-
   /// No description provided for @waveSaved.
   ///
   /// In ru, this message translates to:
@@ -338,12 +302,6 @@ abstract class AppLocalizations {
   /// **'Артист'**
   String get sourceArtist;
 
-  /// No description provided for @switchToWave.
-  ///
-  /// In ru, this message translates to:
-  /// **'Включить мою волну'**
-  String get switchToWave;
-
   /// No description provided for @waveStationsFailed.
   ///
   /// In ru, this message translates to:
@@ -368,107 +326,17 @@ abstract class AppLocalizations {
   /// **'Настройки волны'**
   String get waveSettingsTitle;
 
-  /// No description provided for @waveApply.
-  ///
-  /// In ru, this message translates to:
-  /// **'Применить'**
-  String get waveApply;
-
   /// No description provided for @waveClose.
   ///
   /// In ru, this message translates to:
   /// **'Закрыть'**
   String get waveClose;
 
-  /// No description provided for @waveSavedNote.
-  ///
-  /// In ru, this message translates to:
-  /// **'Настройки волны сохранены'**
-  String get waveSavedNote;
-
   /// No description provided for @waveRejectedNote.
   ///
   /// In ru, this message translates to:
   /// **'Яндекс не принял настройки — смотри лог'**
   String get waveRejectedNote;
-
-  /// No description provided for @moodCalm.
-  ///
-  /// In ru, this message translates to:
-  /// **'спокойное'**
-  String get moodCalm;
-
-  /// No description provided for @moodEven.
-  ///
-  /// In ru, this message translates to:
-  /// **'ровное'**
-  String get moodEven;
-
-  /// No description provided for @moodActive.
-  ///
-  /// In ru, this message translates to:
-  /// **'активное'**
-  String get moodActive;
-
-  /// No description provided for @energyLow.
-  ///
-  /// In ru, this message translates to:
-  /// **'низкая'**
-  String get energyLow;
-
-  /// No description provided for @energyMid.
-  ///
-  /// In ru, this message translates to:
-  /// **'средняя'**
-  String get energyMid;
-
-  /// No description provided for @energyHigh.
-  ///
-  /// In ru, this message translates to:
-  /// **'высокая'**
-  String get energyHigh;
-
-  /// No description provided for @diversityMore.
-  ///
-  /// In ru, this message translates to:
-  /// **'побольше нового'**
-  String get diversityMore;
-
-  /// No description provided for @diversityLess.
-  ///
-  /// In ru, this message translates to:
-  /// **'побольше знакомого'**
-  String get diversityLess;
-
-  /// No description provided for @diversityUsual.
-  ///
-  /// In ru, this message translates to:
-  /// **'как обычно'**
-  String get diversityUsual;
-
-  /// No description provided for @langRu.
-  ///
-  /// In ru, this message translates to:
-  /// **'русское'**
-  String get langRu;
-
-  /// No description provided for @langEn.
-  ///
-  /// In ru, this message translates to:
-  /// **'английское'**
-  String get langEn;
-
-  /// No description provided for @langNonrank.
-  ///
-  /// In ru, this message translates to:
-  /// **'без приоритета'**
-  String get langNonrank;
-
-  /// No description provided for @langAny.
-  ///
-  /// In ru, this message translates to:
-  /// **'любое'**
-  String get langAny;
 
   /// No description provided for @collectionTitle.
   ///
@@ -536,11 +404,47 @@ abstract class AppLocalizations {
   /// **'Чарт'**
   String get chartTitle;
 
+  /// No description provided for @chartSubtitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Популярное в России прямо сейчас'**
+  String get chartSubtitle;
+
   /// No description provided for @artistOpen.
   ///
   /// In ru, this message translates to:
   /// **'К исполнителю'**
   String get artistOpen;
+
+  /// No description provided for @artistAllTracks.
+  ///
+  /// In ru, this message translates to:
+  /// **'Все треки'**
+  String get artistAllTracks;
+
+  /// No description provided for @artistPopularTracks.
+  ///
+  /// In ru, this message translates to:
+  /// **'Популярные треки'**
+  String get artistPopularTracks;
+
+  /// No description provided for @artistAllAlbums.
+  ///
+  /// In ru, this message translates to:
+  /// **'Все альбомы'**
+  String get artistAllAlbums;
+
+  /// No description provided for @artistPhoto.
+  ///
+  /// In ru, this message translates to:
+  /// **'Фото артиста'**
+  String get artistPhoto;
+
+  /// No description provided for @trackDownloaded.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скачано'**
+  String get trackDownloaded;
 
   /// No description provided for @albumOpen.
   ///
@@ -590,12 +494,6 @@ abstract class AppLocalizations {
   /// **'Сведения о треке'**
   String get menuDetails;
 
-  /// No description provided for @menuDetailsBody.
-  ///
-  /// In ru, this message translates to:
-  /// **'Источник: {source}\nКачество: {quality}\nФормат: {codec}'**
-  String menuDetailsBody(String source, String quality, String codec);
-
   /// No description provided for @chartOpen.
   ///
   /// In ru, this message translates to:
@@ -637,6 +535,18 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Сортировка'**
   String get collectionSort;
+
+  /// No description provided for @collectionDownloadAllLikes.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скачать все треки'**
+  String get collectionDownloadAllLikes;
+
+  /// No description provided for @collectionDownloadQueued.
+  ///
+  /// In ru, this message translates to:
+  /// **'В очереди на загрузку: {count}'**
+  String collectionDownloadQueued(int count);
 
   /// No description provided for @sortAdded.
   ///
@@ -1082,11 +992,23 @@ abstract class AppLocalizations {
   /// **'Монохром'**
   String get paletteMono;
 
+  /// No description provided for @paletteAmoled.
+  ///
+  /// In ru, this message translates to:
+  /// **'AMOLED'**
+  String get paletteAmoled;
+
   /// No description provided for @paletteDynamicNote.
   ///
   /// In ru, this message translates to:
   /// **'Material You доступно на Android 12 и новее'**
   String get paletteDynamicNote;
+
+  /// No description provided for @paletteAmoledNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Чистый чёрный фон: на OLED пиксели гаснут, батарея держит дольше'**
+  String get paletteAmoledNote;
 
   /// No description provided for @settingsAccent.
   ///
@@ -1148,17 +1070,17 @@ abstract class AppLocalizations {
   /// **'Лист'**
   String get accentLeaf;
 
+  /// No description provided for @accentOrchid.
+  ///
+  /// In ru, this message translates to:
+  /// **'Орхидея'**
+  String get accentOrchid;
+
   /// No description provided for @launcherForest.
   ///
   /// In ru, this message translates to:
   /// **'Лес'**
   String get launcherForest;
-
-  /// No description provided for @launcherCrimson.
-  ///
-  /// In ru, this message translates to:
-  /// **'Багровый'**
-  String get launcherCrimson;
 
   /// No description provided for @settingsContrast.
   ///
@@ -1825,6 +1747,450 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'База не ответила: {error}'**
   String dbError(String error);
+
+  /// No description provided for @navDiscover.
+  ///
+  /// In ru, this message translates to:
+  /// **'Обзор'**
+  String get navDiscover;
+
+  /// No description provided for @discoverTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Что послушать'**
+  String get discoverTitle;
+
+  /// No description provided for @discoverChart.
+  ///
+  /// In ru, this message translates to:
+  /// **'Чарт'**
+  String get discoverChart;
+
+  /// No description provided for @discoverNewReleases.
+  ///
+  /// In ru, this message translates to:
+  /// **'Новые релизы'**
+  String get discoverNewReleases;
+
+  /// No description provided for @discoverStations.
+  ///
+  /// In ru, this message translates to:
+  /// **'Жанры и настроения'**
+  String get discoverStations;
+
+  /// No description provided for @discoverArtists.
+  ///
+  /// In ru, this message translates to:
+  /// **'Твои артисты'**
+  String get discoverArtists;
+
+  /// No description provided for @discoverAll.
+  ///
+  /// In ru, this message translates to:
+  /// **'Все'**
+  String get discoverAll;
+
+  /// No description provided for @searchHistoryTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'История поиска'**
+  String get searchHistoryTitle;
+
+  /// No description provided for @searchHistoryClear.
+  ///
+  /// In ru, this message translates to:
+  /// **'Очистить'**
+  String get searchHistoryClear;
+
+  /// No description provided for @waveListen.
+  ///
+  /// In ru, this message translates to:
+  /// **'Слушать'**
+  String get waveListen;
+
+  /// No description provided for @waveWheelHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Крути и выбирай режим'**
+  String get waveWheelHint;
+
+  /// No description provided for @waveBackToUsual.
+  ///
+  /// In ru, this message translates to:
+  /// **'Обычная волна'**
+  String get waveBackToUsual;
+
+  /// No description provided for @moodEnergyActive.
+  ///
+  /// In ru, this message translates to:
+  /// **'Бодрое'**
+  String get moodEnergyActive;
+
+  /// No description provided for @moodEnergyFun.
+  ///
+  /// In ru, this message translates to:
+  /// **'Весёлое'**
+  String get moodEnergyFun;
+
+  /// No description provided for @moodEnergyCalm.
+  ///
+  /// In ru, this message translates to:
+  /// **'Спокойное'**
+  String get moodEnergyCalm;
+
+  /// No description provided for @moodEnergySad.
+  ///
+  /// In ru, this message translates to:
+  /// **'Грустное'**
+  String get moodEnergySad;
+
+  /// No description provided for @diversityFavorite.
+  ///
+  /// In ru, this message translates to:
+  /// **'Любимое'**
+  String get diversityFavorite;
+
+  /// No description provided for @diversityDiscover.
+  ///
+  /// In ru, this message translates to:
+  /// **'Незнакомое'**
+  String get diversityDiscover;
+
+  /// No description provided for @diversityPopular.
+  ///
+  /// In ru, this message translates to:
+  /// **'Популярное'**
+  String get diversityPopular;
+
+  /// No description provided for @languageRussian.
+  ///
+  /// In ru, this message translates to:
+  /// **'Русский'**
+  String get languageRussian;
+
+  /// No description provided for @languageForeign.
+  ///
+  /// In ru, this message translates to:
+  /// **'Иностранный'**
+  String get languageForeign;
+
+  /// No description provided for @languageInstrumental.
+  ///
+  /// In ru, this message translates to:
+  /// **'Без слов'**
+  String get languageInstrumental;
+
+  /// No description provided for @homeCoverTone.
+  ///
+  /// In ru, this message translates to:
+  /// **'Тон обложки'**
+  String get homeCoverTone;
+
+  /// No description provided for @homeCoverDarker.
+  ///
+  /// In ru, this message translates to:
+  /// **'Темнее'**
+  String get homeCoverDarker;
+
+  /// No description provided for @homeCoverNormal.
+  ///
+  /// In ru, this message translates to:
+  /// **'Обычная'**
+  String get homeCoverNormal;
+
+  /// No description provided for @homeCoverLighter.
+  ///
+  /// In ru, this message translates to:
+  /// **'Светлее'**
+  String get homeCoverLighter;
+
+  /// No description provided for @homeCoverBlur.
+  ///
+  /// In ru, this message translates to:
+  /// **'Размытие обложки'**
+  String get homeCoverBlur;
+
+  /// No description provided for @homeCoverBlurNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Мягкий фон вместо детальной картинки'**
+  String get homeCoverBlurNote;
+
+  /// No description provided for @djInfo.
+  ///
+  /// In ru, this message translates to:
+  /// **'DJ-сведения'**
+  String get djInfo;
+
+  /// No description provided for @djInfoNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'BPM и тональность в сведениях о треке'**
+  String get djInfoNote;
+
+  /// No description provided for @trackUnknownArtist.
+  ///
+  /// In ru, this message translates to:
+  /// **'Неизвестный исполнитель'**
+  String get trackUnknownArtist;
+
+  /// No description provided for @sourceYandex.
+  ///
+  /// In ru, this message translates to:
+  /// **'Яндекс Музыка'**
+  String get sourceYandex;
+
+  /// No description provided for @sourceYoutube.
+  ///
+  /// In ru, this message translates to:
+  /// **'YouTube'**
+  String get sourceYoutube;
+
+  /// No description provided for @sourceLocalFile.
+  ///
+  /// In ru, this message translates to:
+  /// **'Файл'**
+  String get sourceLocalFile;
+
+  /// No description provided for @detailsSource.
+  ///
+  /// In ru, this message translates to:
+  /// **'Источник'**
+  String get detailsSource;
+
+  /// No description provided for @detailsSources.
+  ///
+  /// In ru, this message translates to:
+  /// **'Источники'**
+  String get detailsSources;
+
+  /// No description provided for @detailsAlbum.
+  ///
+  /// In ru, this message translates to:
+  /// **'Альбом'**
+  String get detailsAlbum;
+
+  /// No description provided for @detailsYear.
+  ///
+  /// In ru, this message translates to:
+  /// **'Год'**
+  String get detailsYear;
+
+  /// No description provided for @detailsDuration.
+  ///
+  /// In ru, this message translates to:
+  /// **'Длительность'**
+  String get detailsDuration;
+
+  /// No description provided for @detailsIsrc.
+  ///
+  /// In ru, this message translates to:
+  /// **'ISRC'**
+  String get detailsIsrc;
+
+  /// No description provided for @detailsQuality.
+  ///
+  /// In ru, this message translates to:
+  /// **'Качество'**
+  String get detailsQuality;
+
+  /// No description provided for @detailsCodec.
+  ///
+  /// In ru, this message translates to:
+  /// **'Кодек'**
+  String get detailsCodec;
+
+  /// No description provided for @detailsSize.
+  ///
+  /// In ru, this message translates to:
+  /// **'Размер'**
+  String get detailsSize;
+
+  /// No description provided for @detailsFile.
+  ///
+  /// In ru, this message translates to:
+  /// **'Файл'**
+  String get detailsFile;
+
+  /// No description provided for @detailsRemoteId.
+  ///
+  /// In ru, this message translates to:
+  /// **'ID источника'**
+  String get detailsRemoteId;
+
+  /// No description provided for @detailsLocalId.
+  ///
+  /// In ru, this message translates to:
+  /// **'Локальный ID'**
+  String get detailsLocalId;
+
+  /// No description provided for @djBpm.
+  ///
+  /// In ru, this message translates to:
+  /// **'BPM'**
+  String get djBpm;
+
+  /// No description provided for @djGain.
+  ///
+  /// In ru, this message translates to:
+  /// **'Громкость'**
+  String get djGain;
+
+  /// No description provided for @djKey.
+  ///
+  /// In ru, this message translates to:
+  /// **'Тональность'**
+  String get djKey;
+
+  /// No description provided for @djNoKey.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не указана'**
+  String get djNoKey;
+
+  /// No description provided for @djSourceNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'BPM и громкость — Deezer. Тональность можно указать вручную по Camelot.'**
+  String get djSourceNote;
+
+  /// No description provided for @downloadsPaused.
+  ///
+  /// In ru, this message translates to:
+  /// **'На паузе'**
+  String get downloadsPaused;
+
+  /// No description provided for @downloadsPause.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пауза'**
+  String get downloadsPause;
+
+  /// No description provided for @downloadsResume.
+  ///
+  /// In ru, this message translates to:
+  /// **'Продолжить'**
+  String get downloadsResume;
+
+  /// No description provided for @settingsDownloads.
+  ///
+  /// In ru, this message translates to:
+  /// **'Загрузки'**
+  String get settingsDownloads;
+
+  /// No description provided for @downloadsSummary.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скачано: {count} · {size}'**
+  String downloadsSummary(int count, String size);
+
+  /// No description provided for @downloadsQueueSummary.
+  ///
+  /// In ru, this message translates to:
+  /// **'В очереди: {queued} · на паузе: {paused}'**
+  String downloadsQueueSummary(int queued, int paused);
+
+  /// No description provided for @downloadsSkipped.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пропущено как недоступное офлайн: {count}'**
+  String downloadsSkipped(int count);
+
+  /// No description provided for @downloadsAutoLikes.
+  ///
+  /// In ru, this message translates to:
+  /// **'Качать любимое автоматически'**
+  String get downloadsAutoLikes;
+
+  /// No description provided for @downloadsAutoLikesNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'По умолчанию выключено. Сначала пробные 20 треков, потом все.'**
+  String get downloadsAutoLikesNote;
+
+  /// No description provided for @downloadsDownloadAll.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скачать все лайки'**
+  String get downloadsDownloadAll;
+
+  /// No description provided for @downloadsDownloadAllNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Поставит в очередь все лайки. Пауза и лимит продолжают работать.'**
+  String get downloadsDownloadAllNote;
+
+  /// No description provided for @downloadsWifiOnly.
+  ///
+  /// In ru, this message translates to:
+  /// **'Только Wi-Fi'**
+  String get downloadsWifiOnly;
+
+  /// No description provided for @downloadsWifiOnlyNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Автозагрузка ждёт Wi-Fi; ручные загрузки разрешены в любой сети.'**
+  String get downloadsWifiOnlyNote;
+
+  /// No description provided for @downloadsLimit.
+  ///
+  /// In ru, this message translates to:
+  /// **'Лимит места'**
+  String get downloadsLimit;
+
+  /// No description provided for @downloadsLimitNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'При достижении очередь останавливается, файлы не удаляются.'**
+  String get downloadsLimitNote;
+
+  /// No description provided for @downloadsUnlimited.
+  ///
+  /// In ru, this message translates to:
+  /// **'Без лимита'**
+  String get downloadsUnlimited;
+
+  /// No description provided for @downloadsGb.
+  ///
+  /// In ru, this message translates to:
+  /// **'{value} ГБ'**
+  String downloadsGb(int value);
+
+  /// No description provided for @downloadsQuality.
+  ///
+  /// In ru, this message translates to:
+  /// **'Качество автозагрузки'**
+  String get downloadsQuality;
+
+  /// No description provided for @downloadsQualityNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не меняет уже скачанные файлы.'**
+  String get downloadsQualityNote;
+
+  /// No description provided for @downloadsDeleteAll.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить все загрузки'**
+  String get downloadsDeleteAll;
+
+  /// No description provided for @downloadsDeleteAllQuestion.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить все скачанные треки?'**
+  String get downloadsDeleteAllQuestion;
+
+  /// No description provided for @downloadsDeletedAll.
+  ///
+  /// In ru, this message translates to:
+  /// **'Все загрузки удалены'**
+  String get downloadsDeletedAll;
+
+  /// No description provided for @downloadsFreeSpace.
+  ///
+  /// In ru, this message translates to:
+  /// **'Свободно: {size}'**
+  String downloadsFreeSpace(String size);
 }
 
 class _AppLocalizationsDelegate

@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_providers.dart';
 import 'core/prefs/prefs.dart';
 import 'core/platform/mimiko_platform.dart';
+import 'features/downloads/download_service.dart';
 import 'features/player/playback_controller.dart';
 import 'l10n/app_localizations.dart';
 import 'router/app_router.dart';
@@ -29,10 +33,26 @@ class _MimikoAppState extends ConsumerState<MimikoApp> {
       MimikoPlatform.requestFrameRate(ref.read(prefsProvider).frameHz);
       // Коллекцию догоняем через паузу: сразу после кадра сеть и запись в
       // базу конкурируют с анимацией входа и дают просадку.
-      Future<void>.delayed(
-        const Duration(seconds: 3),
-        () => ref.read(librarySyncProvider),
-      );
+      Future<void>.delayed(const Duration(seconds: 3), () async {
+        try {
+          await ref.read(librarySyncProvider.future);
+        } on Object {
+          // Без сети автозагрузка всё равно может продолжить локальную очередь.
+        }
+        if (!mounted) return;
+        // Обложки у треков, скачанных до локальных картинок: подтягиваем фоном,
+        // чтобы «Скачанное» не пустело офлайн.
+        unawaited(
+          ref
+              .read(downloadControllerProvider.notifier)
+              .backfillCovers()
+              .catchError((Object _) => 0),
+        );
+        unawaited(reimportPlaylistsOnce(ref));
+        final downloads = ref.read(downloadControllerProvider.notifier);
+        await downloads.recoverQueue();
+        await downloads.kickAutoDownloads();
+      });
     });
   }
 
@@ -49,11 +69,8 @@ class _MimikoAppState extends ConsumerState<MimikoApp> {
     // Material You: палитру системы можно прочитать только виджетом,
     // поэтому оборачиваем всё приложение.
     return DynamicColorBuilder(
-      builder: (lightDynamic, darkDynamic) => _app(
-        prefs,
-        lightDynamic,
-        darkDynamic,
-      ),
+      builder: (lightDynamic, darkDynamic) =>
+          _app(prefs, lightDynamic, darkDynamic),
     );
   }
 
@@ -77,7 +94,28 @@ class _MimikoAppState extends ConsumerState<MimikoApp> {
       routerConfig: appRouterProvider,
       // Мягкое появление интерфейса на старте: окно уже показано, а контент
       // подъезжает за полсекунды — вход не выглядит «щелчком».
-      builder: (context, child) => _AppReveal(child: child ?? const SizedBox()),
+      builder: (context, child) {
+        final dark = Theme.of(context).brightness == Brightness.dark;
+        final style = SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarIconBrightness: dark
+              ? Brightness.light
+              : Brightness.dark,
+          systemNavigationBarDividerColor: Colors.transparent,
+          systemStatusBarContrastEnforced: false,
+          systemNavigationBarContrastEnforced: false,
+        );
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: style,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [_AppReveal(child: child ?? const SizedBox())],
+          ),
+        );
+      },
       themeMode: prefs.themeMode,
       theme: AppTheme.build(
         Brightness.light,

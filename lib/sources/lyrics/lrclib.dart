@@ -85,15 +85,20 @@ class LrcLib {
     required Duration duration,
   }) async {
     try {
-      final response = await _dio.get<dynamic>('/get', queryParameters: {
-        'track_name': title,
-        'artist_name': artist,
-        if (album != null && album.isNotEmpty) 'album_name': album,
-        'duration': duration.inSeconds,
-      });
+      final response = await _dio.get<dynamic>(
+        '/get',
+        queryParameters: {
+          'track_name': title,
+          'artist_name': artist,
+          if (album != null && album.isNotEmpty) 'album_name': album,
+          'duration': duration.inSeconds,
+        },
+      );
       return parse(response.data);
     } on DioException catch (error) {
-      if (error.response?.statusCode == 404) return const Lyrics(lines: [], synced: false);
+      if (error.response?.statusCode == 404) {
+        return const Lyrics(lines: [], synced: false);
+      }
       return const Lyrics(lines: [], synced: false);
     } on Object {
       return const Lyrics(lines: [], synced: false);
@@ -132,14 +137,20 @@ class LrcLib {
       lines: [
         for (final line in const LineSplitter().convert(plainText))
           if (line.trim().isNotEmpty)
-            LyricLine(start: Duration.zero, end: Duration.zero, text: line.trim()),
+            LyricLine(
+              start: Duration.zero,
+              end: Duration.zero,
+              text: line.trim(),
+            ),
       ],
       synced: false,
       plain: plainText,
     );
   }
 
-  static final RegExp _stamp = RegExp(r'\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]');
+  static final RegExp _stamp = RegExp(
+    r'\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]',
+  );
 
   static List<({Duration start, String text})> _stampedLines(String source) {
     final result = <({Duration start, String text})>[];

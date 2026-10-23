@@ -25,17 +25,20 @@ void main() {
       expect(q.advance(), isNull);
     });
 
-    test('repeat=all заворачивает, repeat=one на автопродолжении повторяет', () {
-      final all = QueueManager()..setQueue(ids(2), startIndex: 1);
-      all.setRepeat(PlaybackRepeat.all);
-      expect(all.advance(), 't_0');
+    test(
+      'repeat=all заворачивает, repeat=one на автопродолжении повторяет',
+      () {
+        final all = QueueManager()..setQueue(ids(2), startIndex: 1);
+        all.setRepeat(PlaybackRepeat.all);
+        expect(all.advance(), 't_0');
 
-      final one = QueueManager()..setQueue(ids(2));
-      one.setRepeat(PlaybackRepeat.one);
-      expect(one.advance(manual: false), 't_0');
-      // Ручное переключение всё равно идёт вперёд.
-      expect(one.advance(), 't_1');
-    });
+        final one = QueueManager()..setQueue(ids(2));
+        one.setRepeat(PlaybackRepeat.one);
+        expect(one.advance(manual: false), 't_0');
+        // Ручное переключение всё равно идёт вперёд.
+        expect(one.advance(), 't_1');
+      },
+    );
 
     test('rewind в начале списка остаётся на первом', () {
       final q = QueueManager()..setQueue(ids(2), startIndex: 0);
@@ -70,12 +73,22 @@ void main() {
       expect(q.currentId, isNotNull);
     });
 
-    test('jumpTo ищет по base-индексу, а не по позиции в перемешанном списке', () {
+    test('jumpToPosition выбирает позицию в перемешанном порядке', () {
       final q = QueueManager()..setQueue(ids(6));
       q.setShuffle(PlaybackShuffle.shuffled);
-      expect(q.jumpTo('t_4'), 't_4');
-      expect(q.currentBaseIndex, 4);
-      expect(q.displayOrder[q.displayPosition], 't_4');
+      final target = q.displayOrder[3];
+      expect(q.jumpToPosition(3), target);
+      expect(q.displayPosition, 3);
+      expect(q.currentId, target);
+    });
+
+    test('jumpToPosition попадает во вторую копию повтора, а не в первую', () {
+      final q = QueueManager()..setQueue(['t_0', 't_1', 't_0', 't_2']);
+      expect(q.jumpToPosition(2), 't_0');
+      expect(q.currentBaseIndex, 2);
+      expect(q.displayPosition, 2);
+      expect(q.jumpToPosition(99), isNull);
+      expect(q.displayPosition, 2);
     });
 
     test('пустая очередь не продвигается', () {

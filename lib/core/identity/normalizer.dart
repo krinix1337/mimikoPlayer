@@ -6,12 +6,41 @@ library;
 /// Кириллицу не транслитерируем: каталог Яндекса русский, транслитерация
 /// только рассыплет матчинг.
 const Map<String, String> _latinAccents = {
-  'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'å': 'a',
-  'æ': 'ae', 'ç': 'c', 'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
-  'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i', 'ñ': 'n', 'ò': 'o',
-  'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o', 'ø': 'o', 'ù': 'u',
-  'ú': 'u', 'û': 'u', 'ü': 'u', 'ý': 'y', 'ÿ': 'y', 'ž': 'z',
-  'ş': 's', 'ğ': 'g', 'ı': 'i', 'ő': 'o', 'ű': 'u',
+  'à': 'a',
+  'á': 'a',
+  'â': 'a',
+  'ã': 'a',
+  'ä': 'a',
+  'å': 'a',
+  'æ': 'ae',
+  'ç': 'c',
+  'è': 'e',
+  'é': 'e',
+  'ê': 'e',
+  'ë': 'e',
+  'ì': 'i',
+  'í': 'i',
+  'î': 'i',
+  'ï': 'i',
+  'ñ': 'n',
+  'ò': 'o',
+  'ó': 'o',
+  'ô': 'o',
+  'õ': 'o',
+  'ö': 'o',
+  'ø': 'o',
+  'ù': 'u',
+  'ú': 'u',
+  'û': 'u',
+  'ü': 'u',
+  'ý': 'y',
+  'ÿ': 'y',
+  'ž': 'z',
+  'ş': 's',
+  'ğ': 'g',
+  'ı': 'i',
+  'ő': 'o',
+  'ű': 'u',
 };
 
 /// Слова, которые несут смысл названия, но не различают треки.
@@ -28,7 +57,9 @@ final RegExp _noiseSuffix = RegExp(
   caseSensitive: false,
 );
 
-final RegExp _collapsable = RegExp(r'[.,_!/:;?+=~\u2010-\u2015\u2212\u2018\u2019\u201c\u201d\x27\x22\-]+');
+final RegExp _collapsable = RegExp(
+  r'[.,_!/:;?+=~\u2010-\u2015\u2212\u2018\u2019\u201c\u201d\x27\x22\-]+',
+);
 final RegExp _spaces = RegExp(r'\s+');
 
 String _stripAccents(String input) {
@@ -52,10 +83,7 @@ String normalizeText(String input) {
   s = s.replaceAll(_noiseSuffix, ' ');
   s = s.replaceAll('&', ' and ');
   s = s.replaceAll('×', 'x');
-  s = s.replaceAllMapped(
-    RegExp(r'\b(?:ft|feat|feature)\.?\s+'),
-    (m) => ' ',
-  );
+  s = s.replaceAllMapped(RegExp(r'\b(?:ft|feat|feature)\.?\s+'), (m) => ' ');
   s = _stripAccents(s);
   s = s.replaceAll(_collapsable, ' ');
   s = s.replaceAll(_spaces, ' ');

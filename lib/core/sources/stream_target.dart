@@ -76,8 +76,6 @@ enum Quality {
 
   final String wire;
 
-  static Quality fromWire(String wire) => values.firstWhere(
-    (e) => e.wire == wire,
-    orElse: () => Quality.auto,
-  );
+  static Quality fromWire(String wire) =>
+      values.firstWhere((e) => e.wire == wire, orElse: () => Quality.auto);
 }

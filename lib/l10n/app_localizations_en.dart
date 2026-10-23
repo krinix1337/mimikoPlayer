@@ -70,24 +70,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get waveStart => 'Start the wave';
 
   @override
-  String get waveMood => 'Mood';
-
-  @override
-  String get waveEnergy => 'Energy';
-
-  @override
-  String get waveDiversity => 'Diversity';
-
-  @override
-  String get waveStation => 'Station';
-
-  @override
-  String get wavePresets => 'Presets';
-
-  @override
-  String get waveLanguage => 'Music language';
-
-  @override
   String get waveSaved => 'Wave settings saved';
 
   @override
@@ -132,9 +114,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourceArtist => 'Artist';
 
   @override
-  String get switchToWave => 'Switch to My Wave';
-
-  @override
   String waveStationsFailed(String error) {
     return 'Stations did not load: $error';
   }
@@ -149,55 +128,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get waveSettingsTitle => 'Wave settings';
 
   @override
-  String get waveApply => 'Apply';
-
-  @override
   String get waveClose => 'Close';
 
   @override
-  String get waveSavedNote => 'Wave settings saved';
-
-  @override
   String get waveRejectedNote => 'Yandex rejected the settings — see the log';
-
-  @override
-  String get moodCalm => 'calm';
-
-  @override
-  String get moodEven => 'even';
-
-  @override
-  String get moodActive => 'active';
-
-  @override
-  String get energyLow => 'low';
-
-  @override
-  String get energyMid => 'medium';
-
-  @override
-  String get energyHigh => 'high';
-
-  @override
-  String get diversityMore => 'more new';
-
-  @override
-  String get diversityLess => 'more familiar';
-
-  @override
-  String get diversityUsual => 'as usual';
-
-  @override
-  String get langRu => 'russian';
-
-  @override
-  String get langEn => 'english';
-
-  @override
-  String get langNonrank => 'no priority';
-
-  @override
-  String get langAny => 'any';
 
   @override
   String get collectionTitle => 'Collection';
@@ -234,7 +168,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chartTitle => 'Chart';
 
   @override
+  String get chartSubtitle => 'Popular in Russia right now';
+
+  @override
   String get artistOpen => 'Go to artist';
+
+  @override
+  String get artistAllTracks => 'All tracks';
+
+  @override
+  String get artistPopularTracks => 'Popular tracks';
+
+  @override
+  String get artistAllAlbums => 'All albums';
+
+  @override
+  String get artistPhoto => 'Artist photo';
+
+  @override
+  String get trackDownloaded => 'Downloaded';
 
   @override
   String get albumOpen => 'Go to album';
@@ -259,11 +211,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get menuDetails => 'Track details';
-
-  @override
-  String menuDetailsBody(String source, String quality, String codec) {
-    return 'Source: $source\nQuality: $quality\nFormat: $codec';
-  }
 
   @override
   String get chartOpen => 'Yandex chart';
@@ -293,6 +240,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get collectionSort => 'Sort';
+
+  @override
+  String get collectionDownloadAllLikes => 'Download all tracks';
+
+  @override
+  String collectionDownloadQueued(int count) {
+    return 'Queued for download: $count';
+  }
 
   @override
   String get sortAdded => 'Recently added';
@@ -545,7 +500,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get paletteMono => 'Monochrome';
 
   @override
+  String get paletteAmoled => 'AMOLED';
+
+  @override
   String get paletteDynamicNote => 'Material You needs Android 12 or newer';
+
+  @override
+  String get paletteAmoledNote =>
+      'True black background: OLED pixels turn off and the battery lasts longer';
 
   @override
   String get settingsAccent => 'Accent';
@@ -578,10 +540,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accentLeaf => 'Leaf';
 
   @override
-  String get launcherForest => 'Forest';
+  String get accentOrchid => 'Orchid';
 
   @override
-  String get launcherCrimson => 'Crimson';
+  String get launcherForest => 'Forest';
 
   @override
   String get settingsContrast => 'Contrast';
@@ -946,5 +908,243 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String dbError(String error) {
     return 'Database error: $error';
+  }
+
+  @override
+  String get navDiscover => 'Discover';
+
+  @override
+  String get discoverTitle => 'What to listen to';
+
+  @override
+  String get discoverChart => 'Chart';
+
+  @override
+  String get discoverNewReleases => 'New releases';
+
+  @override
+  String get discoverStations => 'Genres and moods';
+
+  @override
+  String get discoverArtists => 'Your artists';
+
+  @override
+  String get discoverAll => 'All';
+
+  @override
+  String get searchHistoryTitle => 'Search history';
+
+  @override
+  String get searchHistoryClear => 'Clear';
+
+  @override
+  String get waveListen => 'Listen';
+
+  @override
+  String get waveWheelHint => 'Spin and choose a mode';
+
+  @override
+  String get waveBackToUsual => 'Back to usual';
+
+  @override
+  String get moodEnergyActive => 'Active';
+
+  @override
+  String get moodEnergyFun => 'Fun';
+
+  @override
+  String get moodEnergyCalm => 'Calm';
+
+  @override
+  String get moodEnergySad => 'Sad';
+
+  @override
+  String get diversityFavorite => 'Familiar';
+
+  @override
+  String get diversityDiscover => 'Unfamiliar';
+
+  @override
+  String get diversityPopular => 'Popular';
+
+  @override
+  String get languageRussian => 'Russian';
+
+  @override
+  String get languageForeign => 'Foreign';
+
+  @override
+  String get languageInstrumental => 'Instrumental';
+
+  @override
+  String get homeCoverTone => 'Cover tone';
+
+  @override
+  String get homeCoverDarker => 'Darker';
+
+  @override
+  String get homeCoverNormal => 'Normal';
+
+  @override
+  String get homeCoverLighter => 'Lighter';
+
+  @override
+  String get homeCoverBlur => 'Blur cover';
+
+  @override
+  String get homeCoverBlurNote => 'Soft backdrop instead of a detailed image';
+
+  @override
+  String get djInfo => 'DJ info';
+
+  @override
+  String get djInfoNote => 'BPM and key in track details';
+
+  @override
+  String get trackUnknownArtist => 'Unknown artist';
+
+  @override
+  String get sourceYandex => 'Yandex Music';
+
+  @override
+  String get sourceYoutube => 'YouTube';
+
+  @override
+  String get sourceLocalFile => 'File';
+
+  @override
+  String get detailsSource => 'Source';
+
+  @override
+  String get detailsSources => 'Sources';
+
+  @override
+  String get detailsAlbum => 'Album';
+
+  @override
+  String get detailsYear => 'Year';
+
+  @override
+  String get detailsDuration => 'Duration';
+
+  @override
+  String get detailsIsrc => 'ISRC';
+
+  @override
+  String get detailsQuality => 'Quality';
+
+  @override
+  String get detailsCodec => 'Codec';
+
+  @override
+  String get detailsSize => 'Size';
+
+  @override
+  String get detailsFile => 'File';
+
+  @override
+  String get detailsRemoteId => 'Source ID';
+
+  @override
+  String get detailsLocalId => 'Local ID';
+
+  @override
+  String get djBpm => 'BPM';
+
+  @override
+  String get djGain => 'Gain';
+
+  @override
+  String get djKey => 'Key';
+
+  @override
+  String get djNoKey => 'Not set';
+
+  @override
+  String get djSourceNote =>
+      'BPM and gain from Deezer. Set the Camelot key manually.';
+
+  @override
+  String get downloadsPaused => 'Paused';
+
+  @override
+  String get downloadsPause => 'Pause';
+
+  @override
+  String get downloadsResume => 'Resume';
+
+  @override
+  String get settingsDownloads => 'Downloads';
+
+  @override
+  String downloadsSummary(int count, String size) {
+    return 'Downloaded: $count · $size';
+  }
+
+  @override
+  String downloadsQueueSummary(int queued, int paused) {
+    return 'Queued: $queued · paused: $paused';
+  }
+
+  @override
+  String downloadsSkipped(int count) {
+    return 'Skipped as unavailable offline: $count';
+  }
+
+  @override
+  String get downloadsAutoLikes => 'Download likes automatically';
+
+  @override
+  String get downloadsAutoLikesNote =>
+      'Off by default. A trial of 20 tracks runs first, then everything.';
+
+  @override
+  String get downloadsDownloadAll => 'Download all likes';
+
+  @override
+  String get downloadsDownloadAllNote =>
+      'Queues all likes. Pause and the storage limit still apply.';
+
+  @override
+  String get downloadsWifiOnly => 'Wi-Fi only';
+
+  @override
+  String get downloadsWifiOnlyNote =>
+      'Auto-download waits for Wi-Fi; manual downloads are allowed on any network.';
+
+  @override
+  String get downloadsLimit => 'Storage limit';
+
+  @override
+  String get downloadsLimitNote =>
+      'The queue stops at the limit; existing files are not deleted.';
+
+  @override
+  String get downloadsUnlimited => 'No limit';
+
+  @override
+  String downloadsGb(int value) {
+    return '$value GB';
+  }
+
+  @override
+  String get downloadsQuality => 'Auto-download quality';
+
+  @override
+  String get downloadsQualityNote =>
+      'Does not change already downloaded files.';
+
+  @override
+  String get downloadsDeleteAll => 'Delete all downloads';
+
+  @override
+  String get downloadsDeleteAllQuestion => 'Delete all downloaded tracks?';
+
+  @override
+  String get downloadsDeletedAll => 'All downloads deleted';
+
+  @override
+  String downloadsFreeSpace(String size) {
+    return 'Free: $size';
   }
 }
