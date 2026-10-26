@@ -91,6 +91,7 @@ class YandexAuth {
   String? _accessToken;
   String? _refreshToken;
   DateTime? _tokenExpiresAt;
+  String? _avatarUrl;
 
   Stream<AuthState> get changes => _changes.stream;
 
@@ -204,6 +205,7 @@ class YandexAuth {
       final attempt = await _pollOnce(login.deviceCode);
       switch (attempt.kind) {
         case _PollKind.token:
+          _avatarUrl = null;
           await _store(
             accessToken: attempt.token!,
             refreshToken: attempt.refreshToken,
@@ -285,6 +287,7 @@ class YandexAuth {
     await _dao.clear(provider);
     _accessToken = null;
     _refreshToken = null;
+    _avatarUrl = null;
     _api.token = null;
     _emit(const AuthNeedsDeviceLogin());
   }
@@ -382,8 +385,12 @@ class YandexAuth {
         login: login,
         hasPlus: hasPlus,
         accessTokenExpiresAt: expiresAt,
+        avatarUrl: _avatarUrl,
       ),
     );
+    // Аватар живёт в Яндекс ID, отдельно от музыкального профиля. Не ждём
+    // его: вход и счётчики должны появляться сразу, картинка — следом.
+    unawaited(_refreshAvatar(uid, login, hasPlus, expiresAt));
 
     final row = await _dao.load(provider);
     await _dao.save(
@@ -396,6 +403,48 @@ class YandexAuth {
       displayName: account['fullName']?.toString(),
       hasPlus: hasPlus,
     );
+  }
+
+  /// `login.yandex.ru/info` отдаёт `default_avatar_id`; сам файл лежит на
+  /// avatars.yandex.net. Ошибку не показываем: без аватара остаётся иконка.
+  Future<void> _refreshAvatar(
+    String uid,
+    String login,
+    bool hasPlus,
+    DateTime expiresAt,
+  ) async {
+    final token = _accessToken;
+    if (token == null || token.isEmpty) return;
+    try {
+      final response = await _oauth.get<dynamic>(
+        'https://login.yandex.ru/info',
+        queryParameters: const {'format': 'json'},
+        options: Options(headers: {'Authorization': 'OAuth $token'}),
+      );
+      final data = response.data;
+      final avatarId = data is Map
+          ? (data['default_avatar_id'] ?? '').toString()
+          : '';
+      final empty = data is Map && data['is_avatar_empty'] == true;
+      final url = empty || avatarId.isEmpty
+          ? null
+          : 'https://avatars.yandex.net/get-yapic/$avatarId/islands-200';
+      if (_avatarUrl == url) return;
+      _avatarUrl = url;
+      final current = _state;
+      if (current is! AuthReady || current.uid != uid) return;
+      _emit(
+        AuthReady(
+          uid: uid,
+          login: login,
+          hasPlus: hasPlus,
+          accessTokenExpiresAt: expiresAt,
+          avatarUrl: url,
+        ),
+      );
+    } on Object catch (error) {
+      AppLogger.instance.warn('яндекс-аватар: $error');
+    }
   }
 
   Future<String> _deviceId() async {

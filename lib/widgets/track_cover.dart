@@ -170,31 +170,44 @@ class BlurredCover extends StatelessWidget {
       return ColoredBox(color: scheme.surface);
     }
 
-    // Раньше «размытием» было растяжение картинки 168 px на весь экран:
-    // на большой обложке это давало видимые квадраты. Теперь картинка
-    // декодируется крупнее, а мягкость даёт настоящий blur; слой кэшируется
-    // в RepaintBoundary и не перерисовывается на каждом кадре.
+    // Раньше blur считался на полном размере экрана: на бюджетном GPU это
+    // дорого, особенно при переходах. Теперь картинка блюрится маленьким
+    // слоем и растягивается через FittedBox: визуально то же, но в разы
+    // меньше пикселей. Края с запасом 15% обрезаются, чтобы не проступала
+    // прозрачная кромка фильтра.
     final sigma = currentBlur.cover;
+    final screen = MediaQuery.sizeOf(context);
+    final targetHeight = (screen.height * 0.36).clamp(220.0, 360.0);
+    final targetWidth = targetHeight * (screen.width / screen.height);
+    final layerHeight = targetHeight * 1.15;
+    final layerWidth = targetWidth * 1.15;
+    final lowSigma = sigma * layerHeight / screen.height;
     final content = blur && sigma > 0
-        ? Transform.scale(
-            // Чуть крупнее экрана, чтобы прозрачные края после blur не
-            // проступали полосами у границ.
-            scale: 1.2,
-            child: ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-              child: _image(value, scheme),
+        ? ClipRect(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: layerWidth,
+                height: layerHeight,
+                child: ImageFiltered(
+                  imageFilter: ui.ImageFilter.blur(
+                    sigmaX: lowSigma,
+                    sigmaY: lowSigma,
+                  ),
+                  child: _image(value, scheme, cacheWidth: 256),
+                ),
+              ),
             ),
           )
-        : _image(value, scheme);
+        : _image(value, scheme, cacheWidth: 512);
 
     return RepaintBoundary(
       child: Opacity(opacity: opacity, child: content),
     );
   }
 
-  Widget _image(String value, ColorScheme scheme) {
+  Widget _image(String value, ColorScheme scheme, {required int cacheWidth}) {
     final fallback = ColoredBox(color: scheme.surface);
-    const width = 512;
     const quality = FilterQuality.medium;
 
     if (value.startsWith('http://') || value.startsWith('https://')) {
@@ -203,7 +216,7 @@ class BlurredCover extends StatelessWidget {
         width: double.infinity,
         height: double.infinity,
         fit: BoxFit.cover,
-        memCacheWidth: width,
+        memCacheWidth: cacheWidth,
         filterQuality: quality,
         placeholder: (context, _) => fallback,
         errorWidget: (context, _, _) => fallback,
@@ -218,7 +231,7 @@ class BlurredCover extends StatelessWidget {
       image = Image.memory(
         base64Decode(value.substring(comma + 1)),
         fit: BoxFit.cover,
-        cacheWidth: width,
+        cacheWidth: cacheWidth,
         filterQuality: quality,
         gaplessPlayback: true,
       );
@@ -226,7 +239,7 @@ class BlurredCover extends StatelessWidget {
       image = Image.file(
         File(Uri.parse(value).toFilePath()),
         fit: BoxFit.cover,
-        cacheWidth: width,
+        cacheWidth: cacheWidth,
         filterQuality: quality,
         gaplessPlayback: true,
         errorBuilder: (_, _, _) => fallback,

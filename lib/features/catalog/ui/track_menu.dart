@@ -9,6 +9,8 @@ import '../../../core/db/daos/library_dao.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/sources/source_id.dart';
 import '../../../features/downloads/download_service.dart';
+import '../../../features/library/library_actions.dart';
+import '../../../features/library/playlist_create.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../widgets/pressable.dart';
@@ -136,10 +138,9 @@ Future<void> showTrackMenu(
                         label: liked == 1 ? l.commonUnlike : l.menuLike,
                         highlighted: liked == 1,
                         onTap: () async {
-                          await services.db.libraryDao.setLike(
-                            localTrackId,
-                            liked == 1 ? 0 : 1,
-                          );
+                          await LibraryActions(
+                            services,
+                          ).setFeedback(localTrackId, liked == 1 ? 0 : 1);
                           await controller.refreshLikedState();
                           ref.invalidate(collectionProvider);
                           if (sheetContext.mounted) {
@@ -160,10 +161,9 @@ Future<void> showTrackMenu(
                         label: l.menuDislike,
                         highlighted: liked == -1,
                         onTap: () async {
-                          await services.db.libraryDao.setLike(
-                            localTrackId,
-                            liked == -1 ? 0 : -1,
-                          );
+                          await LibraryActions(
+                            services,
+                          ).setFeedback(localTrackId, liked == -1 ? 0 : -1);
                           await controller.refreshLikedState();
                           ref.invalidate(collectionProvider);
                           if (sheetContext.mounted) {
@@ -203,6 +203,7 @@ Future<void> showTrackMenu(
                         _showAddToPlaylist(
                           hostContext,
                           ref,
+                          localTrackId,
                           remoteTrackId,
                           albumId,
                         ),
@@ -348,6 +349,7 @@ Future<void> showTrackMenu(
 Future<void> _showAddToPlaylist(
   BuildContext context,
   WidgetRef ref,
+  String localTrackId,
   String remoteTrackId,
   String albumId,
 ) async {
@@ -361,20 +363,17 @@ Future<void> _showAddToPlaylist(
         playlist,
   ];
   if (!context.mounted) return;
-  if (own.isEmpty) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(l.addToPlaylistEmpty)));
-    return;
-  }
 
-  final chosen = await showModalBottomSheet<PlaylistOverview>(
+  final choice = await showModalBottomSheet<
+    ({PlaylistOverview? playlist, bool create})
+  >(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
     builder: (sheetContext) => SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(sheetContext).size.height * 0.6,
+          maxHeight: MediaQuery.of(sheetContext).size.height * 0.7,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -387,49 +386,86 @@ Future<void> _showAddToPlaylist(
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: own.length,
-                itemBuilder: (context, index) {
-                  final playlist = own[index];
-                  return ListTile(
-                    leading: const Icon(Icons.queue_music_rounded),
-                    title: Text(
-                      playlist.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text('${playlist.trackCount}'),
-                    onTap: () => Navigator.of(sheetContext).pop(playlist),
-                  );
-                },
-              ),
+            ListTile(
+              leading: const Icon(Icons.add_rounded),
+              title: Text(l.playlistCreate),
+              onTap: () => Navigator.of(
+                sheetContext,
+              ).pop((playlist: null, create: true)),
             ),
+            if (own.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                child: Text(
+                  l.addToPlaylistEmpty,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: own.length,
+                  itemBuilder: (context, index) {
+                    final playlist = own[index];
+                    return ListTile(
+                      leading: const Icon(Icons.queue_music_rounded),
+                      title: Text(
+                        playlist.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text('${playlist.trackCount}'),
+                      onTap: () => Navigator.of(
+                        sheetContext,
+                      ).pop((playlist: playlist, create: false)),
+                    );
+                  },
+                ),
+              ),
           ],
         ),
       ),
     ),
   );
-  if (chosen == null || !context.mounted) return;
+  if (choice == null || !context.mounted) return;
+
+  var playlistId = choice.playlist?.id;
+  var kind = playlistId?.substring('yandex:'.length);
+  var title = choice.playlist?.title;
+  if (choice.create) {
+    final draft = await showCreatePlaylistSheet(context, ref);
+    if (draft == null || !context.mounted) return;
+    playlistId = draft.id;
+    kind = draft.kind;
+    title = draft.title;
+  }
+  if (playlistId == null || kind == null || title == null) return;
 
   final ok =
       await services.yandex?.addTrackToPlaylist(
-        kind: chosen.id.substring('yandex:'.length),
+        kind: kind,
         trackId: remoteTrackId,
         albumId: albumId,
       ) ??
       false;
   if (!context.mounted) return;
   if (ok) {
-    ref.invalidate(playlistProvider(chosen.id));
+    await services.db.libraryDao.appendPlaylistTrack(
+      playlistId: playlistId,
+      localTrackId: localTrackId,
+      sourceId: SourceId.yandex.wire,
+      remoteId: remoteTrackId,
+    );
+    ref.invalidate(playlistProvider(playlistId));
     ref.invalidate(playlistsProvider);
     AppLogger.instance.info(
-      'в плейлист ${chosen.id} добавлен трек $remoteTrackId',
+      'в плейлист $playlistId добавлен трек $remoteTrackId',
     );
+    if (!context.mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(l.addToPlaylistDone(chosen.title))));
+    ).showSnackBar(SnackBar(content: Text(l.addToPlaylistDone(title))));
   } else {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(l.addToPlaylistFailed)));

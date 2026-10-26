@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -22,6 +20,7 @@ import '../l10n/app_localizations.dart';
 import '../theme/app_motion.dart';
 import '../theme/blur_settings.dart';
 import '../theme/keyboard_theme.dart';
+import '../theme/scroll_activity.dart';
 import '../theme/surface.dart';
 import 'routes.dart';
 import 'slide_up_route.dart';
@@ -254,15 +253,20 @@ class AppShell extends ConsumerWidget {
     final isHome = location == Routes.home;
 
     return Scaffold(
-      // Контент всегда уходит под плавающие пилюли: иначе над мини-плеером
-      // видна ровная полоса, которая режет карточки и обложки.
-      extendBody: true,
+      // На волне фон должен уходить под плавающую навигацию. На остальных
+      // вкладках тело заканчивается ровно у мини-плеера (или панели, если
+      // плеера нет) — без пустого хвоста под списком.
+      extendBody: isHome,
       backgroundColor: isHome
           ? Colors.transparent
           : Theme.of(context).scaffoldBackgroundColor,
       // Верх не съедаем SafeArea: фон главной должен уходить под статус-бар,
       // а каждая страница сама разбирается со своим отступом сверху.
-      body: SafeArea(top: false, bottom: false, child: child),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: ScrollActivityTracker(child: child),
+      ),
       // SafeArea снаружи, а внутренний нижний отступ навбара убираем:
       // иначе он добавлял пустоту под подписями и пилюля выглядела
       // «тяжёлой снизу».
@@ -464,24 +468,20 @@ class _GlassIndicator extends StatelessWidget {
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: radius,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  scheme.primary.withValues(alpha: 0.30),
-                  scheme.primary.withValues(alpha: 0.06),
-                ],
-              ),
-              border: Border.all(color: scheme.primary.withValues(alpha: 0.35)),
-            ),
+      // Без своего BackdropFilter: панель навигации уже размывает подложку,
+      // а отдельный фильтр на индикаторе 56×32 только тратил GPU.
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              scheme.primary.withValues(alpha: 0.30),
+              scheme.primary.withValues(alpha: 0.06),
+            ],
           ),
+          border: Border.all(color: scheme.primary.withValues(alpha: 0.35)),
         ),
       ),
     );

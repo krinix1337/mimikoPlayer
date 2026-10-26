@@ -262,4 +262,60 @@ void main() {
     expect(rows.single.sizeBytes, 4096);
     expect(rows.single.state, 'complete');
   });
+
+  test('строки очереди сохраняют порядок и повторы', () async {
+    final first = await seed('41', 'Первый', 'A', 100);
+    final second = await seed('42', 'Второй', 'B', 120);
+
+    final rows = await dao.rowsForIds([second, first, second]);
+    expect(
+      [for (final row in rows) row.localTrackId],
+      [second, first, second],
+    );
+    expect(rows.map((row) => row.title), ['Второй', 'Первый', 'Второй']);
+    expect(rows.map((row) => row.artist), ['B', 'A', 'B']);
+    expect(rows.map((row) => row.durationSec), [120, 100, 120]);
+  });
+
+  test('волна видит только «нелюбимые» из переданных треков', () async {
+    final liked = await seed('21', 'Любимый', 'A', 100);
+    final disliked = await seed('22', 'Нелюбимый', 'B', 101);
+    final plain = await seed('23', 'Обычный', 'C', 102);
+    await dao.setLike(liked, 1);
+    await dao.setLike(disliked, -1);
+
+    expect(
+      await dao.dislikedAmong([liked, disliked, plain]),
+      {disliked},
+    );
+  });
+
+  test('оболочка плейлиста и пачка треков дают готовый список', () async {
+    final first = await seed('31', 'Первый', 'A', 100);
+    final second = await seed('32', 'Второй', 'B', 101);
+    await dao.ensurePlaylistShell(
+      id: 'pl_test',
+      source: SourceId.local,
+      remotePlaylistId: 'list:7',
+      title: 'Перенесённый',
+    );
+    await dao.appendPlaylistTracks('pl_test', [
+      (
+        localTrackId: first,
+        sourceId: SourceId.yandex.wire,
+        remoteId: '31',
+      ),
+      (
+        localTrackId: second,
+        sourceId: SourceId.yandex.wire,
+        remoteId: '32',
+      ),
+    ]);
+
+    final overview = await dao.playlistById('pl_test');
+    expect(overview?.title, 'Перенесённый');
+    expect(overview?.trackCount, 2);
+    final rows = await dao.playlistRows('pl_test');
+    expect([for (final row in rows) row.localTrackId], [first, second]);
+  });
 }

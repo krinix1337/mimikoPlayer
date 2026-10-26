@@ -68,7 +68,7 @@ SourceTrack? pickCrossSourceMatch(
   return best;
 }
 
-/// Запрос для поиска той же песни в другом каталоге. Сырое YouTube-название
+/// Запрос для поиска той же песни в другом каталоге. Сырое чужое название
 /// с «(Official Video)» и каналом Яндекс не находит вовсе.
 String crossSourceQuery(String title, List<String> artists) {
   final fromTitle = normalizeMatchText(title);
@@ -76,7 +76,8 @@ String crossSourceQuery(String title, List<String> artists) {
   return '$title ${artists.join(' ')}'.trim();
 }
 
-/// Убирает из названий YouTube-обвес: «(Official Video)», «[Lyric Video]»,
+/// Убирает из названий обвес видео-каталогов: «(Official Video)»,
+/// «[Lyric Video]»,
 /// «prod. …», лишнюю пунктуацию. Оставляет смысловые слова для сравнения.
 String normalizeMatchText(String input) {
   var text = input.toLowerCase().replaceAll('ё', 'е');

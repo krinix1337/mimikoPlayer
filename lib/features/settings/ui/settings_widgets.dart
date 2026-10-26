@@ -11,9 +11,7 @@ import '../../../core/db/daos/downloads_dao.dart';
 import '../../../core/prefs/prefs.dart';
 import '../../../core/platform/mimiko_platform.dart';
 import '../../../core/sources/music_source.dart';
-import '../../../core/sources/source_dto.dart';
 import '../../../core/sources/source_id.dart';
-import '../../../features/auth/ui/yandex_login.dart';
 import '../../../features/downloads/download_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_motion.dart';
@@ -430,6 +428,134 @@ class _SliderRowState extends State<SliderRow> {
   }
 }
 
+/// Выбор по шкале: одна дорожка с делениями вместо ряда кнопок. Значение
+/// меняется перетаскиванием, а выбранная подпись видна справа.
+class DiscreteSliderRow<T> extends StatefulWidget {
+  const DiscreteSliderRow({
+    super.key,
+    required this.label,
+    required this.values,
+    required this.current,
+    required this.labelOf,
+    required this.onPick,
+    this.note,
+  });
+
+  final String label;
+  final List<T> values;
+  final T current;
+  final String Function(T) labelOf;
+  final ValueChanged<T> onPick;
+  final String? note;
+
+  @override
+  State<DiscreteSliderRow<T>> createState() => _DiscreteSliderRowState<T>();
+}
+
+class _DiscreteSliderRowState<T> extends State<DiscreteSliderRow<T>> {
+  late double _value = _index.toDouble();
+
+  int get _index {
+    final index = widget.values.indexOf(widget.current);
+    return index < 0 ? 0 : index;
+  }
+
+  @override
+  void didUpdateWidget(DiscreteSliderRow<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.current != widget.current) _value = _index.toDouble();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final last = (widget.values.length - 1).clamp(1, 100);
+    final index = _value.round().clamp(0, widget.values.length - 1);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(widget.label, style: theme.textTheme.titleMedium),
+              ),
+              AnimatedSwitcher(
+                duration: Motion.of(context).micro(180),
+                child: Text(
+                  widget.labelOf(widget.values[index]),
+                  key: ValueKey(index),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 4,
+              activeTrackColor: scheme.primary,
+              inactiveTrackColor: scheme.surfaceContainerHighest,
+              thumbColor: scheme.primary,
+              overlayColor: scheme.primary.withValues(alpha: 0.12),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+              tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 2),
+              activeTickMarkColor: scheme.onPrimary.withValues(alpha: 0.7),
+              inactiveTickMarkColor: scheme.onSurfaceVariant.withValues(
+                alpha: 0.35,
+              ),
+            ),
+            child: Slider(
+              value: _value.clamp(0, last.toDouble()),
+              min: 0,
+              max: last.toDouble(),
+              divisions: last,
+              onChanged: (value) => setState(() => _value = value),
+              onChangeEnd: (value) =>
+                  widget.onPick(widget.values[value.round()]),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  widget.labelOf(widget.values.first),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  widget.labelOf(widget.values.last),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (widget.note != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              widget.note!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// Палитра акцентов: по пять кругляшей в ряд, как иконки лаунчера.
 class AccentRow extends StatelessWidget {
   const AccentRow({
@@ -517,18 +643,7 @@ class AccentRow extends StatelessWidget {
 class LauncherIconRow extends ConsumerWidget {
   const LauncherIconRow({super.key});
 
-  static const _assetFor = <LauncherIcon, String>{
-    LauncherIcon.defaultIcon: 'assets/icon/variants/default.png',
-    LauncherIcon.acid: 'assets/icon/variants/acid.png',
-    LauncherIcon.mono: 'assets/icon/variants/mono.png',
-    LauncherIcon.night: 'assets/icon/variants/night.png',
-    LauncherIcon.sunset: 'assets/icon/variants/sunset.png',
-    LauncherIcon.mint: 'assets/icon/variants/mint.png',
-    LauncherIcon.violet: 'assets/icon/variants/violet.png',
-    LauncherIcon.ice: 'assets/icon/variants/ice.png',
-    LauncherIcon.amber: 'assets/icon/variants/amber.png',
-    LauncherIcon.forest: 'assets/icon/variants/forest.png',
-  };
+  static String assetFor(LauncherIcon icon) => icon.asset;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -582,7 +697,7 @@ class LauncherIconRow extends ConsumerWidget {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(13),
                             child: Image.asset(
-                              _assetFor[icon]!,
+                              icon.asset,
                               width: 50,
                               height: 50,
                               fit: BoxFit.cover,
@@ -675,7 +790,7 @@ class PriorityTile extends ConsumerWidget {
   static String _name(BuildContext context, SourceId id) => switch (id) {
     SourceId.yandex => 'Яндекс',
     SourceId.soundcloud => 'SoundCloud',
-    SourceId.youtube => 'YouTube',
+    SourceId.youtube => AppLocalizations.of(context).sourceRemoved,
     SourceId.local => AppLocalizations.of(context).collectionFiles,
     SourceId.spotify => 'Spotify',
     SourceId.deezer => 'Deezer',
@@ -925,50 +1040,6 @@ class _CacheTileState extends ConsumerState<CacheTile> {
   }
 }
 
-class AccountTile extends ConsumerWidget {
-  const AccountTile({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l = AppLocalizations.of(context);
-    final auth =
-        ref.watch(yandexAuthStateProvider).value ?? const AuthUnknown();
-    final services = ref.read(appServicesProvider);
-
-    if (auth case final AuthReady ready) {
-      return ListTile(
-        leading: const Icon(Icons.account_circle_rounded),
-        title: Text(ready.login),
-        subtitle: Text(ready.hasPlus ? l.accountPlus : l.accountFree),
-        trailing: TextButton(
-          onPressed: () async {
-            await services.yandexAuth?.logout();
-            ref.invalidate(collectionProvider);
-            if (context.mounted) {
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(SnackBar(content: Text(l.settingsSignedOut)));
-            }
-          },
-          child: Text(l.settingsSignOut),
-        ),
-      );
-    }
-
-    return ListTile(
-      leading: const Icon(Icons.account_circle_rounded),
-      title: const Text('Яндекс'),
-      subtitle: Text(switch (auth) {
-        AuthFailed(:final message) => message,
-        AuthExpired() => l.authExpired,
-        _ => l.authNotSignedIn,
-      }),
-      trailing: FilledButton.tonal(
-        onPressed: () => showYandexLogin(context, ref),
-        child: Text(l.waveSignIn),
-      ),
-    );
-  }
-}
 
 class DatabaseTile extends ConsumerWidget {
   const DatabaseTile({super.key});

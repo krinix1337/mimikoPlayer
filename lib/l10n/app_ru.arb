@@ -51,8 +51,63 @@
   },
   "waveLikeAdded": "Добавлено в любимое",
   "waveLikeRemoved": "Убрано из любимого",
+  "feedbackDislike": "Не нравится",
+  "feedbackUndislike": "Убрать из «Нелюбимого»",
+  "feedbackDislikeAdded": "Добавлено в «Нелюбимое»",
+  "feedbackCleared": "Отметка снята",
+  "feedbackLocalOnly": "только на устройстве",
+  "playlistCreate": "Новый плейлист",
+  "playlistName": "Название",
+  "playlistNameHint": "Например, для дороги",
+  "playlistVisibility": "Кто увидит",
+  "playlistPublic": "Все",
+  "playlistPrivate": "Только я",
+  "playlistCreateAction": "Создать плейлист",
+  "playlistCreated": "Плейлист «{title}» создан",
+  "@playlistCreated": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "playlistCreateFailed": "Не удалось создать плейлист",
+  "importTitle": "Импорт",
+  "importTileSubtitle": "Списки треков и другие площадки",
+  "importHeroTitle": "Перенос музыки",
+  "importHeroNote": "Вставьте список «Исполнитель - Название» — треки найдутся в Яндексе и сохранятся в локальный плейлист.",
+  "importHeroStatus": "Доступен импорт из списка",
+  "importMatched": "{matched} найдено, {skipped} пропущено",
+  "@importMatched": {
+    "placeholders": {
+      "matched": { "type": "int" },
+      "skipped": { "type": "int" }
+    }
+  },
+  "importDone": "Готово: {matched} треков, {skipped} пропущено, {playlists} плейлистов",
+  "@importDone": {
+    "placeholders": {
+      "matched": { "type": "int" },
+      "skipped": { "type": "int" },
+      "playlists": { "type": "int" }
+    }
+  },
+  "importYandexRequired": "Сначала войдите в Яндекс Музыку",
+  "importFailed": "Импорт прервался",
+  "importOther": "Другие площадки",
+  "importList": "Импорт из списка",
+  "importListTitle": "Название плейлиста",
+  "importListLines": "Треки",
+  "importListHint": "Исполнитель - Название\nИсполнитель - Название",
+  "importListFormat": "Одна строка — один трек, формат «Исполнитель - Название». Первые 300 строк.",
+  "importListAction": "Перенести в плейлист",
+  "importListEmpty": "Вставьте хотя бы одну строку",
+  "importOtherYandex": "Плейлист по ссылке откроется в приложении",
+  "importOtherSoundCloud": "Поиск и поток без переноса",
   "waveSettingsTitle": "Настройки волны",
   "waveClose": "Закрыть",
+  "waveSoundCloudTitle": "SoundCloud в волне",
+  "waveSoundCloudNote": "Подмешивать треки из SoundCloud к рекомендациям. Работает без входа.",
   "waveRejectedNote": "Яндекс не принял настройки — смотри лог",
   "collectionTitle": "Коллекция",
   "collectionLiked": "Любимое",
@@ -258,6 +313,9 @@
   "searchHint": "Артист, трек или альбом",
   "searchEmpty": "Начните вводить — ищем по всем подключённым источникам",
   "searchNoResults": "Ничего не нашлось",
+  "searchTracks": "Треки",
+  "searchArtists": "Исполнители",
+  "searchAlbums": "Альбомы",
   "searchResults": "Найдено: {count}",
   "@searchResults": {
     "placeholders": {
@@ -290,6 +348,8 @@
   "lyricsSizeLarge": "Крупный",
   "lyricsDim": "Приглушать остальные строки",
   "settingsAppearance": "Оформление",
+  "appearanceThemeLanguage": "Тема и язык",
+  "appearanceShapeMotion": "Форма и движение",
   "settingsTheme": "Тема",
   "themeSystem": "Как в системе",
   "themeLight": "Светлая",
@@ -333,6 +393,7 @@
   "blurBottomNote": "Стекло под пилюлями: видно, что список продолжается",
   "blurTopNote": "Панели с кнопками «назад» на страницах с обложкой",
   "blurCoversNote": "Сила размытия фоновых обложек на всех экранах",
+  "blurPerformanceNote": "Во время прокрутки стекло становится плотнее и не размывает фон заново, а фоновые обложки размываются в уменьшенном размере. Так плавнее на бюджетных телефонах.",
   "compactUi": "Компактная панель",
   "compactUiNote": "Нижняя навигация и мини-плеер ниже и плотнее.",
   "showMiniPlayer": "Мини-плеер",
@@ -436,9 +497,89 @@
       }
     }
   },
-  "settingsAboutNote": "Локальный плеер: Яндекс, YouTube и свои файлы в одном интерфейсе.",
+  "updatesTitle": "Обновления",
+  "updatesTileSubtitle": "Приватные релизы GitHub",
+  "updatesCheckShort": "Проверить",
+  "updatesChecking": "Проверяю релизы…",
+  "updatesUpToDate": "Установлена последняя версия",
+  "updatesNotChecked": "Обновления ещё не проверялись",
+  "updatesReleases": "Релизы",
+  "updatesLatestRelease": "Последний релиз на GitHub: {version}",
+  "@updatesLatestRelease": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updatesWhatsNew": "Что нового в {version}",
+  "@updatesWhatsNew": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updatesOpenGithub": "Открыть релиз на GitHub",
+  "updatesAvailable": "Доступна версия {version}",
+  "@updatesAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updatesSize": "{size} МБ",
+  "@updatesSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "updatesDownload": "Скачать и установить",
+  "updatesDownloading": "Загрузка: {percent}%",
+  "@updatesDownloading": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "updatesCancel": "Отменить",
+  "updatesOpeningInstaller": "Открываю установщик…",
+  "updatesInstallPermission": "Разреши установку из этого приложения и нажми ещё раз",
+  "updatesTokenTitle": "Доступ к приватному репозиторию",
+  "updatesTokenLabel": "Токен GitHub",
+  "updatesTokenHint": "fine-grained PAT, Contents: Read-only",
+  "updatesTokenHelp": "Токен хранится только на этом телефоне. Нужен fine-grained PAT с доступом Contents: Read-only к krinix1337/mimikoPlayer.",
+  "updatesTokenCheckHint": "Вставь токен и нажми «Проверить».",
+  "updatesTokenMissing": "Токен не задан",
+  "updatesTokenUnchecked": "Токен введён, но не проверен",
+  "updatesTokenValid": "Токен принят",
+  "updatesTokenInvalid": "Токен не подошёл",
+  "updatesTokenDelete": "Удалить токен",
+  "updatesTokenCreate": "Создать токен",
+  "updatesTokenNeeded": "Вставь токен GitHub или собери приложение с GITHUB_TOKEN.",
+  "updatesErrorUnauthorized": "Токен не подошёл или нет доступа к репозиторию",
+  "updatesErrorNotFound": "Нет доступа к репозиторию или релизам",
+  "updatesErrorNoAsset": "В последнем релизе нет APK",
+  "updatesErrorNoDigest": "У релиза нет SHA-256, скачивание отменено",
+  "updatesErrorChecksum": "Контрольная сумма не совпала, файл удалён",
+  "updatesErrorNetwork": "Нет связи с GitHub",
+  "updatesErrorUnknown": "Не удалось проверить обновления",
+  "updatesReady": "Файл скачан и проверен",
+  "updatesInstall": "Установить",
+  "updatesBuildToken": "Токен задан при сборке",
+  "settingsAboutNote": "Локальный плеер: Яндекс Музыка, SoundCloud и свои файлы в одном интерфейсе.",
   "aboutSources": "Источники",
-  "aboutSourcesNote": "Яндекс Музыка — каталог, поток и волна; YouTube — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, официальный текст Яндекса и lyrics.ovh.",
+  "aboutSourcesNote": "Яндекс Музыка — каталог, поток и волна; SoundCloud — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, официальный текст Яндекса и lyrics.ovh.",
+  "settingsAiFilter": "ИИ-фильтр",
+  "accountConnected": "Подключено",
+  "accountSignOut": "Выйти",
+  "accountServices": "Сервисы",
+  "accountSoundCloudNote": "Поиск и поток без входа",
+  "aboutYandexNote": "Каталог, поток, волна и рекомендации",
   "settingsAiFilterSource": "ИИ-фильтр: Slopless",
   "settingsCensorSource": "Версии без цензуры: FckCensorData",
   "authTitle": "Вход в Яндекс",
@@ -548,7 +689,7 @@
   "badgeAi": "ИИ",
   "badgeUncensored": "Без цензуры",
   "sourceYandex": "Яндекс Музыка",
-  "sourceYoutube": "YouTube",
+  "sourceRemoved": "Источник удалён",
   "sourceLocalFile": "Файл",
   "detailsSource": "Источник",
   "detailsSources": "Источники",

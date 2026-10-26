@@ -27,10 +27,12 @@ class MimikoApp extends ConsumerStatefulWidget {
   ConsumerState<MimikoApp> createState() => _MimikoAppState();
 }
 
-class _MimikoAppState extends ConsumerState<MimikoApp> {
+class _MimikoAppState extends ConsumerState<MimikoApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Ссылка, которой поделились: холодный старт забираем один раз, горячий
     // приходит колбэком из уже открытой активности.
     MimikoPlatform.onSharedLink(_openSharedLink);
@@ -72,6 +74,19 @@ class _MimikoAppState extends ConsumerState<MimikoApp> {
         await downloads.kickAutoDownloads();
       });
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(ref.read(playlistSyncProvider.notifier).refresh());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   void _openSharedLink(String text) {
@@ -147,7 +162,10 @@ class _MimikoAppState extends ConsumerState<MimikoApp> {
             fit: StackFit.expand,
             children: [
               _AppReveal(child: child ?? const SizedBox()),
-              _LaunchSplash(enabled: prefs.animations != AnimationsSpeed.off),
+              _LaunchSplash(
+                enabled: prefs.animations != AnimationsSpeed.off,
+                iconAsset: prefs.launcherIcon.asset,
+              ),
             ],
           ),
         );
@@ -226,9 +244,10 @@ class _AppRevealState extends State<_AppReveal>
 /// Анимация запуска: на тёмном экране проявляется значок, держится и
 /// растворяется, открывая уже готовый интерфейс. Один раз за запуск.
 class _LaunchSplash extends StatefulWidget {
-  const _LaunchSplash({required this.enabled});
+  const _LaunchSplash({required this.enabled, required this.iconAsset});
 
   final bool enabled;
+  final String iconAsset;
 
   @override
   State<_LaunchSplash> createState() => _LaunchSplashState();
@@ -304,7 +323,7 @@ class _LaunchSplashState extends State<_LaunchSplash>
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(26),
                             child: Image.asset(
-                              'assets/icon/variants/default.png',
+                              widget.iconAsset,
                               width: 104,
                               height: 104,
                               cacheWidth: 312,

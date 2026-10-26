@@ -185,7 +185,6 @@ class _TrackDetailsSheetState extends ConsumerState<_TrackDetailsSheet> {
 
   static String _sourceName(AppLocalizations l, String wire) => switch (wire) {
     'yandex' => l.sourceYandex,
-    'youtube' => l.sourceYoutube,
     'local' => l.sourceLocalFile,
     'soundcloud' => 'SoundCloud',
     _ => wire,

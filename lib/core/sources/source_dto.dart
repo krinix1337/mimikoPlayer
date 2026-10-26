@@ -45,12 +45,16 @@ final class AuthReady extends AuthState {
     required this.login,
     required this.hasPlus,
     required this.accessTokenExpiresAt,
+    this.avatarUrl,
   });
 
   final String uid;
   final String login;
   final bool hasPlus;
   final DateTime accessTokenExpiresAt;
+
+  /// Аватар из Яндекс ID; null — сервис его не отдал.
+  final String? avatarUrl;
 }
 
 /// Нужен device flow: показать код и подождать подтверждения.

@@ -6,10 +6,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app_providers.dart';
 import '../../../core/prefs/prefs.dart';
-import '../../../core/sources/source_id.dart';
 import '../../../features/downloads/download_service.dart';
+import '../../../features/library/library_actions.dart';
 import '../../../features/player/player_snapshot.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../router/player_launch.dart';
 import '../../../router/routes.dart';
 import '../../../sources/yandex/yandex_station.dart';
 import '../../../theme/app_motion.dart';
@@ -324,7 +325,7 @@ class _WaveStage extends ConsumerWidget {
     // Вся обложка ведёт в плеер: отдельной кнопки поверх картинки нет.
     // Обложка квадратная со скруглением, как в плеере и карточках.
     return GestureDetector(
-      onTap: () => context.push(Routes.player),
+      onTap: () => openPlayer(context),
       child: SizedBox(
         width: 116,
         height: 116,
@@ -467,11 +468,7 @@ class _WaveControls extends ConsumerWidget {
     final controller = ref.read(playbackControllerProvider);
     final next = liked ? 0 : 1;
 
-    await services.db.libraryDao.setLike(
-      current.localTrackId,
-      next,
-      remoteSource: next == 1 ? SourceId.yandex : null,
-    );
+    await LibraryActions(services).setFeedback(current.localTrackId, next);
     if (next == 1) {
       await downloader.trackLiked(current.localTrackId);
     }
@@ -698,6 +695,32 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
               l.waveWheelHint,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Material(
+              color: theme.colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(20),
+              clipBehavior: Clip.antiAlias,
+              child: SwitchListTile.adaptive(
+                value: ref.watch(
+                  prefsProvider.select((p) => p.waveSoundCloud),
+                ),
+                onChanged: (value) {
+                  ref
+                      .read(prefsProvider.notifier)
+                      .setWaveSoundCloud(value);
+                  ref.invalidate(waveTracksProvider);
+                },
+                secondary: CircleAvatar(
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  child: Icon(
+                    Icons.cloud_rounded,
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                title: Text(l.waveSoundCloudTitle),
+                subtitle: Text(l.waveSoundCloudNote),
               ),
             ),
             if (_note != null) ...[

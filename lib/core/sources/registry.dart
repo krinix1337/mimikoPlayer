@@ -13,7 +13,6 @@ final class SourceRegistry {
   static const List<SourceId> defaultPlaybackPriority = [
     SourceId.yandex,
     SourceId.soundcloud,
-    SourceId.youtube,
     SourceId.local,
   ];
 

@@ -160,24 +160,24 @@ StreamReady readyUrl(SourceId source, {int secondsToLive = 600}) => StreamReady(
 
 void main() {
   late FakeSource yandex;
-  late FakeSource youtube;
+  late FakeSource soundcloud;
   late FakeStore store;
   late StreamResolver resolver;
   const trackId = 't_000000000000000000000001';
 
   setUp(() {
     yandex = FakeSource(SourceId.yandex);
-    youtube = FakeSource(SourceId.youtube);
+    soundcloud = FakeSource(SourceId.soundcloud);
     store = FakeStore();
     resolver = StreamResolver(
-      registry: SourceRegistry([yandex, youtube]),
+      registry: SourceRegistry([yandex, soundcloud]),
       store: store,
     );
   });
 
   Future<ResolveResult> run({bool bypassCache = false}) => resolver.resolve(
     localTrackId: trackId,
-    variants: [variant(SourceId.yandex), variant(SourceId.youtube)],
+    variants: [variant(SourceId.yandex), variant(SourceId.soundcloud)],
     bypassCache: bypassCache,
   );
 
@@ -194,12 +194,12 @@ void main() {
 
   test('первым спрашивается приоритетный источник', () async {
     yandex.result = readyUrl(SourceId.yandex);
-    youtube.result = readyUrl(SourceId.youtube);
+    soundcloud.result = readyUrl(SourceId.soundcloud);
 
     final result = await run();
 
     expect(result.playback?.usedSource, SourceId.yandex);
-    expect(youtube.resolveCalls, 0);
+    expect(soundcloud.resolveCalls, 0);
   });
 
   test('недоступный трек в первом источнике уводит во второй', () async {
@@ -209,13 +209,13 @@ void main() {
         reason: SourceFailReason.unavailable,
       ),
     ];
-    youtube.result = readyUrl(SourceId.youtube);
+    soundcloud.result = readyUrl(SourceId.soundcloud);
 
     final result = await run();
 
-    expect(result.playback?.usedSource, SourceId.youtube);
+    expect(result.playback?.usedSource, SourceId.soundcloud);
     expect(yandex.resolveCalls, 1);
-    expect(youtube.resolveCalls, 1);
+    expect(soundcloud.resolveCalls, 1);
   });
 
   test(
@@ -227,14 +227,14 @@ void main() {
           reason: SourceFailReason.authExpired,
         ),
       ];
-      youtube.result = readyUrl(SourceId.youtube);
+      soundcloud.result = readyUrl(SourceId.soundcloud);
 
       final result = await run();
 
       expect(result.isOk, isFalse);
       expect(result.needsUserAction, isTrue);
       expect(result.exhausted, isFalse);
-      expect(youtube.resolveCalls, 0);
+      expect(soundcloud.resolveCalls, 0);
     },
   );
 
@@ -245,11 +245,11 @@ void main() {
         reason: SourceFailReason.needsPlus,
       ),
     ];
-    youtube.result = readyUrl(SourceId.youtube);
+    soundcloud.result = readyUrl(SourceId.soundcloud);
 
     final result = await run();
 
-    expect(result.playback?.usedSource, SourceId.youtube);
+    expect(result.playback?.usedSource, SourceId.soundcloud);
   });
 
   test(
@@ -279,11 +279,11 @@ void main() {
 
   test('негативный кэш пропускает источник целиком', () async {
     store.failures['$trackId|yandex'] = SourceFailReason.unavailable;
-    youtube.result = readyUrl(SourceId.youtube);
+    soundcloud.result = readyUrl(SourceId.soundcloud);
 
     final result = await run();
 
-    expect(result.playback?.usedSource, SourceId.youtube);
+    expect(result.playback?.usedSource, SourceId.soundcloud);
     expect(yandex.resolveCalls, 0);
   });
 
@@ -294,7 +294,7 @@ void main() {
         reason: SourceFailReason.signatureRejected,
       ),
     ];
-    youtube.result = readyUrl(SourceId.youtube);
+    soundcloud.result = readyUrl(SourceId.soundcloud);
 
     await run();
     await run();
@@ -309,9 +309,9 @@ void main() {
         reason: SourceFailReason.unavailable,
       ),
     ];
-    youtube.failures = [
+    soundcloud.failures = [
       const SourceFailure(
-        source: SourceId.youtube,
+        source: SourceId.soundcloud,
         reason: SourceFailReason.geoBlocked,
       ),
     ];
@@ -322,7 +322,7 @@ void main() {
     expect(result.exhausted, isTrue);
     expect(result.failures.map((f) => f.source), [
       SourceId.yandex,
-      SourceId.youtube,
+      SourceId.soundcloud,
     ]);
   });
 
@@ -338,15 +338,15 @@ void main() {
   });
 
   test('источник без варианта этого трека не вызывается', () async {
-    youtube.result = readyUrl(SourceId.youtube);
+    soundcloud.result = readyUrl(SourceId.soundcloud);
 
     final result = await resolver.resolve(
       localTrackId: trackId,
-      variants: [variant(SourceId.youtube)],
+      variants: [variant(SourceId.soundcloud)],
     );
 
     expect(yandex.resolveCalls, 0);
-    expect(result.playback?.usedSource, SourceId.youtube);
+    expect(result.playback?.usedSource, SourceId.soundcloud);
   });
 
   test('совпавшие запросы коалесцируются в одну подпись', () async {

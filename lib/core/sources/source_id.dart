@@ -3,6 +3,7 @@
 enum SourceId {
   yandex('yandex'),
   soundcloud('soundcloud'),
+  /// Больше не источник: значение живёт только для чтения старых строк БД.
   youtube('youtube'),
   local('local'),
   spotify('spotify'),

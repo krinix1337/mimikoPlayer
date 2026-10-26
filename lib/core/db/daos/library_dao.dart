@@ -57,6 +57,19 @@ class LibraryDao {
     return row?.state ?? 0;
   }
 
+  /// Локальные id из переданных, помеченные «не рекомендовать».
+  Future<Set<String>> dislikedAmong(List<String> trackIds) async {
+    if (trackIds.isEmpty) return const {};
+    final rows =
+        await (_db.select(_db.likes)..where(
+              (t) =>
+                  t.state.equals(-1) &
+                  t.localTrackId.isIn(trackIds),
+            ))
+            .get();
+    return {for (final row in rows) row.localTrackId};
+  }
+
   Future<List<String>> likedTrackIds() async {
     final rows =
         await (_db.select(_db.likes)
@@ -402,6 +415,33 @@ class LibraryDao {
     ];
   }
 
+  /// Строки очереди в её порядке. Дубликаты сохраняются: один трек может
+  /// стоять в очереди несколько раз, и каждая позиция должна быть видна.
+  Future<List<CollectionRow>> rowsForIds(List<String> ids) async {
+    if (ids.isEmpty) return const [];
+    final tracks = {
+      for (final track in await _db.tracksDao.byIdList(ids)) track.id: track,
+    };
+    final artists = await mainArtistNames(ids);
+    final artistRemoteIds = await artistRemoteIdsForTracks(ids);
+    final localCovers = await _localCovers(ids);
+    return [
+      for (final id in ids)
+        if (tracks[id] case final track?)
+          CollectionRow(
+            localTrackId: id,
+            title: track.title,
+            artist: artists[id] ?? '',
+            artistRemoteIds: artistRemoteIds[id] ?? const [],
+            explicitFlag: track.explicitFlag,
+            coverUrl: track.coverUrl,
+            coverPath: localCovers[id],
+            durationSec: track.durationSec,
+            source: SourceId.fromWire(track.metadataSource),
+          ),
+    ];
+  }
+
   Future<PlaylistOverview?> playlistById(String id) async {
     final row =
         await (_db.select(_db.playlists)
@@ -434,6 +474,149 @@ class LibraryDao {
       coverUrl: coverUrl,
       trackCount: count.read(_db.playlistTracks.localTrackId.count()) ?? 0,
     );
+  }
+
+  /// Пустая оболочка плейлиста сразу после создания на сервере: список
+  /// показывает его, не дожидаясь полного импорта всех треков.
+  Future<void> ensurePlaylistShell({
+    required String id,
+    required SourceId source,
+    required String remotePlaylistId,
+    required String title,
+    String kind = 'user',
+    int? totalTracks,
+  }) async {
+    final now = DateTime.now();
+    await _db.into(_db.playlists).insertOnConflictUpdate(
+      PlaylistsCompanion.insert(
+        id: id,
+        source: Value(source.wire),
+        remotePlaylistId: Value(remotePlaylistId),
+        title: title,
+        kind: Value(kind),
+        totalTracks: Value(totalTracks),
+        canEdit: const Value(true),
+        lastSyncedAt: Value(now),
+        createdAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
+  }
+
+  /// Дописывает трек в локальный плейлист после успешной записи на сервер.
+  Future<void> appendPlaylistTrack({
+    required String playlistId,
+    required String localTrackId,
+    required String sourceId,
+    required String remoteId,
+  }) async {
+    await _db.transaction(() async {
+      final last =
+          await (_db.select(_db.playlistTracks)
+                ..where((t) => t.playlistId.equals(playlistId))
+                ..orderBy([(t) => OrderingTerm.desc(t.position)])
+                ..limit(1))
+              .getSingleOrNull();
+      await _db.into(_db.playlistTracks).insert(
+        PlaylistTracksCompanion.insert(
+          playlistId: playlistId,
+          localTrackId: localTrackId,
+          position: Value((last?.position ?? -1) + 1),
+          sourceId: sourceId,
+          remoteId: remoteId,
+        ),
+        mode: InsertMode.insertOrIgnore,
+      );
+      final playlist =
+          await (_db.select(_db.playlists)
+                ..where((t) => t.id.equals(playlistId))
+                ..limit(1))
+              .getSingleOrNull();
+      await (_db.update(_db.playlists)
+            ..where((t) => t.id.equals(playlistId)))
+          .write(
+            PlaylistsCompanion(
+              totalTracks: Value((playlist?.totalTracks ?? 0) + 1),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+    });
+  }
+
+  Future<void> appendPlaylistTracks(
+    String playlistId,
+    List<({String localTrackId, String sourceId, String remoteId})> entries,
+  ) async {
+    if (entries.isEmpty) {
+      await setPlaylistTrackCount(playlistId, 0);
+      return;
+    }
+    await _db.transaction(() async {
+      final last =
+          await (_db.select(_db.playlistTracks)
+                ..where((t) => t.playlistId.equals(playlistId))
+                ..orderBy([(t) => OrderingTerm.desc(t.position)])
+                ..limit(1))
+              .getSingleOrNull();
+      final start = (last?.position ?? -1) + 1;
+      await _db.batch((batch) {
+        for (var i = 0; i < entries.length; i++) {
+          final entry = entries[i];
+          batch.insert(
+            _db.playlistTracks,
+            PlaylistTracksCompanion.insert(
+              playlistId: playlistId,
+              localTrackId: entry.localTrackId,
+              position: Value(start + i),
+              sourceId: entry.sourceId,
+              remoteId: entry.remoteId,
+            ),
+            mode: InsertMode.insertOrIgnore,
+          );
+        }
+      });
+      final total = await (_db.selectOnly(_db.playlistTracks)
+            ..addColumns([_db.playlistTracks.localTrackId.count()])
+            ..where(_db.playlistTracks.playlistId.equals(playlistId)))
+          .getSingle();
+      await (_db.update(_db.playlists)
+            ..where((t) => t.id.equals(playlistId)))
+          .write(
+            PlaylistsCompanion(
+              totalTracks: Value(
+                total.read(_db.playlistTracks.localTrackId.count()) ?? 0,
+              ),
+              updatedAt: Value(DateTime.now()),
+              lastSyncedAt: Value(DateTime.now()),
+            ),
+          );
+    });
+  }
+
+  Future<void> clearPlaylistTracks(String playlistId) async {
+    await (_db.delete(
+      _db.playlistTracks,
+    )..where((t) => t.playlistId.equals(playlistId))).go();
+    await (_db.update(_db.playlists)
+          ..where((t) => t.id.equals(playlistId)))
+        .write(
+          PlaylistsCompanion(
+            totalTracks: const Value(0),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+  }
+
+  Future<void> setPlaylistTrackCount(String playlistId, int count) async {
+    await (_db.update(_db.playlists)
+          ..where((t) => t.id.equals(playlistId)))
+        .write(
+          PlaylistsCompanion(
+            totalTracks: Value(count),
+            updatedAt: Value(DateTime.now()),
+            lastSyncedAt: Value(DateTime.now()),
+          ),
+        );
   }
 
   /// Имиты удалённого плейлиста в локальный: строки треков уже сведены

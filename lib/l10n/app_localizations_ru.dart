@@ -125,10 +125,124 @@ class AppLocalizationsRu extends AppLocalizations {
   String get waveLikeRemoved => 'Убрано из любимого';
 
   @override
+  String get feedbackDislike => 'Не нравится';
+
+  @override
+  String get feedbackUndislike => 'Убрать из «Нелюбимого»';
+
+  @override
+  String get feedbackDislikeAdded => 'Добавлено в «Нелюбимое»';
+
+  @override
+  String get feedbackCleared => 'Отметка снята';
+
+  @override
+  String get feedbackLocalOnly => 'только на устройстве';
+
+  @override
+  String get playlistCreate => 'Новый плейлист';
+
+  @override
+  String get playlistName => 'Название';
+
+  @override
+  String get playlistNameHint => 'Например, для дороги';
+
+  @override
+  String get playlistVisibility => 'Кто увидит';
+
+  @override
+  String get playlistPublic => 'Все';
+
+  @override
+  String get playlistPrivate => 'Только я';
+
+  @override
+  String get playlistCreateAction => 'Создать плейлист';
+
+  @override
+  String playlistCreated(String title) {
+    return 'Плейлист «$title» создан';
+  }
+
+  @override
+  String get playlistCreateFailed => 'Не удалось создать плейлист';
+
+  @override
+  String get importTitle => 'Импорт';
+
+  @override
+  String get importTileSubtitle => 'Списки треков и другие площадки';
+
+  @override
+  String get importHeroTitle => 'Перенос музыки';
+
+  @override
+  String get importHeroNote =>
+      'Вставьте список «Исполнитель - Название» — треки найдутся в Яндексе и сохранятся в локальный плейлист.';
+
+  @override
+  String get importHeroStatus => 'Доступен импорт из списка';
+
+  @override
+  String importMatched(int matched, int skipped) {
+    return '$matched найдено, $skipped пропущено';
+  }
+
+  @override
+  String importDone(int matched, int skipped, int playlists) {
+    return 'Готово: $matched треков, $skipped пропущено, $playlists плейлистов';
+  }
+
+  @override
+  String get importYandexRequired => 'Сначала войдите в Яндекс Музыку';
+
+  @override
+  String get importFailed => 'Импорт прервался';
+
+  @override
+  String get importOther => 'Другие площадки';
+
+  @override
+  String get importList => 'Импорт из списка';
+
+  @override
+  String get importListTitle => 'Название плейлиста';
+
+  @override
+  String get importListLines => 'Треки';
+
+  @override
+  String get importListHint => 'Исполнитель - Название\nИсполнитель - Название';
+
+  @override
+  String get importListFormat =>
+      'Одна строка — один трек, формат «Исполнитель - Название». Первые 300 строк.';
+
+  @override
+  String get importListAction => 'Перенести в плейлист';
+
+  @override
+  String get importListEmpty => 'Вставьте хотя бы одну строку';
+
+  @override
+  String get importOtherYandex => 'Плейлист по ссылке откроется в приложении';
+
+  @override
+  String get importOtherSoundCloud => 'Поиск и поток без переноса';
+
+  @override
   String get waveSettingsTitle => 'Настройки волны';
 
   @override
   String get waveClose => 'Закрыть';
+
+  @override
+  String get waveSoundCloudTitle => 'SoundCloud в волне';
+
+  @override
+  String get waveSoundCloudNote =>
+      'Подмешивать треки из SoundCloud к рекомендациям. Работает без входа.';
 
   @override
   String get waveRejectedNote => 'Яндекс не принял настройки — смотри лог';
@@ -439,6 +553,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get searchNoResults => 'Ничего не нашлось';
 
   @override
+  String get searchTracks => 'Треки';
+
+  @override
+  String get searchArtists => 'Исполнители';
+
+  @override
+  String get searchAlbums => 'Альбомы';
+
+  @override
   String searchResults(int count) {
     return 'Найдено: $count';
   }
@@ -495,6 +618,12 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get settingsAppearance => 'Оформление';
+
+  @override
+  String get appearanceThemeLanguage => 'Тема и язык';
+
+  @override
+  String get appearanceShapeMotion => 'Форма и движение';
 
   @override
   String get settingsTheme => 'Тема';
@@ -627,6 +756,10 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get blurCoversNote => 'Сила размытия фоновых обложек на всех экранах';
+
+  @override
+  String get blurPerformanceNote =>
+      'Во время прокрутки стекло становится плотнее и не размывает фон заново, а фоновые обложки размываются в уменьшенном размере. Так плавнее на бюджетных телефонах.';
 
   @override
   String get compactUi => 'Компактная панель';
@@ -870,15 +1003,166 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get updatesTitle => 'Обновления';
+
+  @override
+  String get updatesTileSubtitle => 'Приватные релизы GitHub';
+
+  @override
+  String get updatesCheckShort => 'Проверить';
+
+  @override
+  String get updatesChecking => 'Проверяю релизы…';
+
+  @override
+  String get updatesUpToDate => 'Установлена последняя версия';
+
+  @override
+  String get updatesNotChecked => 'Обновления ещё не проверялись';
+
+  @override
+  String get updatesReleases => 'Релизы';
+
+  @override
+  String updatesLatestRelease(String version) {
+    return 'Последний релиз на GitHub: $version';
+  }
+
+  @override
+  String updatesWhatsNew(String version) {
+    return 'Что нового в $version';
+  }
+
+  @override
+  String get updatesOpenGithub => 'Открыть релиз на GitHub';
+
+  @override
+  String updatesAvailable(String version) {
+    return 'Доступна версия $version';
+  }
+
+  @override
+  String updatesSize(String size) {
+    return '$size МБ';
+  }
+
+  @override
+  String get updatesDownload => 'Скачать и установить';
+
+  @override
+  String updatesDownloading(int percent) {
+    return 'Загрузка: $percent%';
+  }
+
+  @override
+  String get updatesCancel => 'Отменить';
+
+  @override
+  String get updatesOpeningInstaller => 'Открываю установщик…';
+
+  @override
+  String get updatesInstallPermission =>
+      'Разреши установку из этого приложения и нажми ещё раз';
+
+  @override
+  String get updatesTokenTitle => 'Доступ к приватному репозиторию';
+
+  @override
+  String get updatesTokenLabel => 'Токен GitHub';
+
+  @override
+  String get updatesTokenHint => 'fine-grained PAT, Contents: Read-only';
+
+  @override
+  String get updatesTokenHelp =>
+      'Токен хранится только на этом телефоне. Нужен fine-grained PAT с доступом Contents: Read-only к krinix1337/mimikoPlayer.';
+
+  @override
+  String get updatesTokenCheckHint => 'Вставь токен и нажми «Проверить».';
+
+  @override
+  String get updatesTokenMissing => 'Токен не задан';
+
+  @override
+  String get updatesTokenUnchecked => 'Токен введён, но не проверен';
+
+  @override
+  String get updatesTokenValid => 'Токен принят';
+
+  @override
+  String get updatesTokenInvalid => 'Токен не подошёл';
+
+  @override
+  String get updatesTokenDelete => 'Удалить токен';
+
+  @override
+  String get updatesTokenCreate => 'Создать токен';
+
+  @override
+  String get updatesTokenNeeded =>
+      'Вставь токен GitHub или собери приложение с GITHUB_TOKEN.';
+
+  @override
+  String get updatesErrorUnauthorized =>
+      'Токен не подошёл или нет доступа к репозиторию';
+
+  @override
+  String get updatesErrorNotFound => 'Нет доступа к репозиторию или релизам';
+
+  @override
+  String get updatesErrorNoAsset => 'В последнем релизе нет APK';
+
+  @override
+  String get updatesErrorNoDigest =>
+      'У релиза нет SHA-256, скачивание отменено';
+
+  @override
+  String get updatesErrorChecksum =>
+      'Контрольная сумма не совпала, файл удалён';
+
+  @override
+  String get updatesErrorNetwork => 'Нет связи с GitHub';
+
+  @override
+  String get updatesErrorUnknown => 'Не удалось проверить обновления';
+
+  @override
+  String get updatesReady => 'Файл скачан и проверен';
+
+  @override
+  String get updatesInstall => 'Установить';
+
+  @override
+  String get updatesBuildToken => 'Токен задан при сборке';
+
+  @override
   String get settingsAboutNote =>
-      'Локальный плеер: Яндекс, YouTube и свои файлы в одном интерфейсе.';
+      'Локальный плеер: Яндекс Музыка, SoundCloud и свои файлы в одном интерфейсе.';
 
   @override
   String get aboutSources => 'Источники';
 
   @override
   String get aboutSourcesNote =>
-      'Яндекс Музыка — каталог, поток и волна; YouTube — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, официальный текст Яндекса и lyrics.ovh.';
+      'Яндекс Музыка — каталог, поток и волна; SoundCloud — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, официальный текст Яндекса и lyrics.ovh.';
+
+  @override
+  String get settingsAiFilter => 'ИИ-фильтр';
+
+  @override
+  String get accountConnected => 'Подключено';
+
+  @override
+  String get accountSignOut => 'Выйти';
+
+  @override
+  String get accountServices => 'Сервисы';
+
+  @override
+  String get accountSoundCloudNote => 'Поиск и поток без входа';
+
+  @override
+  String get aboutYandexNote => 'Каталог, поток, волна и рекомендации';
 
   @override
   String get settingsAiFilterSource => 'ИИ-фильтр: Slopless';
@@ -1095,7 +1379,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sourceYandex => 'Яндекс Музыка';
 
   @override
-  String get sourceYoutube => 'YouTube';
+  String get sourceRemoved => 'Источник удалён';
 
   @override
   String get sourceLocalFile => 'Файл';

@@ -27,6 +27,7 @@ final class PlayerSnapshot {
     this.resolving = false,
     this.isRadio = false,
     this.liked = false,
+    this.disliked = false,
     this.sourceKind = '',
     this.sourceTitle = '',
   });
@@ -65,6 +66,9 @@ final class PlayerSnapshot {
   /// Текущий трек в любимом.
   final bool liked;
 
+  /// Текущий трек в «Нелюбимом».
+  final bool disliked;
+
   /// Откуда пришла очередь: library, playlist, search, chart, radio…
   final String sourceKind;
 
@@ -91,6 +95,7 @@ final class PlayerSnapshot {
     bool clearCurrent = false,
     bool? isRadio,
     bool? liked,
+    bool? disliked,
     String? sourceKind,
     String? sourceTitle,
   }) => PlayerSnapshot(
@@ -110,6 +115,7 @@ final class PlayerSnapshot {
     issue: clearIssue ? null : (issue ?? this.issue),
     isRadio: isRadio ?? this.isRadio,
     liked: liked ?? this.liked,
+    disliked: disliked ?? this.disliked,
     sourceKind: sourceKind ?? this.sourceKind,
     sourceTitle: sourceTitle ?? this.sourceTitle,
   );

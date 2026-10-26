@@ -12,7 +12,6 @@ import 'sources/soundcloud/soundcloud_source.dart';
 import 'sources/yandex/yandex_api.dart';
 import 'sources/yandex/yandex_auth.dart';
 import 'sources/yandex/yandex_source.dart';
-import 'sources/youtube/youtube_source.dart';
 
 /// Единая точка сборки зависимостей. Нужна потому, что audio_service после
 /// смерти процесса поднимает `main()` headless: состояние приходится
@@ -27,7 +26,6 @@ class AppServices {
       yandex!,
       SoundCloudSource(),
       LocalSource(),
-      YoutubeSource(),
     ]);
     resolver = StreamResolver(registry: registry, store: db.streamsDao);
   }

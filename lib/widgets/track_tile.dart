@@ -8,8 +8,9 @@ import '../core/db/daos/library_dao.dart';
 import '../core/sources/source_id.dart';
 import '../features/catalog/ui/track_menu.dart';
 import '../features/downloads/download_service.dart';
+import '../features/library/library_actions.dart';
 import '../l10n/app_localizations.dart';
-import '../router/routes.dart';
+import '../router/player_launch.dart';
 import 'track_badges.dart';
 import 'track_cover.dart';
 
@@ -147,16 +148,16 @@ class TrackTile extends ConsumerWidget {
           startIndex: index,
           sourceHint: {'kind': kind},
         );
-    router.push(Routes.player);
+    openPlayerRouter(router);
   }
 
   Future<void> _toggleLike(WidgetRef ref) async {
-    final db = ref.read(appServicesProvider).db;
+    final services = ref.read(appServicesProvider);
     final downloader = ref.read(downloadControllerProvider.notifier);
     final controller = ref.read(playbackControllerProvider);
-    final current = await db.libraryDao.likeState(row.localTrackId);
+    final current = await services.db.libraryDao.likeState(row.localTrackId);
     final next = current == 1 ? 0 : 1;
-    await db.libraryDao.setLike(row.localTrackId, next);
+    await LibraryActions(services).setFeedback(row.localTrackId, next);
     if (next == 1) {
       await downloader.trackLiked(row.localTrackId);
     }

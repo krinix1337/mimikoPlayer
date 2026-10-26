@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,19 +8,34 @@ import '../../../app_providers.dart';
 import '../../../core/db/daos/library_dao.dart';
 import '../../../core/prefs/prefs.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../router/player_launch.dart';
 import '../../../router/routes.dart';
-import '../../../theme/app_insets.dart';
 import '../../../theme/app_motion.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/track_cover.dart';
 
 /// Коллекция: разделы сверху вниз, как в живом клиенте Яндекса, —
 /// любимое, недавние обложки, артисты и сетка «ещё».
-class CollectionScreen extends ConsumerWidget {
+class CollectionScreen extends ConsumerStatefulWidget {
   const CollectionScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CollectionScreen> createState() => _CollectionScreenState();
+}
+
+class _CollectionScreenState extends ConsumerState<CollectionScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(ref.read(playlistSyncProvider.notifier).refresh());
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final liked = ref.watch(collectionProvider(CollectionKind.liked));
     final playlists = ref.watch(playlistsProvider);
@@ -111,7 +128,6 @@ class CollectionScreen extends ConsumerWidget {
                     downloaded: downloaded.value?.length,
                   ),
                 ),
-                const SizedBox(height: kShellBottomInset),
               ],
             ),
           ),
@@ -128,6 +144,7 @@ class CollectionScreen extends ConsumerWidget {
 
     try {
       final likes = await importYandexLikes(source: source, db: services.db);
+      await importYandexDislikes(source: source, db: services.db);
       final lists = await importYandexPlaylists(
         source: source,
         db: services.db,
@@ -427,7 +444,7 @@ class _RecentCarousel extends StatelessWidget {
             'title': AppLocalizations.of(context).collectionLiked,
           },
         );
-    router.push(Routes.player);
+    openPlayerRouter(router);
   }
 }
 
@@ -456,7 +473,7 @@ class _ArtistStrip extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (context, index) {
           final artist = artists[index];
-          // Карточка артиста сейчас есть только у Яндекса: id канала YouTube
+          // Карточка артиста сейчас есть только у Яндекса: чужой id
           // и суррогат `name:…` откроют пустую страницу.
           final canOpen = RegExp(r'^\d+$').hasMatch(artist.remoteId);
           return SizedBox(

@@ -125,10 +125,124 @@ class AppLocalizationsEn extends AppLocalizations {
   String get waveLikeRemoved => 'Removed from liked';
 
   @override
+  String get feedbackDislike => 'Not for me';
+
+  @override
+  String get feedbackUndislike => 'Remove from disliked';
+
+  @override
+  String get feedbackDislikeAdded => 'Added to disliked';
+
+  @override
+  String get feedbackCleared => 'Mark removed';
+
+  @override
+  String get feedbackLocalOnly => 'device only';
+
+  @override
+  String get playlistCreate => 'New playlist';
+
+  @override
+  String get playlistName => 'Name';
+
+  @override
+  String get playlistNameHint => 'For example, for the road';
+
+  @override
+  String get playlistVisibility => 'Who can see it';
+
+  @override
+  String get playlistPublic => 'Everyone';
+
+  @override
+  String get playlistPrivate => 'Only me';
+
+  @override
+  String get playlistCreateAction => 'Create playlist';
+
+  @override
+  String playlistCreated(String title) {
+    return 'Playlist “$title” created';
+  }
+
+  @override
+  String get playlistCreateFailed => 'Could not create the playlist';
+
+  @override
+  String get importTitle => 'Import';
+
+  @override
+  String get importTileSubtitle => 'Track lists and other platforms';
+
+  @override
+  String get importHeroTitle => 'Move your music';
+
+  @override
+  String get importHeroNote =>
+      'Paste an “Artist - Title” list — tracks are matched on Yandex and saved to a local playlist.';
+
+  @override
+  String get importHeroStatus => 'List import is available';
+
+  @override
+  String importMatched(int matched, int skipped) {
+    return '$matched found, $skipped skipped';
+  }
+
+  @override
+  String importDone(int matched, int skipped, int playlists) {
+    return 'Done: $matched tracks, $skipped skipped, $playlists playlists';
+  }
+
+  @override
+  String get importYandexRequired => 'Sign in to Yandex Music first';
+
+  @override
+  String get importFailed => 'The import stopped';
+
+  @override
+  String get importOther => 'Other platforms';
+
+  @override
+  String get importList => 'Import from a list';
+
+  @override
+  String get importListTitle => 'Playlist name';
+
+  @override
+  String get importListLines => 'Tracks';
+
+  @override
+  String get importListHint => 'Artist - Title\nArtist - Title';
+
+  @override
+  String get importListFormat =>
+      'One line per track, “Artist - Title”. First 300 lines.';
+
+  @override
+  String get importListAction => 'Move into a playlist';
+
+  @override
+  String get importListEmpty => 'Paste at least one line';
+
+  @override
+  String get importOtherYandex => 'A playlist link opens in the app';
+
+  @override
+  String get importOtherSoundCloud => 'Search and streaming without moving';
+
+  @override
   String get waveSettingsTitle => 'Wave settings';
 
   @override
   String get waveClose => 'Close';
+
+  @override
+  String get waveSoundCloudTitle => 'SoundCloud in the wave';
+
+  @override
+  String get waveSoundCloudNote =>
+      'Mix SoundCloud tracks into the recommendations. Works without signing in.';
 
   @override
   String get waveRejectedNote => 'Yandex rejected the settings — see the log';
@@ -438,6 +552,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchNoResults => 'Nothing found';
 
   @override
+  String get searchTracks => 'Tracks';
+
+  @override
+  String get searchArtists => 'Artists';
+
+  @override
+  String get searchAlbums => 'Albums';
+
+  @override
   String searchResults(int count) {
     return 'Found: $count';
   }
@@ -494,6 +617,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAppearance => 'Appearance';
+
+  @override
+  String get appearanceThemeLanguage => 'Theme and language';
+
+  @override
+  String get appearanceShapeMotion => 'Shape and motion';
 
   @override
   String get settingsTheme => 'Theme';
@@ -626,6 +755,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get blurCoversNote =>
       'Blur strength for backdrop covers across screens';
+
+  @override
+  String get blurPerformanceNote =>
+      'While scrolling, glass becomes denser and stops re-blurring the backdrop, and background covers are blurred at a reduced size. Smoother on budget phones.';
 
   @override
   String get compactUi => 'Compact panel';
@@ -870,15 +1003,166 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get updatesTitle => 'Updates';
+
+  @override
+  String get updatesTileSubtitle => 'Private GitHub releases';
+
+  @override
+  String get updatesCheckShort => 'Check';
+
+  @override
+  String get updatesChecking => 'Checking releases…';
+
+  @override
+  String get updatesUpToDate => 'You\'re on the latest version';
+
+  @override
+  String get updatesNotChecked => 'Updates haven\'t been checked yet';
+
+  @override
+  String get updatesReleases => 'Releases';
+
+  @override
+  String updatesLatestRelease(String version) {
+    return 'Latest GitHub release: $version';
+  }
+
+  @override
+  String updatesWhatsNew(String version) {
+    return 'What\'s new in $version';
+  }
+
+  @override
+  String get updatesOpenGithub => 'Open release on GitHub';
+
+  @override
+  String updatesAvailable(String version) {
+    return 'Version $version is available';
+  }
+
+  @override
+  String updatesSize(String size) {
+    return '$size MB';
+  }
+
+  @override
+  String get updatesDownload => 'Download and install';
+
+  @override
+  String updatesDownloading(int percent) {
+    return 'Downloading: $percent%';
+  }
+
+  @override
+  String get updatesCancel => 'Cancel';
+
+  @override
+  String get updatesOpeningInstaller => 'Opening the installer…';
+
+  @override
+  String get updatesInstallPermission =>
+      'Allow installs from this app, then try again';
+
+  @override
+  String get updatesTokenTitle => 'Private repository access';
+
+  @override
+  String get updatesTokenLabel => 'GitHub token';
+
+  @override
+  String get updatesTokenHint => 'fine-grained PAT, Contents: Read-only';
+
+  @override
+  String get updatesTokenHelp =>
+      'The token stays on this phone. Use a fine-grained PAT with Contents: Read-only access to krinix1337/mimikoPlayer.';
+
+  @override
+  String get updatesTokenCheckHint => 'Paste a token and press Check.';
+
+  @override
+  String get updatesTokenMissing => 'No token set';
+
+  @override
+  String get updatesTokenUnchecked => 'Token entered but not checked';
+
+  @override
+  String get updatesTokenValid => 'Token accepted';
+
+  @override
+  String get updatesTokenInvalid => 'Token rejected';
+
+  @override
+  String get updatesTokenDelete => 'Remove token';
+
+  @override
+  String get updatesTokenCreate => 'Create a token';
+
+  @override
+  String get updatesTokenNeeded =>
+      'Enter a GitHub token or build the app with GITHUB_TOKEN.';
+
+  @override
+  String get updatesErrorUnauthorized =>
+      'The token was rejected or has no access to the repository';
+
+  @override
+  String get updatesErrorNotFound => 'No access to the repository or releases';
+
+  @override
+  String get updatesErrorNoAsset => 'The latest release has no APK';
+
+  @override
+  String get updatesErrorNoDigest =>
+      'The release has no SHA-256; download cancelled';
+
+  @override
+  String get updatesErrorChecksum => 'Checksum mismatch; the file was deleted';
+
+  @override
+  String get updatesErrorNetwork => 'Cannot reach GitHub';
+
+  @override
+  String get updatesErrorUnknown => 'Could not check for updates';
+
+  @override
+  String get updatesReady => 'Downloaded and verified';
+
+  @override
+  String get updatesInstall => 'Install';
+
+  @override
+  String get updatesBuildToken => 'Token provided at build time';
+
+  @override
   String get settingsAboutNote =>
-      'A local player: Yandex, YouTube and your own files behind one interface.';
+      'A local player: Yandex Music, SoundCloud and your own files behind one interface.';
 
   @override
   String get aboutSources => 'Sources';
 
   @override
   String get aboutSourcesNote =>
-      'Yandex Music for catalog, streams and the wave; YouTube for search and streams; local files from the Music folder. Lyrics: LRCLIB, official Yandex text and lyrics.ovh.';
+      'Yandex Music for catalog, streams and the wave; SoundCloud for search and streams; local files from the Music folder. Lyrics: LRCLIB, official Yandex text and lyrics.ovh.';
+
+  @override
+  String get settingsAiFilter => 'AI filter';
+
+  @override
+  String get accountConnected => 'Connected';
+
+  @override
+  String get accountSignOut => 'Sign out';
+
+  @override
+  String get accountServices => 'Services';
+
+  @override
+  String get accountSoundCloudNote => 'Search and streaming without signing in';
+
+  @override
+  String get aboutYandexNote =>
+      'Catalog, streaming, the wave and recommendations';
 
   @override
   String get settingsAiFilterSource => 'AI filter: Slopless';
@@ -1096,7 +1380,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourceYandex => 'Yandex Music';
 
   @override
-  String get sourceYoutube => 'YouTube';
+  String get sourceRemoved => 'Source removed';
 
   @override
   String get sourceLocalFile => 'File';

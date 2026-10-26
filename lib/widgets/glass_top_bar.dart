@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/blur_settings.dart';
 import '../theme/keyboard_theme.dart';
+import '../theme/scroll_activity.dart';
 
 /// Стеклянная шапка поверх прокручиваемой страницы: кнопки и мягкое размытие
 /// без непрозрачной полосы. Заголовок проявляется, когда большая шапка ушла.
@@ -29,115 +30,118 @@ class GlassTopBar extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final top = MediaQuery.paddingOf(context).top;
+    final barHeight = top + kToolbarHeight;
+    const fadeHeight = 22.0;
 
     return SizedBox(
-      height: top + kToolbarHeight + 20,
-      child: AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) {
-          final offset = controller.hasClients ? controller.offset : 0.0;
-          // Наверху страницы панель прозрачна: иначе над ярким hero виден
-          // резкий тёмный прямоугольник. Стекло проявляется при прокрутке.
-          final exposure = ((offset - 12) / 80).clamp(0.0, 1.0);
-          final sigma = currentBlur.top * exposure;
-          final glassColor = scheme.surface.withValues(
-            alpha: kKeyboardTestTheme
+      height: barHeight + fadeHeight,
+      child: ValueListenableBuilder<bool>(
+        valueListenable: appScrollActive,
+        builder: (context, scrolling, _) => AnimatedBuilder(
+          animation: controller,
+          builder: (context, _) {
+            final offset = controller.hasClients ? controller.offset : 0.0;
+            // Наверху страницы панель прозрачна: иначе над ярким hero виден
+            // резкий тёмный прямоугольник. Стекло проявляется при прокрутке.
+            final exposure = ((offset - 12) / 80).clamp(0.0, 1.0);
+            final sigma = currentBlur.top;
+            // Пока список движется, фильтр не пересчитывается: плотная
+            // подложка вместо blur. Стекло возвращается после остановки.
+            final useBlur = sigma > 0.3 && !scrolling;
+            final baseAlpha = kKeyboardTestTheme
                 ? 0.95
-                : (sigma > 0 ? 0.5 : 0.78) * exposure,
-          );
-          final shown = ((offset - revealAt) / 48).clamp(0.0, 1.0);
+                : (sigma > 0 ? (scrolling ? 0.9 : 0.5) : 0.78);
+            final tintTop = scheme.surface.withValues(
+              alpha: baseAlpha * exposure,
+            );
+            // Тон на срезе фильтра и сразу под ним одинаковый: так кромка
+            // размытия не читается отдельной полосой. Ниже тон сходит на нет.
+            final tintCut = scheme.surface.withValues(
+              alpha: baseAlpha * 0.7 * exposure,
+            );
+            final shown = ((offset - revealAt) / 48).clamp(0.0, 1.0);
+            final blurGlass = DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [tintTop, tintCut],
+                ),
+              ),
+            );
+            final fadeGlass = DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [tintCut, tintCut.withValues(alpha: 0)],
+                ),
+              ),
+            );
 
-          return Stack(
-            children: [
-              if (exposure > 0)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: _GlassBlur(sigma: sigma, tint: glassColor),
+            return Stack(
+              children: [
+                if (exposure > 0) ...[
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: barHeight,
+                    child: IgnorePointer(
+                      child: ClipRect(
+                        child: useBlur
+                            ? BackdropFilter(
+                                filter: ui.ImageFilter.blur(
+                                  sigmaX: sigma,
+                                  sigmaY: sigma,
+                                ),
+                                child: blurGlass,
+                              )
+                            : blurGlass,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: barHeight,
+                    left: 0,
+                    right: 0,
+                    height: fadeHeight,
+                    child: IgnorePointer(child: fadeGlass),
+                  ),
+                ],
+                Positioned(
+                  top: top,
+                  left: 4,
+                  right: 4,
+                  height: kToolbarHeight,
+                  child: Row(
+                    children: [
+                      IconButton(
+                        tooltip: l.playerBack,
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        onPressed:
+                            onBack ?? () => Navigator.of(context).maybePop(),
+                      ),
+                      Expanded(
+                        child: Opacity(
+                          opacity: shown,
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                      ),
+                      ...actions,
+                    ],
                   ),
                 ),
-              Positioned(
-                top: top,
-                left: 4,
-                right: 4,
-                height: kToolbarHeight,
-                child: Row(
-                  children: [
-                    IconButton(
-                      tooltip: l.playerBack,
-                      icon: const Icon(Icons.arrow_back_rounded),
-                      onPressed:
-                          onBack ?? () => Navigator.of(context).maybePop(),
-                    ),
-                    Expanded(
-                      child: Opacity(
-                        opacity: shown,
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                      ),
-                    ),
-                    ...actions,
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
-    );
-  }
-}
-
-/// Размытие с плавным сходом к нижней кромке: одиночный BackdropFilter
-/// обрывается заметной полосой. Полосы фильтруются с убывающей силой,
-/// последняя - уже без размытия, поэтому переход в чёткий контент мягкий.
-class _GlassBlur extends StatelessWidget {
-  const _GlassBlur({required this.sigma, required this.tint});
-
-  final double sigma;
-  final Color tint;
-
-  static const _fade = [1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1];
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Column(
-          children: [
-            for (final step in _fade)
-              Expanded(
-                child: sigma * step < 0.3
-                    ? const SizedBox.expand()
-                    : ClipRect(
-                        // BackdropFilter не маскируется градиентом: внутри
-                        // ShaderMask/Opacity он теряет подложку и не блюрит.
-                        child: BackdropFilter(
-                          filter: ui.ImageFilter.blur(
-                            sigmaX: sigma * step,
-                            sigmaY: sigma * step,
-                          ),
-                          child: const SizedBox.expand(),
-                        ),
-                      ),
-              ),
-            const Expanded(child: SizedBox.expand()),
-          ],
-        ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [tint, tint.withValues(alpha: 0)],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

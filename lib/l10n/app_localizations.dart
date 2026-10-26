@@ -320,6 +320,204 @@ abstract class AppLocalizations {
   /// **'Убрано из любимого'**
   String get waveLikeRemoved;
 
+  /// No description provided for @feedbackDislike.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не нравится'**
+  String get feedbackDislike;
+
+  /// No description provided for @feedbackUndislike.
+  ///
+  /// In ru, this message translates to:
+  /// **'Убрать из «Нелюбимого»'**
+  String get feedbackUndislike;
+
+  /// No description provided for @feedbackDislikeAdded.
+  ///
+  /// In ru, this message translates to:
+  /// **'Добавлено в «Нелюбимое»'**
+  String get feedbackDislikeAdded;
+
+  /// No description provided for @feedbackCleared.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отметка снята'**
+  String get feedbackCleared;
+
+  /// No description provided for @feedbackLocalOnly.
+  ///
+  /// In ru, this message translates to:
+  /// **'только на устройстве'**
+  String get feedbackLocalOnly;
+
+  /// No description provided for @playlistCreate.
+  ///
+  /// In ru, this message translates to:
+  /// **'Новый плейлист'**
+  String get playlistCreate;
+
+  /// No description provided for @playlistName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Название'**
+  String get playlistName;
+
+  /// No description provided for @playlistNameHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Например, для дороги'**
+  String get playlistNameHint;
+
+  /// No description provided for @playlistVisibility.
+  ///
+  /// In ru, this message translates to:
+  /// **'Кто увидит'**
+  String get playlistVisibility;
+
+  /// No description provided for @playlistPublic.
+  ///
+  /// In ru, this message translates to:
+  /// **'Все'**
+  String get playlistPublic;
+
+  /// No description provided for @playlistPrivate.
+  ///
+  /// In ru, this message translates to:
+  /// **'Только я'**
+  String get playlistPrivate;
+
+  /// No description provided for @playlistCreateAction.
+  ///
+  /// In ru, this message translates to:
+  /// **'Создать плейлист'**
+  String get playlistCreateAction;
+
+  /// No description provided for @playlistCreated.
+  ///
+  /// In ru, this message translates to:
+  /// **'Плейлист «{title}» создан'**
+  String playlistCreated(String title);
+
+  /// No description provided for @playlistCreateFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось создать плейлист'**
+  String get playlistCreateFailed;
+
+  /// No description provided for @importTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Импорт'**
+  String get importTitle;
+
+  /// No description provided for @importTileSubtitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Списки треков и другие площадки'**
+  String get importTileSubtitle;
+
+  /// No description provided for @importHeroTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Перенос музыки'**
+  String get importHeroTitle;
+
+  /// No description provided for @importHeroNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вставьте список «Исполнитель - Название» — треки найдутся в Яндексе и сохранятся в локальный плейлист.'**
+  String get importHeroNote;
+
+  /// No description provided for @importHeroStatus.
+  ///
+  /// In ru, this message translates to:
+  /// **'Доступен импорт из списка'**
+  String get importHeroStatus;
+
+  /// No description provided for @importMatched.
+  ///
+  /// In ru, this message translates to:
+  /// **'{matched} найдено, {skipped} пропущено'**
+  String importMatched(int matched, int skipped);
+
+  /// No description provided for @importDone.
+  ///
+  /// In ru, this message translates to:
+  /// **'Готово: {matched} треков, {skipped} пропущено, {playlists} плейлистов'**
+  String importDone(int matched, int skipped, int playlists);
+
+  /// No description provided for @importYandexRequired.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сначала войдите в Яндекс Музыку'**
+  String get importYandexRequired;
+
+  /// No description provided for @importFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Импорт прервался'**
+  String get importFailed;
+
+  /// No description provided for @importOther.
+  ///
+  /// In ru, this message translates to:
+  /// **'Другие площадки'**
+  String get importOther;
+
+  /// No description provided for @importList.
+  ///
+  /// In ru, this message translates to:
+  /// **'Импорт из списка'**
+  String get importList;
+
+  /// No description provided for @importListTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Название плейлиста'**
+  String get importListTitle;
+
+  /// No description provided for @importListLines.
+  ///
+  /// In ru, this message translates to:
+  /// **'Треки'**
+  String get importListLines;
+
+  /// No description provided for @importListHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Исполнитель - Название\nИсполнитель - Название'**
+  String get importListHint;
+
+  /// No description provided for @importListFormat.
+  ///
+  /// In ru, this message translates to:
+  /// **'Одна строка — один трек, формат «Исполнитель - Название». Первые 300 строк.'**
+  String get importListFormat;
+
+  /// No description provided for @importListAction.
+  ///
+  /// In ru, this message translates to:
+  /// **'Перенести в плейлист'**
+  String get importListAction;
+
+  /// No description provided for @importListEmpty.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вставьте хотя бы одну строку'**
+  String get importListEmpty;
+
+  /// No description provided for @importOtherYandex.
+  ///
+  /// In ru, this message translates to:
+  /// **'Плейлист по ссылке откроется в приложении'**
+  String get importOtherYandex;
+
+  /// No description provided for @importOtherSoundCloud.
+  ///
+  /// In ru, this message translates to:
+  /// **'Поиск и поток без переноса'**
+  String get importOtherSoundCloud;
+
   /// No description provided for @waveSettingsTitle.
   ///
   /// In ru, this message translates to:
@@ -331,6 +529,18 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Закрыть'**
   String get waveClose;
+
+  /// No description provided for @waveSoundCloudTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'SoundCloud в волне'**
+  String get waveSoundCloudTitle;
+
+  /// No description provided for @waveSoundCloudNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Подмешивать треки из SoundCloud к рекомендациям. Работает без входа.'**
+  String get waveSoundCloudNote;
 
   /// No description provided for @waveRejectedNote.
   ///
@@ -872,6 +1082,24 @@ abstract class AppLocalizations {
   /// **'Ничего не нашлось'**
   String get searchNoResults;
 
+  /// No description provided for @searchTracks.
+  ///
+  /// In ru, this message translates to:
+  /// **'Треки'**
+  String get searchTracks;
+
+  /// No description provided for @searchArtists.
+  ///
+  /// In ru, this message translates to:
+  /// **'Исполнители'**
+  String get searchArtists;
+
+  /// No description provided for @searchAlbums.
+  ///
+  /// In ru, this message translates to:
+  /// **'Альбомы'**
+  String get searchAlbums;
+
   /// No description provided for @searchResults.
   ///
   /// In ru, this message translates to:
@@ -979,6 +1207,18 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Оформление'**
   String get settingsAppearance;
+
+  /// No description provided for @appearanceThemeLanguage.
+  ///
+  /// In ru, this message translates to:
+  /// **'Тема и язык'**
+  String get appearanceThemeLanguage;
+
+  /// No description provided for @appearanceShapeMotion.
+  ///
+  /// In ru, this message translates to:
+  /// **'Форма и движение'**
+  String get appearanceShapeMotion;
 
   /// No description provided for @settingsTheme.
   ///
@@ -1237,6 +1477,12 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Сила размытия фоновых обложек на всех экранах'**
   String get blurCoversNote;
+
+  /// No description provided for @blurPerformanceNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Во время прокрутки стекло становится плотнее и не размывает фон заново, а фоновые обложки размываются в уменьшенном размере. Так плавнее на бюджетных телефонах.'**
+  String get blurPerformanceNote;
 
   /// No description provided for @compactUi.
   ///
@@ -1688,10 +1934,244 @@ abstract class AppLocalizations {
   /// **'Версия {version}'**
   String settingsVersion(String version);
 
+  /// No description provided for @updatesTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Обновления'**
+  String get updatesTitle;
+
+  /// No description provided for @updatesTileSubtitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Приватные релизы GitHub'**
+  String get updatesTileSubtitle;
+
+  /// No description provided for @updatesCheckShort.
+  ///
+  /// In ru, this message translates to:
+  /// **'Проверить'**
+  String get updatesCheckShort;
+
+  /// No description provided for @updatesChecking.
+  ///
+  /// In ru, this message translates to:
+  /// **'Проверяю релизы…'**
+  String get updatesChecking;
+
+  /// No description provided for @updatesUpToDate.
+  ///
+  /// In ru, this message translates to:
+  /// **'Установлена последняя версия'**
+  String get updatesUpToDate;
+
+  /// No description provided for @updatesNotChecked.
+  ///
+  /// In ru, this message translates to:
+  /// **'Обновления ещё не проверялись'**
+  String get updatesNotChecked;
+
+  /// No description provided for @updatesReleases.
+  ///
+  /// In ru, this message translates to:
+  /// **'Релизы'**
+  String get updatesReleases;
+
+  /// No description provided for @updatesLatestRelease.
+  ///
+  /// In ru, this message translates to:
+  /// **'Последний релиз на GitHub: {version}'**
+  String updatesLatestRelease(String version);
+
+  /// No description provided for @updatesWhatsNew.
+  ///
+  /// In ru, this message translates to:
+  /// **'Что нового в {version}'**
+  String updatesWhatsNew(String version);
+
+  /// No description provided for @updatesOpenGithub.
+  ///
+  /// In ru, this message translates to:
+  /// **'Открыть релиз на GitHub'**
+  String get updatesOpenGithub;
+
+  /// No description provided for @updatesAvailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'Доступна версия {version}'**
+  String updatesAvailable(String version);
+
+  /// No description provided for @updatesSize.
+  ///
+  /// In ru, this message translates to:
+  /// **'{size} МБ'**
+  String updatesSize(String size);
+
+  /// No description provided for @updatesDownload.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скачать и установить'**
+  String get updatesDownload;
+
+  /// No description provided for @updatesDownloading.
+  ///
+  /// In ru, this message translates to:
+  /// **'Загрузка: {percent}%'**
+  String updatesDownloading(int percent);
+
+  /// No description provided for @updatesCancel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отменить'**
+  String get updatesCancel;
+
+  /// No description provided for @updatesOpeningInstaller.
+  ///
+  /// In ru, this message translates to:
+  /// **'Открываю установщик…'**
+  String get updatesOpeningInstaller;
+
+  /// No description provided for @updatesInstallPermission.
+  ///
+  /// In ru, this message translates to:
+  /// **'Разреши установку из этого приложения и нажми ещё раз'**
+  String get updatesInstallPermission;
+
+  /// No description provided for @updatesTokenTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Доступ к приватному репозиторию'**
+  String get updatesTokenTitle;
+
+  /// No description provided for @updatesTokenLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Токен GitHub'**
+  String get updatesTokenLabel;
+
+  /// No description provided for @updatesTokenHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'fine-grained PAT, Contents: Read-only'**
+  String get updatesTokenHint;
+
+  /// No description provided for @updatesTokenHelp.
+  ///
+  /// In ru, this message translates to:
+  /// **'Токен хранится только на этом телефоне. Нужен fine-grained PAT с доступом Contents: Read-only к krinix1337/mimikoPlayer.'**
+  String get updatesTokenHelp;
+
+  /// No description provided for @updatesTokenCheckHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вставь токен и нажми «Проверить».'**
+  String get updatesTokenCheckHint;
+
+  /// No description provided for @updatesTokenMissing.
+  ///
+  /// In ru, this message translates to:
+  /// **'Токен не задан'**
+  String get updatesTokenMissing;
+
+  /// No description provided for @updatesTokenUnchecked.
+  ///
+  /// In ru, this message translates to:
+  /// **'Токен введён, но не проверен'**
+  String get updatesTokenUnchecked;
+
+  /// No description provided for @updatesTokenValid.
+  ///
+  /// In ru, this message translates to:
+  /// **'Токен принят'**
+  String get updatesTokenValid;
+
+  /// No description provided for @updatesTokenInvalid.
+  ///
+  /// In ru, this message translates to:
+  /// **'Токен не подошёл'**
+  String get updatesTokenInvalid;
+
+  /// No description provided for @updatesTokenDelete.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить токен'**
+  String get updatesTokenDelete;
+
+  /// No description provided for @updatesTokenCreate.
+  ///
+  /// In ru, this message translates to:
+  /// **'Создать токен'**
+  String get updatesTokenCreate;
+
+  /// No description provided for @updatesTokenNeeded.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вставь токен GitHub или собери приложение с GITHUB_TOKEN.'**
+  String get updatesTokenNeeded;
+
+  /// No description provided for @updatesErrorUnauthorized.
+  ///
+  /// In ru, this message translates to:
+  /// **'Токен не подошёл или нет доступа к репозиторию'**
+  String get updatesErrorUnauthorized;
+
+  /// No description provided for @updatesErrorNotFound.
+  ///
+  /// In ru, this message translates to:
+  /// **'Нет доступа к репозиторию или релизам'**
+  String get updatesErrorNotFound;
+
+  /// No description provided for @updatesErrorNoAsset.
+  ///
+  /// In ru, this message translates to:
+  /// **'В последнем релизе нет APK'**
+  String get updatesErrorNoAsset;
+
+  /// No description provided for @updatesErrorNoDigest.
+  ///
+  /// In ru, this message translates to:
+  /// **'У релиза нет SHA-256, скачивание отменено'**
+  String get updatesErrorNoDigest;
+
+  /// No description provided for @updatesErrorChecksum.
+  ///
+  /// In ru, this message translates to:
+  /// **'Контрольная сумма не совпала, файл удалён'**
+  String get updatesErrorChecksum;
+
+  /// No description provided for @updatesErrorNetwork.
+  ///
+  /// In ru, this message translates to:
+  /// **'Нет связи с GitHub'**
+  String get updatesErrorNetwork;
+
+  /// No description provided for @updatesErrorUnknown.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось проверить обновления'**
+  String get updatesErrorUnknown;
+
+  /// No description provided for @updatesReady.
+  ///
+  /// In ru, this message translates to:
+  /// **'Файл скачан и проверен'**
+  String get updatesReady;
+
+  /// No description provided for @updatesInstall.
+  ///
+  /// In ru, this message translates to:
+  /// **'Установить'**
+  String get updatesInstall;
+
+  /// No description provided for @updatesBuildToken.
+  ///
+  /// In ru, this message translates to:
+  /// **'Токен задан при сборке'**
+  String get updatesBuildToken;
+
   /// No description provided for @settingsAboutNote.
   ///
   /// In ru, this message translates to:
-  /// **'Локальный плеер: Яндекс, YouTube и свои файлы в одном интерфейсе.'**
+  /// **'Локальный плеер: Яндекс Музыка, SoundCloud и свои файлы в одном интерфейсе.'**
   String get settingsAboutNote;
 
   /// No description provided for @aboutSources.
@@ -1703,8 +2183,44 @@ abstract class AppLocalizations {
   /// No description provided for @aboutSourcesNote.
   ///
   /// In ru, this message translates to:
-  /// **'Яндекс Музыка — каталог, поток и волна; YouTube — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, официальный текст Яндекса и lyrics.ovh.'**
+  /// **'Яндекс Музыка — каталог, поток и волна; SoundCloud — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, официальный текст Яндекса и lyrics.ovh.'**
   String get aboutSourcesNote;
+
+  /// No description provided for @settingsAiFilter.
+  ///
+  /// In ru, this message translates to:
+  /// **'ИИ-фильтр'**
+  String get settingsAiFilter;
+
+  /// No description provided for @accountConnected.
+  ///
+  /// In ru, this message translates to:
+  /// **'Подключено'**
+  String get accountConnected;
+
+  /// No description provided for @accountSignOut.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выйти'**
+  String get accountSignOut;
+
+  /// No description provided for @accountServices.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сервисы'**
+  String get accountServices;
+
+  /// No description provided for @accountSoundCloudNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Поиск и поток без входа'**
+  String get accountSoundCloudNote;
+
+  /// No description provided for @aboutYandexNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Каталог, поток, волна и рекомендации'**
+  String get aboutYandexNote;
 
   /// No description provided for @settingsAiFilterSource.
   ///
@@ -2108,11 +2624,11 @@ abstract class AppLocalizations {
   /// **'Яндекс Музыка'**
   String get sourceYandex;
 
-  /// No description provided for @sourceYoutube.
+  /// No description provided for @sourceRemoved.
   ///
   /// In ru, this message translates to:
-  /// **'YouTube'**
-  String get sourceYoutube;
+  /// **'Источник удалён'**
+  String get sourceRemoved;
 
   /// No description provided for @sourceLocalFile.
   ///

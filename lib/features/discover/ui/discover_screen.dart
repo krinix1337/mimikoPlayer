@@ -6,10 +6,10 @@ import '../../../app_providers.dart';
 import '../../../core/db/daos/library_dao.dart';
 import '../../../core/sources/source_dto.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../router/player_launch.dart';
 import '../../../router/routes.dart';
 import '../../../sources/yandex/yandex_source.dart';
 import '../../../sources/yandex/yandex_station.dart';
-import '../../../theme/app_insets.dart';
 import '../../../wave_providers.dart';
 import '../../../widgets/chart_rank_cover.dart';
 import '../../../widgets/pressable.dart';
@@ -56,7 +56,6 @@ class DiscoverScreen extends ConsumerWidget {
                   const _NewReleasesSection(),
                   const _StationsSection(),
                   const _ArtistsSection(),
-                  const SizedBox(height: kShellBottomInset),
                 ],
               ),
             ),
@@ -256,11 +255,24 @@ class _StationsSection extends ConsumerWidget {
             itemBuilder: (context, index) {
               final station = stations[index];
               return ActionChip(
-                avatar: station.iconUrl == null
-                    ? null
-                    : ClipOval(
+                avatar: station.iconUrl != null
+                    ? ClipOval(
                         child: TrackCover(url: station.iconUrl, size: 24),
-                      ),
+                      )
+                    : station.id == WaveStationIds.coolMusic
+                    ? CircleAvatar(
+                        radius: 12,
+                        backgroundColor:
+                            Theme.of(context).colorScheme.primaryContainer,
+                        child: Icon(
+                          Icons.local_fire_department_rounded,
+                          size: 16,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onPrimaryContainer,
+                        ),
+                      )
+                    : null,
                 label: Text(station.title),
                 onPressed: () => _startStation(context, ref, station.id),
               );
@@ -480,5 +492,5 @@ Future<void> _play(
         startIndex: index,
         sourceHint: {'kind': kind, 'title': ?title},
       );
-  if (context.mounted) context.push(Routes.player);
+  if (context.mounted) openPlayer(context);
 }

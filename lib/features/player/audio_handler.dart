@@ -15,6 +15,7 @@ import '../../core/sources/source_errors.dart';
 import '../../core/sources/source_id.dart';
 import '../../core/sources/stream_resolver.dart';
 import '../../core/sources/stream_target.dart';
+import '../library/library_actions.dart';
 import 'equalizer_presets.dart';
 import 'playback_controller.dart';
 import 'player_snapshot.dart';
@@ -174,9 +175,14 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   Future<void> refreshLikedState() async {
     final localTrackId = _queue.currentId;
     if (localTrackId == null) return;
-    final liked = await _services.db.libraryDao.likeState(localTrackId) == 1;
-    if (_snapshot.liked != liked) {
-      _publish(_snapshot.copyWith(liked: liked));
+    final feedback = await _services.db.libraryDao.likeState(localTrackId);
+    final liked = feedback == 1;
+    final disliked = feedback == -1;
+    if (_snapshot.liked != liked || _snapshot.disliked != disliked) {
+      _publish(
+        _snapshot.copyWith(liked: liked, disliked: disliked),
+      );
+      _emitServiceState();
     }
   }
 
@@ -304,6 +310,26 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   @override
   Future<void> skipToQueueItem(int index) async {
     await skipToIndex(index);
+  }
+
+  @override
+  Future<dynamic> customAction(
+    String name, [
+    Map<String, dynamic>? extras,
+  ]) async {
+    final localTrackId = _queue.currentId;
+    if (localTrackId == null) return null;
+    final actions = LibraryActions(_services);
+    final state = await actions.feedbackOf(localTrackId);
+    final next = switch (name) {
+      'like' => state == 1 ? 0 : 1,
+      'dislike' => state == -1 ? 0 : -1,
+      _ => null,
+    };
+    if (next == null) return null;
+    await actions.setFeedback(localTrackId, next);
+    await refreshLikedState();
+    _emitServiceState();
   }
 
   @override
@@ -470,7 +496,9 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         ? track!.title
         : localTrackId;
     final artist = artists.isEmpty ? 'Локальный файл' : artists.join(', ');
-    final liked = await db.libraryDao.likeState(localTrackId) == 1;
+    final feedback = await db.libraryDao.likeState(localTrackId);
+    final liked = feedback == 1;
+    final disliked = feedback == -1;
     final artistRemoteIds =
         (await db.libraryDao.artistRemoteIdsForTracks([
           localTrackId,
@@ -505,6 +533,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         uncensored: false,
         duration: Duration(seconds: track?.durationSec ?? 0),
         liked: liked,
+        disliked: disliked,
         clearIssue: true,
       ),
     );
@@ -649,6 +678,28 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   }
 
   /// Докачка очереди радио. Возвращает true, если появились новые треки.
+  /// Добавка из SoundCloud к радио: ищем ещё треки текущего исполнителя.
+  /// Если SoundCloud молчит, волна продолжает жить на Яндексе.
+  Future<List<SourceTrack>> _soundCloudRefill() async {
+    final source = _services.registry.byId(SourceId.soundcloud);
+    final artist = _snapshot.current?.artist.trim() ?? '';
+    if (source == null || artist.isEmpty) return const [];
+    try {
+      final result = await source.search(artist, pageSize: 10);
+      final tracks = [
+        for (final track in result.tracks)
+          if (track.available && track.duration.inSeconds >= 60) track,
+      ].take(3).toList();
+      if (tracks.isNotEmpty) {
+        AppLogger.instance.info('волна: SoundCloud докачал ${tracks.length}');
+      }
+      return tracks;
+    } on Object catch (error) {
+      AppLogger.instance.warn('soundcloud refill: $error');
+      return const [];
+    }
+  }
+
   Future<bool> _refillRadio({bool moveToFirstNew = false}) async {
     if (_sourceHint?['kind'] != 'radio') return false;
     if (_radioRefillInFlight) return false;
@@ -658,11 +709,20 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     _radioRefillInFlight = true;
     final station = '${_sourceHint?['station'] ?? 'user:onyourwave'}';
     try {
-      final fetched = await source.station.waveMany(
-        station: station,
-        batches: 3,
-        target: 15,
-      );
+      final base = station.startsWith('playlist:')
+          ? (List<SourceTrack>.of(
+              await source.playlistTracks(station.substring(9)),
+            )..shuffle())
+          : await source.station.waveMany(
+              station: station,
+              batches: 3,
+              target: 15,
+            );
+      final fetched =
+          _sourceHint?['soundcloud'] == true &&
+              !station.startsWith('playlist:')
+          ? [...base, ...await _soundCloudRefill()]
+          : base;
       if (_services.hideAiTracks) {
         // Волна может стартовать раньше, чем фоновая загрузка списка.
         await AiFilter.instance.ensureLoaded();
@@ -675,7 +735,15 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
           : fetched;
       if (tracks.isEmpty) return false;
       final ids = await _services.db.tracksDao.ingestAll(tracks);
-      if (!_queue.appendBatch(ids, moveToFirstNew: moveToFirstNew)) {
+      final disliked = await _services.db.libraryDao.dislikedAmong(ids);
+      final playableIds = [
+        for (final id in ids)
+          if (!disliked.contains(id)) id,
+      ];
+      if (!_queue.appendBatch(
+        playableIds,
+        moveToFirstNew: moveToFirstNew,
+      )) {
         // Ротор вернул то же самое — пробуем ещё раз на следующем треке.
         return false;
       }
@@ -740,8 +808,8 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     }
   }
 
-  /// Ищет ту же песню в других playable-источниках (SoundCloud/YouTube/
-  /// Яндекс), когда трек снят или источник его не отдаёт. Сравнение строгое:
+  /// Ищет ту же песню в других playable-источниках (SoundCloud/Яндекс),
+  /// когда трек снят или источник его не отдаёт. Сравнение строгое:
   /// название + исполнитель + близкая длительность.
   Future<ResolvedPlayback?> _crossSourcePlayback(
     String localTrackId, {
@@ -981,7 +1049,22 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
           MediaControl.skipToPrevious,
           if (stopped || !playing) MediaControl.play else MediaControl.pause,
           MediaControl.skipToNext,
-          if (!stopped) MediaControl.stop,
+          if (!stopped)
+            MediaControl.custom(
+              name: 'like',
+              label: 'Нравится',
+              androidIcon: _snapshot.liked
+                  ? 'drawable/ic_like_filled'
+                  : 'drawable/ic_like',
+            ),
+          if (!stopped)
+            MediaControl.custom(
+              name: 'dislike',
+              label: 'Не нравится',
+              androidIcon: _snapshot.disliked
+                  ? 'drawable/ic_dislike_filled'
+                  : 'drawable/ic_dislike',
+            ),
         ],
         systemActions: const {
           MediaAction.seek,

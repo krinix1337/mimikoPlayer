@@ -5,11 +5,15 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.StatFs
+import android.provider.Settings
+import androidx.core.content.FileProvider
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 
 /**
  * AudioServiceActivity — требование плагина audio_service, поэтому свой класс
@@ -93,6 +97,17 @@ class MimikoActivity : AudioServiceActivity() {
                 }
 
                 "freeBytes" -> result.success(freeBytes())
+
+                "appVersion" -> result.success(appVersion())
+
+                "installApk" -> {
+                    val path = call.arguments as? String
+                    if (path.isNullOrBlank()) {
+                        result.error("bad_argument", "path пустой", null)
+                    } else {
+                        result.success(installApk(path))
+                    }
+                }
 
                 "networkStatus" -> result.success(networkStatus())
 
@@ -273,6 +288,46 @@ class MimikoActivity : AudioServiceActivity() {
                 PackageManager.DONT_KILL_APP,
             )
         }
+    }
+
+    private fun appVersion(): String = runCatching {
+        val info = if (Build.VERSION.SDK_INT >= 33) {
+            packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            packageManager.getPackageInfo(packageName, 0)
+        }
+        info.versionName ?: ""
+    }.getOrDefault("")
+
+    /**
+     * Отдаёт APK системному установщику. На Android 8+ при первом запуске
+     * открывает разрешение «Установка неизвестных приложений»; после него
+     * пользователь нажимает кнопку ещё раз.
+     */
+    private fun installApk(path: String): Boolean {
+        val file = File(path)
+        if (!file.exists() || file.length() == 0L) return false
+        if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+            runCatching {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:$packageName"),
+                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+            return false
+        }
+        return runCatching {
+            val uri = FileProvider.getUriForFile(this, "$packageName.updates", file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            true
+        }.getOrDefault(false)
     }
 
     companion object {

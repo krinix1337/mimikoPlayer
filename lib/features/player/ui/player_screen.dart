@@ -1,12 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app_providers.dart';
+import '../../../core/db/daos/library_dao.dart';
 import '../../../core/prefs/prefs.dart';
-import '../../../core/sources/source_id.dart';
 import '../../../features/downloads/download_service.dart';
 import '../../../features/home/wave_mode_label.dart';
+import '../../../features/library/library_actions.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../theme/app_motion.dart';
@@ -29,11 +32,44 @@ class PlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends ConsumerState<PlayerScreen> {
+class _PlayerScreenState extends ConsumerState<PlayerScreen>
+    with SingleTickerProviderStateMixin {
   double _swipeDirection = 1;
 
   /// Смещение обложки под пальцем: соседний трек въезжает вместе с ним.
   double _drag = 0;
+
+  late final AnimationController _settle = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 280),
+  );
+  double _settleFrom = 0;
+  double _settleTo = 0;
+  bool _settling = false;
+
+  /// Внешнее переключение трека во время свайпа: обложку не анимируем
+  /// второй раз, иначе соседняя картинка успевает отъехать и вернуться.
+  bool _suppressSwitch = false;
+  bool _pendingTrackChange = false;
+  String? _lastTrackId;
+  int _lastIndex = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    _settle.addListener(() {
+      final value = Curves.easeOutCubic.transform(_settle.value);
+      if (mounted) {
+        setState(() => _drag = _settleFrom + (_settleTo - _settleFrom) * value);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _settle.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +87,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final prevCover = place.$2 > 0
         ? ref.watch(trackCoverProvider(place.$1[place.$2 - 1])).value
         : null;
+
+    if (_lastTrackId != current?.localTrackId) {
+      _lastTrackId = current?.localTrackId;
+      if (_pendingTrackChange || _drag != 0) {
+        _pendingTrackChange = false;
+        _settle.stop();
+        _settling = false;
+        _drag = 0;
+      }
+    }
+    if (place.$2 != _lastIndex) {
+      _swipeDirection = place.$2 > _lastIndex ? 1 : -1;
+      _lastIndex = place.$2;
+    }
+    if (_suppressSwitch && !_pendingTrackChange) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _suppressSwitch) {
+          setState(() => _suppressSwitch = false);
+        }
+      });
+    }
 
     return Scaffold(
       body: Stack(
@@ -85,11 +142,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                 : prevCover;
                             return GestureDetector(
                               behavior: HitTestBehavior.opaque,
-                              onHorizontalDragUpdate: (details) =>
-                                  setState(() => _drag += details.delta.dx),
-                              onHorizontalDragCancel: () =>
-                                  setState(() => _drag = 0),
-                              onHorizontalDragEnd: _onSwipe,
+                              onHorizontalDragStart: (_) {
+                                if (!_settling) _settle.stop();
+                              },
+                              onHorizontalDragUpdate: (details) {
+                                if (_settling) return;
+                                setState(() => _drag += details.delta.dx);
+                              },
+                              onHorizontalDragCancel: () {
+                                if (_settling) return;
+                                _animateDragTo(0);
+                              },
+                              onHorizontalDragEnd: (details) => _onSwipe(
+                                details,
+                                box.maxWidth,
+                                place.$1,
+                                place.$2,
+                              ),
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
@@ -107,9 +176,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                   Transform.translate(
                                     offset: Offset(offset, 0),
                                     child: AnimatedSwitcher(
-                                      duration: const Duration(
-                                        milliseconds: 320,
-                                      ),
+                                      duration: _suppressSwitch
+                                          ? Duration.zero
+                                          : const Duration(milliseconds: 260),
                                       switchInCurve: Curves.easeOutCubic,
                                       switchOutCurve: Curves.easeInCubic,
                                       transitionBuilder: (child, animation) {
@@ -156,22 +225,56 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _playing() =>
       ref.watch(playerSnapshotProviderValue.select((s) => s.playing));
 
-  void _onSwipe(DragEndDetails details) {
+  Future<void> _onSwipe(
+    DragEndDetails details,
+    double width,
+    List<String> queue,
+    int index,
+  ) async {
+    if (_settling) return;
     final velocity = details.primaryVelocity ?? 0;
     final dragged = _drag;
     final forward = velocity < 0 || (velocity == 0 && dragged < 0);
     if (velocity.abs() < 160 && dragged.abs() < 90) {
-      if (dragged != 0) setState(() => _drag = 0);
+      if (dragged != 0) _animateDragTo(0);
       return;
     }
-    final controller = ref.read(playbackControllerProvider);
-    setState(() => _drag = 0);
+
     _swipeDirection = forward ? 1 : -1;
-    if (forward) {
-      controller.skipNext();
-    } else {
-      controller.skipPrevious();
+    final controller = ref.read(playbackControllerProvider);
+    final neighborIndex = index + (forward ? 1 : -1);
+    final hasNeighbor = neighborIndex >= 0 && neighborIndex < queue.length;
+    if (!hasNeighbor) {
+      _animateDragTo(0);
+      if (forward) {
+        await controller.skipNext();
+      } else {
+        await controller.skipPrevious();
+      }
+      return;
     }
+
+    _settling = true;
+    await _animateDragTo(forward ? -width : width);
+    if (!mounted) return;
+    _pendingTrackChange = true;
+    _suppressSwitch = true;
+    unawaited(controller.skipToIndex(neighborIndex));
+    // Если current так и не сменился (очередь перестроилась или резолв
+    // завис), возвращаем обложку на место, а не оставляем пустой экран.
+    Timer(const Duration(milliseconds: 900), () {
+      if (!mounted || !_pendingTrackChange) return;
+      _pendingTrackChange = false;
+      _settling = false;
+      _suppressSwitch = false;
+      _animateDragTo(0);
+    });
+  }
+
+  Future<void> _animateDragTo(double target) {
+    _settleFrom = _drag;
+    _settleTo = target;
+    return _settle.forward(from: 0).whenComplete(() {});
   }
 }
 
@@ -261,11 +364,7 @@ class _TopBar extends ConsumerWidget {
           IconButton(
             tooltip: l.playerQueue,
             icon: const Icon(Icons.queue_music_rounded),
-            onPressed: () => showModalBottomSheet<void>(
-              context: context,
-              showDragHandle: true,
-              builder: (context) => const _QueueSheet(),
-            ),
+            onPressed: () => showQueueSheet(context),
           ),
           IconButton(
             tooltip: l.playerSleep,
@@ -504,7 +603,17 @@ class _Controls extends ConsumerWidget {
     final repeat = ref.watch(
       playerSnapshotProviderValue.select((s) => s.repeat),
     );
-    final liked = ref.watch(playerSnapshotProviderValue.select((s) => s.liked));
+    final feedback = ref.watch(
+      playerSnapshotProviderValue.select((s) => (s.liked, s.disliked)),
+    );
+    final liked = feedback.$1;
+    final disliked = feedback.$2;
+    ref.listen(
+      playerSnapshotProviderValue.select((s) => (s.liked, s.disliked)),
+      (previous, next) {
+        if (previous != next) ref.invalidate(collectionProvider);
+      },
+    );
     final busy = ref.watch(
       playerSnapshotProviderValue.select((s) => s.buffering && !s.playing),
     );
@@ -554,17 +663,25 @@ class _Controls extends ConsumerWidget {
                 ? Icons.favorite_rounded
                 : Icons.favorite_outline_rounded,
             tooltip: liked ? l.commonUnlike : l.commonLike,
-            onPressed: () => _toggleLike(context, ref, liked),
+            onPressed: () => _toggleFeedback(context, ref, liked ? 0 : 1),
+          ),
+          _ControlButton(
+            active: disliked,
+            icon: disliked
+                ? Icons.thumb_down_alt_rounded
+                : Icons.thumb_down_alt_outlined,
+            tooltip: disliked ? l.feedbackUndislike : l.feedbackDislike,
+            onPressed: () => _toggleFeedback(context, ref, disliked ? 0 : -1),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _toggleLike(
+  Future<void> _toggleFeedback(
     BuildContext context,
     WidgetRef ref,
-    bool liked,
+    int next,
   ) async {
     final l = AppLocalizations.of(context);
     final current = ref.read(playbackControllerProvider).snapshot.current;
@@ -572,11 +689,9 @@ class _Controls extends ConsumerWidget {
     final services = ref.read(appServicesProvider);
     final downloader = ref.read(downloadControllerProvider.notifier);
     final controller = ref.read(playbackControllerProvider);
-    final next = liked ? 0 : 1;
-    await services.db.libraryDao.setLike(
+    final synced = await LibraryActions(services).setFeedback(
       current.localTrackId,
       next,
-      remoteSource: next == 1 ? SourceId.yandex : null,
     );
     if (next == 1) {
       await downloader.trackLiked(current.localTrackId);
@@ -585,9 +700,14 @@ class _Controls extends ConsumerWidget {
     if (!ref.context.mounted) return;
     ref.invalidate(collectionProvider);
     if (context.mounted) {
+      final message = switch (next) {
+        1 => l.waveLikeAdded,
+        -1 => l.feedbackDislikeAdded,
+        _ => l.feedbackCleared,
+      };
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(next == 1 ? l.waveLikeAdded : l.waveLikeRemoved),
+          content: Text(synced ? message : '$message · ${l.feedbackLocalOnly}'),
         ),
       );
     }
@@ -616,6 +736,8 @@ class _ControlButton extends StatelessWidget {
       onPressed: onPressed,
       iconSize: size,
       color: active ? scheme.primary : scheme.onSurface,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 42, height: 48),
       icon: Icon(icon),
     );
     if (tooltip == null) return button;
@@ -769,6 +891,15 @@ class _IssueBanner extends StatelessWidget {
   }
 }
 
+Future<void> showQueueSheet(BuildContext context) =>
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+      builder: (context) => const _QueueSheet(),
+    );
+
 class _QueueSheet extends ConsumerWidget {
   const _QueueSheet();
 
@@ -777,49 +908,207 @@ class _QueueSheet extends ConsumerWidget {
     final snapshot = ref.watch(
       playerSnapshotProviderValue.select((s) => (s.queue, s.index)),
     );
-    final controller = ref.read(playbackControllerProvider);
     final l = AppLocalizations.of(context);
     final queue = snapshot.$1;
     final current = snapshot.$2;
+    final rows = ref.watch(queueRowsProvider(queue));
 
-    if (queue.isEmpty) {
-      return SafeArea(child: Center(child: Text(l.playerQueueEmpty)));
-    }
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.58,
+      minChildSize: 0.32,
+      maxChildSize: 0.96,
+      snap: true,
+      shouldCloseOnMinExtent: true,
+      builder: (context, scroll) => switch (rows) {
+        AsyncValue(:final error?) => ListView(
+          controller: scroll,
+          children: [
+            const _QueueHeader(),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(l.dbError('$error'), textAlign: TextAlign.center),
+            ),
+          ],
+        ),
+        AsyncData() when queue.isEmpty => ListView(
+          controller: scroll,
+          children: [
+            const _QueueHeader(),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(l.playerQueueEmpty, textAlign: TextAlign.center),
+            ),
+          ],
+        ),
+        AsyncValue(:final value?) => ListView.builder(
+          controller: scroll,
+          padding: EdgeInsets.only(
+            bottom: 8 + MediaQuery.viewPaddingOf(context).bottom,
+          ),
+          itemCount: value.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) return _QueueHeader(count: value.length);
+            final position = index - 1;
+            return _QueueRow(
+              row: value[position],
+              position: position,
+              current: position == current,
+              onTap: () {
+                // Позиция, а не id: у повтора в плейлисте одна и та же строка
+                // стоит несколько раз, и поиск по id прыгал всегда на первую.
+                ref
+                    .read(playbackControllerProvider)
+                    .skipToIndex(position);
+                Navigator.of(context).pop();
+              },
+            );
+          },
+        ),
+        _ => ListView(
+          controller: scroll,
+          children: const [
+            _QueueHeader(),
+            Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ],
+        ),
+      },
+    );
+  }
+}
 
-    return SafeArea(
-      child: ListView.builder(
-        shrinkWrap: true,
-        itemCount: queue.length,
-        itemBuilder: (context, index) {
-          final id = queue[index];
-          return ListTile(
-            leading: Text('${index + 1}'),
-            title: _QueueTitle(trackId: id),
-            selected: index == current,
-            onTap: () {
-              // Позиция, а не id: у повтора в плейлисте одна и та же строка
-              // стоит несколько раз, и поиск по id прыгал всегда на первую.
-              controller.skipToIndex(index);
-              Navigator.of(context).pop();
-            },
-          );
-        },
+class _QueueHeader extends StatelessWidget {
+  const _QueueHeader({this.count});
+
+  final int? count;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+      child: Column(
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  AppLocalizations.of(context).playerQueue,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              if (count != null)
+                Text(
+                  '$count',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _QueueTitle extends ConsumerWidget {
-  const _QueueTitle({required this.trackId});
+class _QueueRow extends StatelessWidget {
+  const _QueueRow({
+    required this.row,
+    required this.position,
+    required this.current,
+    required this.onTap,
+  });
 
-  final String trackId;
+  final CollectionRow row;
+  final int position;
+  final bool current;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Text(
-    ref.watch(trackTitleProvider(trackId)).value ?? trackId,
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-  );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Material(
+      color: current
+          ? scheme.primary.withValues(alpha: 0.10)
+          : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 7, 16, 7),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 24,
+                child: Text(
+                  '${position + 1}',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: current ? scheme.primary : scheme.onSurfaceVariant,
+                    fontWeight: current ? FontWeight.w700 : null,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              TrackCover(
+                url: row.coverPath ?? row.coverUrl,
+                size: 44,
+                radius: 10,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      row.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: current ? scheme.primary : scheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      row.artist.isEmpty ? row.source.wire : row.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                row.durationSec > 0
+                    ? _format(Duration(seconds: row.durationSec))
+                    : '',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Таймер сна живёт в плеере, а не в экране: закрытие страницы его не сбрасывает.

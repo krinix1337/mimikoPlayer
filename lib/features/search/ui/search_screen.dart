@@ -9,7 +9,9 @@ import '../../../core/content/ai_filter.dart';
 import '../../../core/sources/source_dto.dart';
 import '../../../features/auth/ui/yandex_login.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../router/player_launch.dart';
 import '../../../router/routes.dart';
+import '../../../sources/yandex/yandex_source.dart';
 import '../../../widgets/remote_track_actions.dart';
 import '../../../widgets/track_badges.dart';
 import '../../../widgets/track_cover.dart';
@@ -67,6 +69,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final hits = _query.isEmpty
         ? const AsyncValue<List<SourceSearchHit>>.data([])
         : ref.watch(combinedSearchProvider(_query));
+    final sections = _query.isEmpty
+        ? const AsyncValue<SearchSections>.data(SearchSections())
+        : ref.watch(yandexSearchSectionsProvider(_query));
     final auth =
         ref.watch(yandexAuthStateProvider).value ?? const AuthUnknown();
     final history = ref.watch(prefsProvider.select((p) => p.searchHistory));
@@ -156,16 +161,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     loading: () =>
                         const Center(child: CircularProgressIndicator()),
                     error: (error, _) => Center(child: Text(l.searchFailed)),
-                    data: (list) => list.isEmpty
+                    data: (list) =>
+                        list.isEmpty &&
+                            sections.value?.isEmpty != false &&
+                            sections.isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : list.isEmpty && sections.value?.isEmpty != false
                         ? Center(child: Text(l.searchNoResults))
-                        : ListView.builder(
-                            itemCount: list.length,
-                            itemBuilder: (context, index) => _HitTile(
-                              hit: list[index],
-                              all: list,
-                              index: index,
-                              query: _query,
-                            ),
+                        : _SearchResults(
+                            hits: list,
+                            sections: sections.value,
+                            query: _query,
                           ),
                   ),
           ),
@@ -173,6 +179,107 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
     );
   }
+}
+
+class _SearchResults extends StatelessWidget {
+  const _SearchResults({
+    required this.hits,
+    required this.sections,
+    required this.query,
+  });
+
+  final List<SourceSearchHit> hits;
+  final SearchSections? sections;
+  final String query;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final artists = sections?.artists ?? const <SearchArtistHit>[];
+    final albums = sections?.albums ?? const <AlbumBrief>[];
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 24),
+      children: [
+        if (artists.isNotEmpty) ...[
+          _SectionTitle(title: l.searchArtists),
+          for (final artist in artists.take(4))
+            ListTile(
+              leading: ClipOval(
+                child: TrackCover(url: artist.coverUrl, size: 44),
+              ),
+              title: Text(
+                artist.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: artist.trackCount == null
+                  ? null
+                  : Text('${artist.trackCount}'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => context.push(Routes.artistFor(artist.remoteId)),
+            ),
+        ],
+        if (albums.isNotEmpty) ...[
+          _SectionTitle(title: l.searchAlbums),
+          SizedBox(
+            height: 188,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: albums.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final album = albums[index];
+                return SizedBox(
+                  width: 128,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () =>
+                        context.push(Routes.albumFor(album.remoteId)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TrackCover(url: album.coverUrl, size: 128),
+                        const SizedBox(height: 6),
+                        Text(
+                          album.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall,
+                        ),
+                        Text(
+                          album.artists.join(', '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+        if (hits.isNotEmpty) _SectionTitle(title: l.searchTracks),
+        for (var i = 0; i < hits.length; i++)
+          _HitTile(hit: hits[i], all: hits, index: i, query: query),
+      ],
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
+    child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+  );
 }
 
 class _HitTile extends ConsumerWidget {
@@ -253,7 +360,7 @@ class _HitTile extends ConsumerWidget {
         'title': searchLabel,
       },
     );
-    router.push(Routes.player);
+    openPlayerRouter(router);
   }
 }
 

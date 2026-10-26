@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../app_providers.dart';
 import '../../../features/downloads/download_service.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../router/routes.dart';
+import '../../../router/player_launch.dart';
 import '../../../theme/app_motion.dart';
 import '../../../theme/blur_settings.dart';
 import '../../../theme/keyboard_theme.dart';
@@ -80,7 +79,7 @@ class MiniPlayer extends ConsumerWidget {
                   ),
             shadow: false,
             child: InkWell(
-              onTap: () => context.push(Routes.player),
+              onTap: () => openPlayer(context),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [

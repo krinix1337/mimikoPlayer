@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,11 +10,12 @@ import '../../../core/platform/mimiko_platform.dart';
 import '../../../core/sources/source_dto.dart';
 import '../../../features/player/player_snapshot.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../router/player_launch.dart';
 import '../../../router/routes.dart';
-import '../../../theme/app_insets.dart';
 import '../../../theme/app_motion.dart';
 import '../../../features/downloads/download_service.dart';
 import '../../../features/player/ui/mini_player.dart';
+import '../playlist_create.dart';
 import '../../../widgets/glass_top_bar.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/track_cover.dart';
@@ -40,9 +43,8 @@ class CollectionKindScreen extends ConsumerWidget {
     };
 
     return Scaffold(
-      // Пилюля плавает над списком: без extendBody над ней остаётся полоса,
-      // которая режет обложки и строки.
-      extendBody: true,
+      // Список заканчивается у мини-плеера, без пустого хвоста под ним.
+      extendBody: false,
       // Пилюля уважает настройку и не заезжает под системную навигацию.
       bottomNavigationBar: SafeArea(
         top: false,
@@ -112,9 +114,6 @@ class CollectionKindScreen extends ConsumerWidget {
                 ),
               ),
             ],
-            const SliverToBoxAdapter(
-              child: SizedBox(height: kMiniPlayerBottomInset),
-            ),
           ],
         ),
       ),
@@ -168,7 +167,7 @@ class CollectionKindScreen extends ConsumerWidget {
     if (shuffle) {
       await controller.setShuffle(PlaybackShuffle.shuffled);
     }
-    router.push(Routes.player);
+    openPlayerRouter(router);
   }
 }
 
@@ -533,17 +532,39 @@ class _CoverMosaic extends StatelessWidget {
 }
 
 /// Сетка импортированных плейлистов.
-class PlaylistsScreen extends ConsumerWidget {
+class PlaylistsScreen extends ConsumerStatefulWidget {
   const PlaylistsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PlaylistsScreen> createState() => _PlaylistsScreenState();
+}
+
+class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(ref.read(playlistSyncProvider.notifier).refresh());
+      }
+    });
+  }
+
+  Future<void> _create() async {
+    final draft = await showCreatePlaylistSheet(context, ref);
+    if (draft != null && mounted) {
+      context.push(Routes.playlist(draft.id));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final playlists = ref.watch(playlistsProvider);
 
     return Scaffold(
-      // Обложки уходят под плавающую пилюлю, а не режутся полосой над ней.
-      extendBody: true,
+      // Сетка заканчивается у мини-плеера, а не уезжает под него.
+      extendBody: false,
       // Пилюля уважает настройку и не заезжает под системную навигацию.
       bottomNavigationBar: SafeArea(
         top: false,
@@ -553,61 +574,84 @@ class PlaylistsScreen extends ConsumerWidget {
               : const SizedBox.shrink(),
         ),
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            pinned: true,
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            title: Text(l.collectionPlaylists),
-            titleTextStyle: Theme.of(context).textTheme.headlineSmall,
-          ),
-          switch (playlists) {
-            AsyncError(:final error) => SliverFillRemaining(
-              hasScrollBody: false,
-              child: _ErrorBox(text: l.dbError('$error')),
+      body: RefreshIndicator(
+        onRefresh: () =>
+            ref.read(playlistSyncProvider.notifier).refresh(force: true),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              title: Text(l.collectionPlaylists),
+              titleTextStyle: Theme.of(context).textTheme.headlineSmall,
+              actions: [
+                IconButton(
+                  tooltip: l.playlistCreate,
+                  icon: const Icon(Icons.add_rounded),
+                  onPressed: _create,
+                ),
+              ],
             ),
-            AsyncData(:final value) when value.isEmpty => SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
+            switch (playlists) {
+              AsyncError(:final error) => SliverFillRemaining(
+                hasScrollBody: false,
+                child: _ErrorBox(text: l.dbError('$error')),
+              ),
+              AsyncData(:final value) when value.isEmpty =>
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(28),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            l.collectionEmptyPlaylists,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                          const SizedBox(height: 16),
+                          FilledButton.tonalIcon(
+                            onPressed: _create,
+                            icon: const Icon(Icons.add_rounded),
+                            label: Text(l.playlistCreate),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              AsyncData(:final value) => SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 220,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 14,
+                    childAspectRatio: 0.78,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    childCount: value.length,
+                    (context, index) => RiseIn(
+                      delay: Duration(
+                        milliseconds: (index * 24).clamp(0, 200),
+                      ),
+                      child: _PlaylistCard(playlist: value[index]),
+                    ),
+                  ),
+                ),
+              ),
+              _ => const SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.all(28),
-                  child: Text(
-                    l.collectionEmptyPlaylists,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
+                  padding: EdgeInsets.all(48),
+                  child: Center(child: CircularProgressIndicator()),
                 ),
               ),
-            ),
-            AsyncData(:final value) => SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 220,
-                  mainAxisSpacing: 14,
-                  crossAxisSpacing: 14,
-                  childAspectRatio: 0.78,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  childCount: value.length,
-                  (context, index) => RiseIn(
-                    delay: Duration(milliseconds: (index * 24).clamp(0, 200)),
-                    child: _PlaylistCard(playlist: value[index]),
-                  ),
-                ),
-              ),
-            ),
-            _ => const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(48),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ),
-          },
-          const SliverToBoxAdapter(
-            child: SizedBox(height: kMiniPlayerBottomInset),
-          ),
-        ],
+            },
+          ],
+        ),
       ),
     );
   }
@@ -672,9 +716,8 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
     final detail = ref.watch(playlistProvider(widget.playlistId));
 
     return Scaffold(
-      // Фон с оттенком обложки должен уходить под мини-плеер, иначе вокруг
-      // пилюли остаётся чёрная полоса.
-      extendBody: true,
+      // Список заканчивается у мини-плеера, без пустой полосы под ним.
+      extendBody: false,
       // Пилюля уважает настройку и не заезжает под системную навигацию.
       bottomNavigationBar: SafeArea(
         top: false,
@@ -794,11 +837,6 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
                       kind: 'playlist',
                     ),
                   ),
-                  // Место под плавающую пилюлю мини-плеера: с extendBody
-                  // список уезжает под неё.
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: kMiniPlayerBottomInset),
-                  ),
                 ],
               ),
               Positioned(
@@ -873,12 +911,13 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
     if (shuffle) {
       await controller.setShuffle(PlaybackShuffle.shuffled);
     }
-    router.push(Routes.player);
+    openPlayerRouter(router);
   }
 
   /// Ссылка на плейлист Яндекса: `ownerUid:kind` уже внутри локального id,
   /// а для своих плейлистов владелец - текущий аккаунт.
   String? _shareLink(WidgetRef ref, PlaylistOverview overview) {
+    if (overview.source != 'yandex') return null;
     final raw = overview.id.startsWith('yandex:')
         ? overview.id.substring(7)
         : overview.id;

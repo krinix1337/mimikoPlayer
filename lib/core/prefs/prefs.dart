@@ -27,6 +27,7 @@ final class Prefs {
     this.showMiniPlayer = true,
     this.homeBackground = HomeBackground.both,
     this.waveOnWifiOnly = false,
+    this.waveSoundCloud = false,
     this.showNavLabels = true,
     this.artworkShape = ArtworkShape.rounded,
     this.hideAiTracks = false,
@@ -46,6 +47,7 @@ final class Prefs {
     this.eqPreset = 'flat',
     this.eqCustomGains = const [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     this.eqCustomLevel = 0,
+    this.githubToken = '',
   });
 
   final ThemeMode themeMode;
@@ -63,6 +65,9 @@ final class Prefs {
   final bool fade;
 
   final bool waveOnWifiOnly;
+
+  /// Подмешивать в волну треки из SoundCloud рядом с рекомендациями Яндекса.
+  final bool waveSoundCloud;
 
   /// Размер строк в караоке и приглушение неактивных строк.
   final LyricsSize lyricsSize;
@@ -126,6 +131,10 @@ final class Prefs {
   final List<double> eqCustomGains;
   final double eqCustomLevel;
 
+  /// Fine-grained PAT для приватных GitHub Releases. Хранится только на
+  /// устройстве и никогда не попадает в APK, если не задан при сборке.
+  final String githubToken;
+
   Locale? get locale => localeCode == null ? null : Locale(localeCode!);
 
   /// Длительность перехода с учётом пользовательского масштаба анимаций.
@@ -152,6 +161,7 @@ final class Prefs {
     String? quality,
     bool? fade,
     bool? waveOnWifiOnly,
+    bool? waveSoundCloud,
     LyricsSize? lyricsSize,
     bool? lyricsDimOthers,
     bool? compactUi,
@@ -177,6 +187,7 @@ final class Prefs {
     String? eqPreset,
     List<double>? eqCustomGains,
     double? eqCustomLevel,
+    String? githubToken,
   }) => Prefs(
     themeMode: themeMode ?? this.themeMode,
     palette: palette ?? this.palette,
@@ -190,6 +201,7 @@ final class Prefs {
     quality: quality ?? this.quality,
     fade: fade ?? this.fade,
     waveOnWifiOnly: waveOnWifiOnly ?? this.waveOnWifiOnly,
+    waveSoundCloud: waveSoundCloud ?? this.waveSoundCloud,
     lyricsSize: lyricsSize ?? this.lyricsSize,
     lyricsDimOthers: lyricsDimOthers ?? this.lyricsDimOthers,
     compactUi: compactUi ?? this.compactUi,
@@ -217,6 +229,7 @@ final class Prefs {
     eqPreset: eqPreset ?? this.eqPreset,
     eqCustomGains: eqCustomGains ?? this.eqCustomGains,
     eqCustomLevel: eqCustomLevel ?? this.eqCustomLevel,
+    githubToken: githubToken ?? this.githubToken,
   );
 
   Map<String, Object?> toJson() => {
@@ -232,6 +245,7 @@ final class Prefs {
     'quality': quality,
     'fade': fade,
     'wave_on_wifi_only': waveOnWifiOnly,
+    'wave_soundcloud': waveSoundCloud,
     'lyrics_size': lyricsSize.name,
     'lyrics_dim': lyricsDimOthers,
     'compact_ui': compactUi,
@@ -256,6 +270,7 @@ final class Prefs {
     'eq_preset': eqPreset,
     'eq_custom_gains': eqCustomGains,
     'eq_custom_level': eqCustomLevel,
+    'github_token': githubToken,
   };
 
   static Prefs fromJson(Map<String, Object?> json) {
@@ -301,6 +316,7 @@ final class Prefs {
       quality: json['quality'] is String ? json['quality']! as String : 'auto',
       fade: json['fade'] != false,
       waveOnWifiOnly: json['wave_on_wifi_only'] == true,
+      waveSoundCloud: json['wave_soundcloud'] == true,
       lyricsSize: required('lyrics_size', LyricsSize.values, LyricsSize.normal),
       lyricsDimOthers: json['lyrics_dim'] != false,
       compactUi: json['compact_ui'] != false,
@@ -360,6 +376,9 @@ final class Prefs {
         final num value => value.toDouble().clamp(-12.0, 12.0).toDouble(),
         _ => 0,
       },
+      githubToken: json['github_token'] is String
+          ? (json['github_token']! as String).trim()
+          : '',
       searchHistory: switch (json['search_history']) {
         final List<Object?> items => [
           for (final item in items)
@@ -437,20 +456,24 @@ enum LyricsSize {
 /// Иконка в лаунчере: `activity-alias` с этим компонентом включается,
 /// остальные отключаются. `defaultIcon` — основной `<activity>`.
 enum LauncherIcon {
-  defaultIcon('MimikoLauncherDefault'),
-  acid('MimikoLauncherAcid'),
-  mono('MimikoLauncherMono'),
-  night('MimikoLauncherNight'),
-  sunset('MimikoLauncherSunset'),
-  mint('MimikoLauncherMint'),
-  violet('MimikoLauncherViolet'),
-  ice('MimikoLauncherIce'),
-  amber('MimikoLauncherAmber'),
-  forest('MimikoLauncherForest');
+  defaultIcon(
+    'MimikoLauncherDefault',
+    'assets/icon/variants/default.png',
+  ),
+  acid('MimikoLauncherAcid', 'assets/icon/variants/acid.png'),
+  mono('MimikoLauncherMono', 'assets/icon/variants/mono.png'),
+  night('MimikoLauncherNight', 'assets/icon/variants/night.png'),
+  sunset('MimikoLauncherSunset', 'assets/icon/variants/sunset.png'),
+  mint('MimikoLauncherMint', 'assets/icon/variants/mint.png'),
+  violet('MimikoLauncherViolet', 'assets/icon/variants/violet.png'),
+  ice('MimikoLauncherIce', 'assets/icon/variants/ice.png'),
+  amber('MimikoLauncherAmber', 'assets/icon/variants/amber.png'),
+  forest('MimikoLauncherForest', 'assets/icon/variants/forest.png');
 
-  const LauncherIcon(this.component);
+  const LauncherIcon(this.component, this.asset);
 
   final String component;
+  final String asset;
 
   static LauncherIcon fromComponent(String component) {
     for (final icon in values) {

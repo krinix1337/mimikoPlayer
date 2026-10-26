@@ -121,8 +121,8 @@ class YandexSource implements MusicSource {
     return YandexDto.tracks(result.data);
   }
 
-  /// Лайки аккаунта: эндпоинт отдаёт только пары id/albumId, поэтому
-  /// метаданные добираются через [getTracksByIds].
+  /// Лайки и «нелюбимое» аккаунта: эндпоинт отдаёт только пары id/albumId,
+  /// поэтому метаданные добираются через [getTracksByIds].
   ///
   /// `limit: null` — сколько отдал Я.Музыка: страница `/likes/tracks`
   /// не пагинируется и приносит всю коллекцию целиком (на аккаунте
@@ -132,10 +132,29 @@ class YandexSource implements MusicSource {
   int lastLikesExpected = 0;
 
   Future<List<LikedTrack>> likedTracks({int? limit}) async {
+    final tracks = await _libraryTracks('likes', limit: limit);
+    lastLikesExpected = _lastLibraryExpected;
+    return tracks;
+  }
+
+  /// «Нелюбимое»: тот же формат, что у лайков, только путь `dislikes`.
+  Future<List<LikedTrack>> dislikedTracks({int? limit}) async {
+    final tracks = await _libraryTracks('dislikes', limit: limit);
+    lastDislikesExpected = _lastLibraryExpected;
+    return tracks;
+  }
+
+  int lastDislikesExpected = 0;
+  int _lastLibraryExpected = 0;
+
+  Future<List<LikedTrack>> _libraryTracks(
+    String kind, {
+    int? limit,
+  }) async {
     final uid = auth is AuthReady ? (auth as AuthReady).uid : null;
     if (uid == null) return const [];
 
-    final result = await _api.get('/users/$uid/likes/tracks');
+    final result = await _api.get('/users/$uid/$kind/tracks');
     final library = result.asMap?['library'];
     final pairs = library is Map ? library['tracks'] : null;
     if (pairs is! List) return const [];
@@ -162,7 +181,7 @@ class YandexSource implements MusicSource {
       refs.add(ref);
     }
 
-    lastLikesExpected = refs.length;
+    _lastLibraryExpected = refs.length;
     final liked = <LikedTrack>[];
     for (var i = 0; i < refs.length; i += 50) {
       final batch = await getTracksByIds(
@@ -246,9 +265,13 @@ class YandexSource implements MusicSource {
     // `/playlists` отдаёт только короткие ссылки `{id, albumId}` — без
     // названий, артистов и длительности. Если скормить их ingest напрямую,
     // у всех треков оказывается один и тот же пустой отпечаток, и плейлист
-    // схлопывается в одну случайную песню. Поэтому добираем полные объекты.
+    // схлопывается в одну случайную песню. Чужие публичные плейлисты уже
+    // приходят с полными объектами внутри `track`; их берём как есть.
+    final nested = _nestedPlaylistTracks(first['tracks']);
     final refs = playlistTrackRefs(first['tracks']);
-    final tracks = await _resolvePlaylistTracks(refs);
+    final tracks = nested.isNotEmpty
+        ? nested
+        : await _resolvePlaylistTracks(refs);
     // Частично разрешённый плейлист не импортируем: импорт заменяет связи
     // целиком, и обрезанный список стёр бы то, что уже есть.
     if (tracks == null) return null;
@@ -268,6 +291,35 @@ class YandexSource implements MusicSource {
       tracks: tracks,
     );
   }
+
+  /// Полные треки из публичного плейлиста: элемент выглядит как
+  /// `{id, timestamp, track: {...}}`. Собственные плейлисты так не отдают.
+  static List<SourceTrack> _nestedPlaylistTracks(Object? value) => [
+    for (final item in (value is List ? value : const <Object>[]))
+      if (item is Map && item['track'] is Map)
+        YandexDto.track(Map<String, dynamic>.from(item['track'] as Map)),
+  ];
+
+  /// Только обложка плейлиста — для карточки станции без выгрузки всех треков.
+  Future<String?> playlistCover(String remotePlaylistId) async {
+    final uid = auth is AuthReady ? (auth as AuthReady).uid : null;
+    if (uid == null) return null;
+    final parts = remotePlaylistId.split(':');
+    final owner = parts.length == 2 ? parts.first : uid;
+    final kind = parts.length == 2 ? parts.last : remotePlaylistId;
+    final result = await _api.get('/users/$owner/playlists', {'kinds': kind});
+    if (!result.isOk) return null;
+    final first = result.asList.where(
+      (item) => item['kind'].toString() == kind,
+    ).firstOrNull;
+    if (first == null) return null;
+    return YandexDto.coverFrom(first['cover']) ??
+        YandexDto.coverUrl(first['coverUri']);
+  }
+
+  /// Треки плейлиста без импорта в коллекцию: нужны станции «Крутая музыка».
+  Future<List<SourceTrack>> playlistTracks(String remotePlaylistId) async =>
+      (await getPlaylist(remotePlaylistId))?.tracks ?? const [];
 
   /// Короткие ссылки из ответа `/playlists`: `{timestamp, id, albumId}`.
   static List<RemoteTrackRef> playlistTrackRefs(Object? value) => [
@@ -681,6 +733,110 @@ class YandexSource implements MusicSource {
     return result.isOk;
   }
 
+  /// Ставит отметку «нравится» (1), «не рекомендовать» (-1) или снимает её
+  /// (0). Яндекс сам убирает противоположную отметку, но для предсказуемого
+  /// состояния локальной базы сначала снимаем её явно.
+  Future<bool> setTrackFeedback(String trackId, int state) async {
+    final uid = auth is AuthReady ? (auth as AuthReady).uid : null;
+    if (uid == null) return false;
+
+    Future<bool> send(String kind, String action) async {
+      final result = await _api.post(
+        '/users/$uid/$kind/tracks/$action',
+        body: {'track-ids': trackId},
+        form: true,
+      );
+      return result.isOk;
+    }
+
+    switch (state) {
+      case 1:
+        await send('dislikes', 'remove');
+        return send('likes', 'add-multiple');
+      case -1:
+        await send('likes', 'remove');
+        return send('dislikes', 'add-multiple');
+      default:
+        final like = await send('likes', 'remove');
+        final dislike = await send('dislikes', 'remove');
+        return like || dislike;
+    }
+  }
+
+  /// Создаёт пустой плейлист на сервере и возвращает его `kind`.
+  Future<String?> createPlaylist({
+    required String title,
+    String visibility = 'public',
+  }) async {
+    final uid = auth is AuthReady ? (auth as AuthReady).uid : null;
+    if (uid == null) return null;
+    final result = await _api.post(
+      '/users/$uid/playlists/create',
+      body: {'title': title, 'visibility': visibility},
+      form: true,
+    );
+    if (!result.isOk) return null;
+    final kind = result.asMap?['kind'];
+    return kind == null ? null : '$kind';
+  }
+
+  /// Артисты и альбомы одним запросом `type=all`; треки на экране поиска
+  /// приходят из общего каскада, поэтому здесь они не дублируются.
+  Future<SearchSections> searchSections(String query, {int limit = 6}) async {
+    if (query.trim().isEmpty) return const SearchSections();
+    final result = await _api.get('/search', {
+      'text': query,
+      'type': 'all',
+      'page': '0',
+      'page-size': '$limit',
+    });
+    if (!result.isOk) return const SearchSections();
+    final data = result.asMap;
+
+    List<Map<String, dynamic>> section(String key) {
+      final block = data?[key];
+      final results = block is Map ? block['results'] : null;
+      return [
+        for (final item in (results is List ? results : const []))
+          if (item is Map) Map<String, dynamic>.from(item),
+      ];
+    }
+
+    return SearchSections(
+      artists: [
+        for (final item in section('artists').take(limit))
+          SearchArtistHit(
+            remoteId: '${item['id']}',
+            name: '${item['name'] ?? ''}',
+            coverUrl:
+                YandexDto.coverFrom(item['cover'], size: '400x400') ??
+                YandexDto.coverUrl(item['ogImage'], size: '400x400'),
+            trackCount: (item['counts'] as Map?)?['tracks'] as num?,
+          ),
+      ],
+      albums: [
+        for (final item in section('albums').take(limit))
+          AlbumBrief(
+            remoteId: '${item['id']}',
+            title: '${item['title'] ?? ''}',
+            artists: [
+              for (final artist in (item['artists'] as List? ?? const []))
+                if (artist is Map) '${artist['name'] ?? ''}',
+            ],
+            artistIds: [
+              for (final artist in (item['artists'] as List? ?? const []))
+                if (artist is Map) '${artist['id'] ?? ''}',
+            ],
+            coverUrl:
+                YandexDto.coverFrom(item['cover']) ??
+                YandexDto.coverUrl(item['coverUri']),
+            year: (item['year'] as num?)?.toInt(),
+            trackCount: (item['trackCount'] as num?)?.toInt(),
+          ),
+      ],
+    );
+  }
+
   @override
   Future<void> dispose() async {
     await _authChanges.close();
@@ -714,6 +870,32 @@ final class LikedTrack {
 
   final SourceTrack track;
   final DateTime? likedAt;
+}
+
+final class SearchArtistHit {
+  const SearchArtistHit({
+    required this.remoteId,
+    required this.name,
+    this.coverUrl,
+    this.trackCount,
+  });
+
+  final String remoteId;
+  final String name;
+  final String? coverUrl;
+  final num? trackCount;
+}
+
+final class SearchSections {
+  const SearchSections({
+    this.artists = const [],
+    this.albums = const [],
+  });
+
+  final List<SearchArtistHit> artists;
+  final List<AlbumBrief> albums;
+
+  bool get isEmpty => artists.isEmpty && albums.isEmpty;
 }
 
 final class ArtistBrief {

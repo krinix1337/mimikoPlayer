@@ -82,9 +82,16 @@ final downloadedFilesSummaryProvider =
           .watchCompletedFilesSummary(),
     );
 
-final sourcePriorityProvider = FutureProvider<List<SourceId>>(
-  (ref) => ref.watch(appServicesProvider).db.settingsDao.playbackPriority(),
-);
+final sourcePriorityProvider = FutureProvider<List<SourceId>>((ref) async {
+  final services = ref.watch(appServicesProvider);
+  final order = await services.db.settingsDao.playbackPriority();
+  // В сохранённом порядке могли остаться источники, которых больше нет в
+  // сборке (например, YouTube): в настройках им нечего показывать.
+  return [
+    for (final id in order)
+      if (services.registry.byId(id) != null) id,
+  ];
+});
 
 /// Стартовое значение читает main() до runApp: провайдер берёт его при первом
 /// build, дальше только перезапись одним blob'ом в `app_settings`.
@@ -149,6 +156,9 @@ class PrefsController extends Notifier<Prefs> {
       eqCustomLevel: level,
     ),
   );
+
+  Future<void> setGithubToken(String token) =>
+      _write(state.copyWith(githubToken: token.trim()));
 
   Future<void> setLyricsSize(LyricsSize size) =>
       _write(state.copyWith(lyricsSize: size));
@@ -251,20 +261,14 @@ class PrefsController extends Notifier<Prefs> {
 
   Future<void> setWaveOnWifiOnly(bool value) =>
       _write(state.copyWith(waveOnWifiOnly: value));
+
+  Future<void> setWaveSoundCloud(bool value) =>
+      _write(state.copyWith(waveSoundCloud: value));
 }
 
 final prefsProvider = NotifierProvider<PrefsController, Prefs>(
   PrefsController.new,
 );
-
-/// Заголовок трека по локальному id — для очередей и списков истории.
-final trackTitleProvider = FutureProvider.autoDispose.family<String, String>((
-  ref,
-  id,
-) async {
-  final track = await ref.watch(appServicesProvider).db.tracksDao.byId(id);
-  return track?.title ?? id;
-});
 
 /// Обложка трека по локальному id — нужна для превью соседнего трека при
 /// свайпе в плеере, где под рукой только очередь из id.
@@ -276,11 +280,18 @@ final trackCoverProvider = FutureProvider.autoDispose.family<String?, String>((
   return track?.coverUrl;
 });
 
+/// Полные строки очереди для шторки: номер, обложка, автор и длительность.
+final queueRowsProvider = FutureProvider.autoDispose
+    .family<List<CollectionRow>, List<String>>((ref, ids) async {
+      final db = ref.watch(appServicesProvider).db;
+      return db.libraryDao.rowsForIds(ids);
+    });
+
 /// Поиск по всем подключённым источникам сразу. Источник без входа
 /// молча пропускается: просить логиниться — дело экрана входа.
 ///
 /// Отдаём результаты по мере готовности, а не ждём самый медленный источник:
-/// иначе медленный YouTube держал пустой экран, хотя Яндекс уже ответил.
+/// иначе медленный SoundCloud держал пустой экран, хотя Яндекс уже ответил.
 /// Загружает список ИИ-исполнителей для бейджей «ИИ» в списках.
 /// Один общий future: строки только смотрят на его готовность.
 final aiBadgeReadyProvider = FutureProvider<void>((ref) async {
@@ -341,6 +352,17 @@ final combinedSearchProvider = StreamProvider.autoDispose
       );
       ref.onDispose(controller.close);
       return controller.stream;
+    });
+
+/// Артисты и альбомы для экрана поиска. Треки идут общим каскадом, поэтому
+/// здесь отдельный запрос `type=all` и только две секции.
+final yandexSearchSectionsProvider = FutureProvider.autoDispose
+    .family<SearchSections, String>((ref, query) async {
+      final source = ref.watch(yandexSourceProvider);
+      if (source == null || !ref.watch(yandexReadyProvider)) {
+        return const SearchSections();
+      }
+      return source.searchSections(query);
     });
 
 final yandexSourceProvider = Provider<YandexSource?>((ref) {
@@ -597,6 +619,7 @@ final chartProvider = FutureProvider<List<ChartEntry>>((ref) async {
 /// Без неё лайки остаются в том объёме, каким их застал прошлый импорт, —
 /// именно из-за этого в коллекции висело 500 из 1028.
 const String _likesSyncedKey = 'likes_synced_at_v2';
+const String _dislikesSyncedKey = 'dislikes_synced_at_v2';
 
 /// Прогрев «Обзора»: чарт и новинки качаются сразу после входа, а не в
 /// момент открытия вкладки. Без этого секция новинок появлялась позже всех
@@ -707,10 +730,39 @@ final librarySyncProvider = FutureProvider<void>((ref) async {
     }
   }
 
+  // «Нелюбимое» — отдельный список в API. Импортируем после лайков, чтобы
+  // трек, который на сервере уже не рекомендован, не остался любимым.
+  final lastDislikesRaw = await services.db.settingsDao.value(
+    _dislikesSyncedKey,
+  );
+  final lastDislikes = lastDislikesRaw == null
+      ? null
+      : DateTime.tryParse(lastDislikesRaw.replaceAll('"', ''));
+  final dislikesFresh =
+      lastDislikes != null &&
+      DateTime.now().difference(lastDislikes) < const Duration(hours: 6);
+  if (!dislikesFresh) {
+    try {
+      final dislikes = await importYandexDislikes(
+        source: source,
+        db: services.db,
+      );
+      await services.db.settingsDao.setValue(
+        _dislikesSyncedKey,
+        DateTime.now().toIso8601String(),
+      );
+      if (dislikes > 0) ref.invalidate(collectionProvider);
+    } on Object catch (error) {
+      AppLogger.instance.warn('«Нелюбимое» не синхронизировалось: $error');
+    }
+  }
+
   // Плейлисты — отдельно: падение одного не должно отменять лайки.
   try {
     final lists = await importYandexPlaylists(source: source, db: services.db);
-    AppLogger.instance.info('коллекция: $likes лайков, $lists плейлистов');
+    AppLogger.instance.info(
+      'коллекция: $likes лайков, $lists плейлистов',
+    );
     ref.invalidate(playlistsProvider);
   } on Object catch (error) {
     AppLogger.instance.warn('плейлисты не синхронизировались: $error');
@@ -814,6 +866,116 @@ Future<int> importYandexLikes({
   });
   return entries.length;
 }
+
+/// Импортирует «Нелюбимое» Яндекса. Отметка -1 перезаписывает локальный
+/// лайк: на сервере эти состояния взаимоисключающие.
+Future<int> importYandexDislikes({
+  required YandexSource? source,
+  required AppDatabase db,
+}) async {
+  if (source == null) return 0;
+  final entries = await source.dislikedTracks();
+  await db.transaction(() async {
+    for (final entry in entries) {
+      final ingested = await db.tracksDao.ingest(entry.track);
+      await db.libraryDao.setLike(
+        ingested.localTrackId,
+        -1,
+        remoteSource: SourceId.yandex,
+        refreshTimestamp: false,
+        likedAt: entry.likedAt,
+      );
+    }
+  });
+  return entries.length;
+}
+
+/// Быстрая синхронизация списка плейлистов: полные треки тянутся только у
+/// новых и изменившихся по количеству. Именно поэтому добавленный в другом
+/// клиенте плейлист появляется без перезапуска и без импорта всей коллекции.
+Future<int> syncYandexPlaylists({
+  required YandexSource? source,
+  required AppDatabase db,
+  int limit = 50,
+}) async {
+  if (source == null) return 0;
+  final summaries = <PlaylistSummary>[
+    ...await source.playlists(),
+    ...await source.likedPlaylists(),
+  ];
+  final local = {
+    for (final playlist in await db.libraryDao.playlistsOverview())
+      playlist.id: playlist,
+  };
+  var fetched = 0;
+  for (final summary in summaries.take(limit)) {
+    final id = 'yandex:${summary.remotePlaylistId}';
+    final existing = local[id];
+    final count = summary.trackCount;
+    final changed =
+        existing == null || (count != null && existing.trackCount != count);
+    if (!changed) continue;
+    final snapshot = await source.getPlaylist(summary.remotePlaylistId);
+    if (snapshot == null) continue;
+    await db.libraryDao.importPlaylist(
+      source: SourceId.yandex,
+      snapshot: snapshot,
+    );
+    fetched++;
+  }
+  if (summaries.length <= limit) {
+    await db.libraryDao.removePlaylistsExcept({
+      for (final summary in summaries) 'yandex:${summary.remotePlaylistId}',
+    });
+  }
+  return fetched;
+}
+
+/// Быстрый синк по запросу экрана или возврата приложения. Полный обход
+/// сервера не чаще раза в 30 секунд, если не просили force.
+class PlaylistSyncController extends Notifier<DateTime?> {
+  bool _running = false;
+
+  @override
+  DateTime? build() => null;
+
+  Future<bool> refresh({bool force = false}) async {
+    if (_running) return false;
+    final last = state;
+    if (!force &&
+        last != null &&
+        DateTime.now().difference(last) < const Duration(seconds: 30)) {
+      return false;
+    }
+    _running = true;
+    try {
+      final services = ref.read(appServicesProvider);
+      final source = ref.read(yandexSourceProvider);
+      if (source == null) return false;
+      final changed = await syncYandexPlaylists(
+        source: source,
+        db: services.db,
+      );
+      state = DateTime.now();
+      if (changed > 0) {
+        ref.invalidate(playlistsProvider);
+        ref.invalidate(collectionProvider);
+        ref.invalidate(playlistProvider);
+      }
+      return changed > 0;
+    } on Object catch (error) {
+      AppLogger.instance.warn('быстрый синк плейлистов: $error');
+      return false;
+    } finally {
+      _running = false;
+    }
+  }
+}
+
+final playlistSyncProvider =
+    NotifierProvider<PlaylistSyncController, DateTime?>(
+      PlaylistSyncController.new,
+    );
 
 /// Сохраняет плейлисты Яндекса целиком: список + треки внутри.
 Future<int> importYandexPlaylists({

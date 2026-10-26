@@ -89,6 +89,31 @@ class MimikoPlatform {
     }
   }
 
+  /// versionName из манифеста без хардкода в Dart.
+  static Future<String> appVersion() async {
+    try {
+      return await _channel.invokeMethod<String>('appVersion') ?? '';
+    } on PlatformException catch (error) {
+      AppLogger.instance.warn('версию прочитать не вышло: ${error.message}');
+      return '';
+    } on MissingPluginException {
+      return '';
+    }
+  }
+
+  /// Открыть системный установщик для скачанного APK. false — нужно
+  /// разрешить установку из этого приложения и повторить.
+  static Future<bool> installApk(String path) async {
+    try {
+      return await _channel.invokeMethod<bool>('installApk', path) ?? false;
+    } on PlatformException catch (error) {
+      AppLogger.instance.warn('установщик не открылся: ${error.message}');
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
   /// Ссылка, с которой приложение запустили (холодный старт). Забирается
   /// один раз: повторный вызов вернёт null.
   static Future<String?> takeInitialSharedLink() async {

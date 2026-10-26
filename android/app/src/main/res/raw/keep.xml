@@ -5,4 +5,4 @@
   audio_service_* и падал на CustomAction с iconId = 0. Держим их явно.
 -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/audio_service_*,@drawable/ic_stat_mimiko" />
+    tools:keep="@drawable/audio_service_*,@drawable/ic_stat_mimiko,@drawable/ic_like*,@drawable/ic_dislike*" />

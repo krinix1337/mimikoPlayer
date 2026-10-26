@@ -71,8 +71,11 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    height: 18,
-    padding: const EdgeInsets.symmetric(horizontal: 5),
+    // Не height+alignment: в Column плеера Container с alignment
+    // растягивается на всю ширину. Симметричный padding даёт ту же высоту
+    // 18 и центрирует текст без растяжения.
+    constraints: const BoxConstraints(minHeight: 18),
+    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
     decoration: BoxDecoration(
       color: background,
       borderRadius: BorderRadius.circular(5),

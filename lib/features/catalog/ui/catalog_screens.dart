@@ -8,9 +8,9 @@ import '../../../core/sources/source_dto.dart';
 import '../../../features/player/player_snapshot.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../library/ui/collection_screen.dart' show SectionHeader;
+import '../../../router/player_launch.dart';
 import '../../../router/routes.dart';
 import '../../../sources/yandex/yandex_source.dart';
-import '../../../theme/app_insets.dart';
 import '../../../widgets/chart_rank_cover.dart';
 import '../../../widgets/glass_top_bar.dart';
 import '../../../widgets/pressable.dart';
@@ -42,7 +42,7 @@ Future<void> playRemoteTracks(
     },
   );
   if (shuffle) await controller.setShuffle(PlaybackShuffle.shuffled);
-  router.push(Routes.player);
+  openPlayerRouter(router);
 }
 
 class ArtistScreen extends ConsumerStatefulWidget {
@@ -199,9 +199,6 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen> {
                         ),
                       ),
                     ),
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: kShellBottomInset),
-                  ),
                 ],
               ),
               Positioned(
@@ -424,7 +421,6 @@ class ArtistTracksScreen extends ConsumerWidget {
                     ),
                   ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: kShellBottomInset)),
         ],
       ),
     );
@@ -488,7 +484,6 @@ class ArtistAlbumsScreen extends ConsumerWidget {
                     ),
                   ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: kShellBottomInset)),
         ],
       ),
     );
@@ -674,9 +669,6 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen> {
                       kind: 'album',
                       title: value.title,
                     ),
-                  ),
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: kShellBottomInset),
                   ),
                 ],
               ),
@@ -915,9 +907,6 @@ class _ChartScreenState extends ConsumerState<ChartScreen> {
                     title: l.discoverChart,
                   ),
                 ),
-              ),
-              const SliverToBoxAdapter(
-                child: SizedBox(height: kShellBottomInset),
               ),
             ],
           ),
