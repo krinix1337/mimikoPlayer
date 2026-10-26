@@ -5,6 +5,8 @@ import 'dart:ui' as ui;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../theme/blur_settings.dart';
+
 /// Обложка трека: кэш на диск, заглушка-конверт, скругление по токенам M3.
 ///
 /// URL бывает трёх видов: http(s) из каталога, `file://` — вынутая из тега
@@ -144,9 +146,8 @@ class _Fallback extends StatelessWidget {
   );
 }
 
-/// Фон из обложки. Реального блюра нет: картинка декодируется мелкой и
-/// растягивается на весь экран — это дешевле `ImageFilter` в разы, а выглядит
-/// как тот же размытый цветной фон.
+/// Фон из обложки: копия картинки с настоящим `ImageFilter.blur`, сила берётся
+/// из настроек «Размытие». Слой кэшируется, чтобы не пересчитывать blur.
 class BlurredCover extends StatelessWidget {
   const BlurredCover({
     super.key,
@@ -158,7 +159,7 @@ class BlurredCover extends StatelessWidget {
   final String? url;
   final double opacity;
 
-  /// true — сильно растянутая мягкая картинка; false — резкая обложка.
+  /// true — мягкий размытый фон; false — резкая обложка.
   final bool blur;
 
   @override
@@ -173,13 +174,14 @@ class BlurredCover extends StatelessWidget {
     // на большой обложке это давало видимые квадраты. Теперь картинка
     // декодируется крупнее, а мягкость даёт настоящий blur; слой кэшируется
     // в RepaintBoundary и не перерисовывается на каждом кадре.
-    final content = blur
+    final sigma = currentBlur.cover;
+    final content = blur && sigma > 0
         ? Transform.scale(
             // Чуть крупнее экрана, чтобы прозрачные края после blur не
             // проступали полосами у границ.
             scale: 1.2,
             child: ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+              imageFilter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
               child: _image(value, scheme),
             ),
           )

@@ -245,6 +245,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get collectionDownloadAllLikes => 'Download all tracks';
 
   @override
+  String get collectionShare => 'Share';
+
+  @override
+  String get playlistNotFound => 'Couldn\'t open the playlist. Check the link.';
+
+  @override
+  String get menuAddToPlaylist => 'Add to playlist';
+
+  @override
+  String addToPlaylistDone(String title) {
+    return 'Added to \"$title\"';
+  }
+
+  @override
+  String get addToPlaylistFailed => 'Couldn\'t add the track to the playlist';
+
+  @override
+  String get addToPlaylistEmpty => 'You don\'t have your own playlists yet';
+
+  @override
   String collectionDownloadQueued(int count) {
     return 'Queued for download: $count';
   }
@@ -573,6 +593,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get uiSection => 'Interface';
 
   @override
+  String get settingsBlur => 'Blur';
+
+  @override
+  String get blurBottom => 'Bottom bar and mini player';
+
+  @override
+  String get blurTop => 'Top bars';
+
+  @override
+  String get blurCovers => 'Backdrop covers';
+
+  @override
+  String get blurOff => 'Off';
+
+  @override
+  String get blurSoft => 'Soft';
+
+  @override
+  String get blurMedium => 'Medium';
+
+  @override
+  String get blurStrong => 'Strong';
+
+  @override
+  String get blurBottomNote =>
+      'Glass under the pills: content keeps showing through';
+
+  @override
+  String get blurTopNote => 'Back bars on screens with artwork';
+
+  @override
+  String get blurCoversNote =>
+      'Blur strength for backdrop covers across screens';
+
+  @override
   String get compactUi => 'Compact panel';
 
   @override
@@ -630,6 +685,52 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsFadeNote =>
       'Volume ramps up on start and down on pause, seek and track change.';
+
+  @override
+  String get settingsEqualizer => 'Equalizer';
+
+  @override
+  String get equalizerEnabled => 'Enable equalizer';
+
+  @override
+  String get equalizerNote =>
+      'The preset applies to current playback immediately.';
+
+  @override
+  String get equalizerPreset => 'Preset';
+
+  @override
+  String get equalizerTune => 'Customize';
+
+  @override
+  String get equalizerCustom => 'Custom';
+
+  @override
+  String get equalizerLevel => 'lvl';
+
+  @override
+  String get eqPresetFlat => 'Flat';
+
+  @override
+  String get eqPresetBass => 'Bass';
+
+  @override
+  String get eqPresetTreble => 'Treble';
+
+  @override
+  String get eqPresetRock => 'Rock';
+
+  @override
+  String get eqPresetElectronic => 'Electronic';
+
+  @override
+  String get eqPresetPop => 'Pop';
+
+  @override
+  String get eqPresetVocal => 'Vocal';
+
+  @override
+  String get eqPresetAcoustic => 'Acoustic';
 
   @override
   String get censorBypass => 'Uncensored version';
@@ -716,21 +817,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roleAbsent => 'not connected';
-
-  @override
-  String get settingsFrame => 'Frame rate';
-
-  @override
-  String get frameSystem => 'Match system';
-
-  @override
-  String get frame120 => '120 Hz';
-
-  @override
-  String get frame90 => '90 Hz';
-
-  @override
-  String get frame60 => '60 Hz';
 
   @override
   String get settingsStorage => 'Storage';
@@ -989,12 +1075,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeCoverLighter => 'Lighter';
 
   @override
-  String get homeCoverBlur => 'Blur cover';
-
-  @override
-  String get homeCoverBlurNote => 'Soft backdrop instead of a detailed image';
-
-  @override
   String get djInfo => 'DJ info';
 
   @override
@@ -1002,6 +1082,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get trackUnknownArtist => 'Unknown artist';
+
+  @override
+  String get badgeExplicit => '18+';
+
+  @override
+  String get badgeAi => 'AI';
+
+  @override
+  String get badgeUncensored => 'Uncensored';
 
   @override
   String get sourceYandex => 'Yandex Music';

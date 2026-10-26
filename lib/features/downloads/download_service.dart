@@ -766,13 +766,23 @@ class DownloadController extends Notifier<Map<String, DownloadStatus>> {
     await _continueAuto();
   }
 
-  /// «Скачать всё» из Любимого: очередь ручных загрузок. Пользователь нажал
+  /// «Скачать всё» для лайков: очередь ручных загрузок. Пользователь нажал
   /// сам, поэтому Wi-Fi не ждём, но лимит места и один трек за раз остаются.
   Future<int> downloadAllLikes() async {
+    final liked = await ref
+        .read(appServicesProvider)
+        .db
+        .libraryDao
+        .likedTrackIds();
+    return downloadAllTracks(liked);
+  }
+
+  /// Пакетная ручная загрузка из списка (лайки, плейлист): только треки с
+  /// удалённым вариантом, без Wi-Fi-гейта, с тем же лимитом места.
+  Future<int> downloadAllTracks(Iterable<String> localTrackIds) async {
     final services = ref.read(appServicesProvider);
-    final liked = await services.db.libraryDao.likedTrackIds();
     final eligible = <String>[];
-    for (final id in liked) {
+    for (final id in localTrackIds) {
       final variants = await services.db.tracksDao.variantsOf(id);
       if (variants.any((variant) => variant.ref.source != SourceId.local)) {
         eligible.add(id);

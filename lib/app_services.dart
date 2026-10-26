@@ -8,6 +8,7 @@ import 'core/sources/registry.dart';
 import 'core/sources/stream_resolver.dart';
 import 'core/sources/stream_target.dart';
 import 'sources/local/local_source.dart';
+import 'sources/soundcloud/soundcloud_source.dart';
 import 'sources/yandex/yandex_api.dart';
 import 'sources/yandex/yandex_auth.dart';
 import 'sources/yandex/yandex_source.dart';
@@ -22,7 +23,12 @@ class AppServices {
     yandexApi = YandexApi();
     yandexAuth = YandexAuth(db.authDao, yandexApi!);
     yandex = YandexSource(api: yandexApi)..attachAuth(yandexAuth!);
-    registry = SourceRegistry([yandex!, LocalSource(), YoutubeSource()]);
+    registry = SourceRegistry([
+      yandex!,
+      SoundCloudSource(),
+      LocalSource(),
+      YoutubeSource(),
+    ]);
     resolver = StreamResolver(registry: registry, store: db.streamsDao);
   }
 
@@ -44,6 +50,15 @@ class AppServices {
   /// Фильтр явно помеченных ИИ-треков; нужен и фоновой докачке волны.
   bool hideAiTracks = false;
 
+  /// Эквалайзер: пресет и включённость читает фоновый плеер, а не UI.
+  bool eqEnabled = false;
+  String eqPreset = 'flat';
+  List<double> eqCustomGains = const [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  double eqCustomLevel = 0;
+
+  /// Плеер подписывается сюда, чтобы применить настройки без Riverpod.
+  void Function()? onEqualizerChanged;
+
   static AppServices? _instance;
 
   static AppServices ensure() => _instance ??= AppServices._();
@@ -54,6 +69,11 @@ class AppServices {
     defaultQuality = Quality.fromWire(prefs.quality);
     fadeEnabled = prefs.fade;
     hideAiTracks = prefs.hideAiTracks;
+    eqEnabled = prefs.eqEnabled;
+    eqPreset = prefs.eqPreset;
+    eqCustomGains = prefs.eqCustomGains;
+    eqCustomLevel = prefs.eqCustomLevel;
+    onEqualizerChanged?.call();
     CensorBase.instance.enabled = prefs.censorBypass;
     if (hideAiTracks) {
       // Список большой и ходит в сеть; грузим после первого кадра.

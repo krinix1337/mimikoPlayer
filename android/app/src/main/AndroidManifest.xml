@@ -7,9 +7,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Без этого android.media.audiofx.Equalizer не создаётся вовсе. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
 
     <application
-        android:label="mimikoPlayer"
+        android:label="${appLabel}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <!-- audio_service требует FlutterFragmentActivity, а не FlutterActivity:
@@ -30,6 +32,23 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- Приём ссылки на плейлист: «Поделиться» из любого приложения. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="text/plain"/>
+            </intent-filter>
+            <!-- Открытие ссылки music.yandex.* (только плейлисты; обычные
+                 треки и альбомы не перехватываем). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="music.yandex.ru" android:pathPrefix="/users/"/>
+                <data android:scheme="https" android:host="music.yandex.ru" android:pathPrefix="/playlists"/>
+                <data android:scheme="https" android:host="music.yandex.com" android:pathPrefix="/users/"/>
+                <data android:scheme="https" android:host="music.yandex.com" android:pathPrefix="/playlists"/>
+            </intent-filter>
         </activity>
 
         <activity
@@ -55,7 +74,7 @@
             android:enabled="true"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
-            android:label="mimikoPlayer"
+            android:label="${appLabel}"
             android:roundIcon="@mipmap/ic_launcher">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -69,7 +88,7 @@
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_acid"
-            android:label="mimikoPlayer">
+            android:label="${appLabel}">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -82,7 +101,7 @@
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_mono"
-            android:label="mimikoPlayer">
+            android:label="${appLabel}">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -96,7 +115,7 @@
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_sunset"
-            android:label="mimikoPlayer">
+            android:label="${appLabel}">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -109,7 +128,7 @@
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_mint"
-            android:label="mimikoPlayer">
+            android:label="${appLabel}">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -121,7 +140,7 @@
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_night"
-            android:label="mimikoPlayer">
+            android:label="${appLabel}">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -134,7 +153,7 @@
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_violet"
-            android:label="mimikoPlayer">
+            android:label="${appLabel}">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -147,7 +166,7 @@
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_ice"
-            android:label="mimikoPlayer">
+            android:label="${appLabel}">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -160,7 +179,7 @@
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_amber"
-            android:label="mimikoPlayer">
+            android:label="${appLabel}">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -173,7 +192,7 @@
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_forest"
-            android:label="mimikoPlayer">
+            android:label="${appLabel}">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

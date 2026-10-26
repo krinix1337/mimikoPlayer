@@ -116,10 +116,25 @@
   },
   "collectionSort": "Сортировка",
   "collectionDownloadAllLikes": "Скачать все треки",
+  "collectionShare": "Поделиться",
+  "playlistNotFound": "Не удалось открыть плейлист. Проверьте ссылку.",
+  "menuAddToPlaylist": "Добавить в плейлист",
+  "addToPlaylistDone": "Добавлено в «{title}»",
+  "@addToPlaylistDone": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "addToPlaylistFailed": "Не удалось добавить трек в плейлист",
+  "addToPlaylistEmpty": "Своих плейлистов пока нет",
   "collectionDownloadQueued": "В очереди на загрузку: {count}",
   "@collectionDownloadQueued": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "sortAdded": "Недавно добавленные",
@@ -307,6 +322,17 @@
   "cornerPill": "Пилюля",
   "settingsMotion": "Анимации",
   "uiSection": "Интерфейс",
+  "settingsBlur": "Размытие",
+  "blurBottom": "Нижняя панель и мини-плеер",
+  "blurTop": "Верхние панели",
+  "blurCovers": "Фоновые обложки",
+  "blurOff": "Выкл",
+  "blurSoft": "Мягкое",
+  "blurMedium": "Среднее",
+  "blurStrong": "Сильное",
+  "blurBottomNote": "Стекло под пилюлями: видно, что список продолжается",
+  "blurTopNote": "Панели с кнопками «назад» на страницах с обложкой",
+  "blurCoversNote": "Сила размытия фоновых обложек на всех экранах",
   "compactUi": "Компактная панель",
   "compactUiNote": "Нижняя навигация и мини-плеер ниже и плотнее.",
   "showMiniPlayer": "Мини-плеер",
@@ -325,6 +351,21 @@
   "bgBoth": "Обложка и пятна",
   "settingsFade": "Плавное затухание",
   "settingsFadeNote": "Громкость плавно поднимается при старте и опускается при паузе, перемотке и смене трека.",
+  "settingsEqualizer": "Эквалайзер",
+  "equalizerEnabled": "Включить эквалайзер",
+  "equalizerNote": "Пресет применяется к текущему воспроизведению сразу.",
+  "equalizerPreset": "Пресет",
+  "equalizerTune": "Настроить",
+  "equalizerCustom": "Своя настройка",
+  "equalizerLevel": "ур.",
+  "eqPresetFlat": "Ровный",
+  "eqPresetBass": "Бас",
+  "eqPresetTreble": "Верх",
+  "eqPresetRock": "Рок",
+  "eqPresetElectronic": "Электро",
+  "eqPresetPop": "Поп",
+  "eqPresetVocal": "Вокал",
+  "eqPresetAcoustic": "Акустика",
   "censorBypass": "Версия без цензуры",
   "censorBypassNote": "Подменять треки из базы FckCensorData (GitHub) на незацензуренную версию. База загружается по сети; если файла нет, играет версия Яндекса.",
   "settingsReset": "Сбросить настройки",
@@ -359,11 +400,6 @@
   "roleStream": "воспроизводит",
   "roleCatalog": "только каталог",
   "roleAbsent": "не подключён",
-  "settingsFrame": "Частота кадров",
-  "frameSystem": "Как в системе",
-  "frame120": "120 Гц",
-  "frame90": "90 Гц",
-  "frame60": "60 Гц",
   "settingsStorage": "Хранилище",
   "settingsCache": "Кэш обложек",
   "settingsCacheClear": "Очистить кэш",
@@ -505,11 +541,12 @@
   "homeCoverDarker": "Темнее",
   "homeCoverNormal": "Обычная",
   "homeCoverLighter": "Светлее",
-  "homeCoverBlur": "Размытие обложки",
-  "homeCoverBlurNote": "Мягкий фон вместо детальной картинки",
   "djInfo": "DJ-сведения",
   "djInfoNote": "BPM и тональность в сведениях о треке",
   "trackUnknownArtist": "Неизвестный исполнитель",
+  "badgeExplicit": "18+",
+  "badgeAi": "ИИ",
+  "badgeUncensored": "Без цензуры",
   "sourceYandex": "Яндекс Музыка",
   "sourceYoutube": "YouTube",
   "sourceLocalFile": "Файл",
@@ -537,21 +574,31 @@
   "downloadsSummary": "Скачано: {count} · {size}",
   "@downloadsSummary": {
     "placeholders": {
-      "count": { "type": "int" },
-      "size": { "type": "String" }
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
     }
   },
   "downloadsQueueSummary": "В очереди: {queued} · на паузе: {paused}",
   "@downloadsQueueSummary": {
     "placeholders": {
-      "queued": { "type": "int" },
-      "paused": { "type": "int" }
+      "queued": {
+        "type": "int"
+      },
+      "paused": {
+        "type": "int"
+      }
     }
   },
   "downloadsSkipped": "Пропущено как недоступное офлайн: {count}",
   "@downloadsSkipped": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "downloadsAutoLikes": "Качать любимое автоматически",
@@ -566,7 +613,9 @@
   "downloadsGb": "{value} ГБ",
   "@downloadsGb": {
     "placeholders": {
-      "value": { "type": "int" }
+      "value": {
+        "type": "int"
+      }
     }
   },
   "downloadsQuality": "Качество автозагрузки",
@@ -577,7 +626,9 @@
   "downloadsFreeSpace": "Свободно: {size}",
   "@downloadsFreeSpace": {
     "placeholders": {
-      "size": { "type": "String" }
+      "size": {
+        "type": "String"
+      }
     }
   }
 }

@@ -11,19 +11,6 @@ class MimikoPlatform {
     'net.nekto.mimiko/platform',
   );
 
-  /// Вернуть реальную частоту, которую система дала окну (0 — канал недоступен).
-  static Future<double> actualRefreshRate() async {
-    try {
-      final value = await _channel.invokeMethod<double>('actualRefreshRate');
-      return value ?? 0;
-    } on PlatformException catch (error) {
-      AppLogger.instance.warn('частоту прочитать не вышло: ${error.message}');
-      return 0;
-    } on MissingPluginException {
-      return 0;
-    }
-  }
-
   /// Попросить режим не ниже [hz]; 0 — вернуть управление системе.
   static Future<double> requestFrameRate(double hz) async {
     try {
@@ -88,6 +75,43 @@ class MimikoPlatform {
     } on MissingPluginException {
       return 0;
     }
+  }
+
+  /// Системный лист «Поделиться» с текстом (ссылка на плейлист).
+  static Future<bool> shareText(String text) async {
+    try {
+      return await _channel.invokeMethod<bool>('shareText', text) ?? false;
+    } on PlatformException catch (error) {
+      AppLogger.instance.warn('поделиться не вышло: ${error.message}');
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  /// Ссылка, с которой приложение запустили (холодный старт). Забирается
+  /// один раз: повторный вызов вернёт null.
+  static Future<String?> takeInitialSharedLink() async {
+    try {
+      return await _channel.invokeMethod<String>('getInitialSharedLink');
+    } on PlatformException catch (error) {
+      AppLogger.instance.warn(
+        'входящую ссылку прочитать не вышло: ${error.message}',
+      );
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  /// Ссылка, пришедшая в уже запущенное приложение (шаринг/клик по ссылке).
+  static void onSharedLink(void Function(String text) handler) {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onSharedLink' && call.arguments is String) {
+        handler(call.arguments as String);
+      }
+      return null;
+    });
   }
 
   static Future<NetworkStatus> networkStatus() async {

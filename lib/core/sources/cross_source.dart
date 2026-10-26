@@ -1,4 +1,17 @@
 import 'source_dto.dart';
+import 'source_errors.dart';
+
+/// Стоит ли лечить отказ подстановкой из другого каталога.
+///
+/// Снятый/не найденный трек и удалённый ответ источника — да. Сеть и
+/// авторизация — нет: поиск в чужом каталоге упрётся в то же самое.
+bool worthCrossSource(SourceFailure failure) => switch (failure.reason) {
+  SourceFailReason.unavailable ||
+  SourceFailReason.notInCatalog ||
+  SourceFailReason.geoBlocked ||
+  SourceFailReason.remoteError => true,
+  _ => false,
+};
 
 /// Подбор той же песни в другом источнике, когда основной поток недоступен.
 ///

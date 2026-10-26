@@ -15,7 +15,7 @@ class AppTheme {
   }) {
     final scheme = _scheme(brightness, prefs, platformScheme);
     final radius = prefs.corner.radius;
-    final text = _textTheme(scheme, prefs.contrast);
+    final text = textTheme(scheme, prefs.contrast);
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
@@ -440,7 +440,7 @@ class AppTheme {
   /// Шкала ровно по токенам M3: display/headline — emphasized (для
   /// выразительности), body — 400, label — 500. Высокий контраст поднимает
   /// вес body до 600, как требует MD3 для контроля читаемости.
-  static TextTheme _textTheme(ColorScheme scheme, Contrast contrast) {
+  static TextTheme textTheme(ColorScheme scheme, Contrast contrast) {
     final bodyWeight = contrast == Contrast.high
         ? FontWeight.w600
         : FontWeight.w400;

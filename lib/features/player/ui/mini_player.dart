@@ -7,6 +7,8 @@ import '../../../features/downloads/download_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../theme/app_motion.dart';
+import '../../../theme/blur_settings.dart';
+import '../../../theme/keyboard_theme.dart';
 import '../../../theme/surface.dart';
 import '../../../widgets/track_cover.dart';
 
@@ -44,83 +46,111 @@ class MiniPlayer extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final radius = Motion.of(context).prefs.corner.radius;
+    // Те же поля, что у нижней панели: иначе пилюля шире на пару пикселей.
+    final compact = ref.watch(prefsProvider.select((p) => p.compactUi));
+    final side = compact ? 16.0 : 12.0;
 
     return AnimatedSize(
       duration: motion.morph,
       curve: Curves.easeOutCubic,
       alignment: Alignment.bottomCenter,
-      clipBehavior: Clip.hardEdge,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(11, 6, 11, 4),
-        child: AppSurface(
-          radius: radius,
-          color: scheme.surfaceContainerHigh.withValues(alpha: 0.92),
-          shadow: false,
-          child: InkWell(
-            onTap: () => context.push(Routes.player),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  // Фиксированная высота: обложка, две строки и кнопки считаются
-                  // от одной оси, поэтому строка не «плавает» по вертикали.
-                  height: 64,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        TrackCover(url: current.coverUrl, size: 44, radius: 12),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      current.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.titleMedium,
-                                    ),
-                                  ),
-                                  _MiniDownloadPin(
-                                    trackId: current.localTrackId,
-                                  ),
-                                ],
-                              ),
-                              Text(
-                                snapshot.$3 ? l.commonLoading : current.artist,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
+      child: TweenAnimationBuilder<double>(
+        // Пилюля выезжает из-за навигации и проявляется: без этого слот
+        // просто вырастал полоской.
+        tween: Tween(begin: 0, end: 1),
+        duration: motion.morph,
+        curve: Curves.easeOutCubic,
+        builder: (context, t, child) => Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(0, (1 - t) * 28),
+            child: child,
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(side, 6, side, 4),
+          child: AppSurface(
+            radius: kKeyboardTestTheme ? 28 : radius,
+            // С размытием пилюля прозрачнее, без него — плотная: иначе
+            // белый текст трека просвечивает сквозь неё.
+            color: kKeyboardTestTheme
+                ? scheme.surfaceContainerHigh
+                : scheme.surfaceContainerHigh.withValues(
+                    alpha: currentBlur.hasBottom ? 0.7 : 0.98,
+                  ),
+            shadow: false,
+            child: InkWell(
+              onTap: () => context.push(Routes.player),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    // Фиксированная высота: обложка, две строки и кнопки считаются
+                    // от одной оси, поэтому строка не «плавает» по вертикали.
+                    height: 64,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          TrackCover(
+                            url: current.coverUrl,
+                            size: 44,
+                            radius: 12,
                           ),
-                        ),
-                        _TinyButton(
-                          tooltip: snapshot.$2 ? l.commonPause : l.commonPlay,
-                          icon: snapshot.$2
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
-                          onPressed: controller.togglePlay,
-                        ),
-                        _TinyButton(
-                          tooltip: l.commonNext,
-                          icon: Icons.skip_next_rounded,
-                          onPressed: controller.skipNext,
-                        ),
-                      ],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        current.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.titleMedium,
+                                      ),
+                                    ),
+                                    _MiniDownloadPin(
+                                      trackId: current.localTrackId,
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  snapshot.$3
+                                      ? l.commonLoading
+                                      : current.artist,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          _TinyButton(
+                            tooltip: snapshot.$2 ? l.commonPause : l.commonPlay,
+                            icon: snapshot.$2
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            onPressed: controller.togglePlay,
+                          ),
+                          _TinyButton(
+                            tooltip: l.commonNext,
+                            icon: Icons.skip_next_rounded,
+                            onPressed: controller.skipNext,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const _MiniProgress(),
-              ],
+                  const _MiniProgress(),
+                ],
+              ),
             ),
           ),
         ),

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:phoneyandex/core/sources/cross_source.dart';
 import 'package:phoneyandex/core/sources/source_dto.dart';
+import 'package:phoneyandex/core/sources/source_errors.dart';
 import 'package:phoneyandex/core/sources/source_id.dart';
 
 SourceTrack track(String title, List<String> artists, int seconds) =>
@@ -80,5 +81,31 @@ void main() {
       crossSourceQuery('(Official Video)', ['Joji']),
       '(Official Video) Joji',
     );
+  });
+
+  test('подстановка лечит снятые и удалённые, но не сеть и не авторизацию', () {
+    SourceFailure failure(SourceFailReason reason) =>
+        SourceFailure(source: SourceId.yandex, reason: reason);
+
+    for (final reason in [
+      SourceFailReason.unavailable,
+      SourceFailReason.notInCatalog,
+      SourceFailReason.geoBlocked,
+      SourceFailReason.remoteError,
+    ]) {
+      expect(worthCrossSource(failure(reason)), isTrue, reason: reason.name);
+    }
+    for (final reason in [
+      SourceFailReason.network,
+      SourceFailReason.authRequired,
+      SourceFailReason.authExpired,
+      SourceFailReason.needsPlus,
+      SourceFailReason.remoteThrottled,
+      SourceFailReason.codecUnsupported,
+      SourceFailReason.localFileMissing,
+      SourceFailReason.allSourcesExhausted,
+    ]) {
+      expect(worthCrossSource(failure(reason)), isFalse, reason: reason.name);
+    }
   });
 }

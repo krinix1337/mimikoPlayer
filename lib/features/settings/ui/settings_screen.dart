@@ -8,8 +8,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../app_providers.dart';
 import '../../../core/prefs/prefs.dart';
 import '../../../features/downloads/download_service.dart';
+import '../../../features/player/equalizer_presets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
+import '../../../router/slide_up_route.dart';
+import '../../../theme/app_insets.dart';
+import '../../../theme/keyboard_theme.dart';
 import 'settings_widgets.dart';
 
 /// Настройки по разделам: хаб с категориями, каждая категория — отдельный
@@ -31,12 +35,15 @@ class SettingsScreen extends ConsumerWidget {
       final language = prefs.localeCode == null
           ? l.languageSystem
           : prefs.localeCode!.toUpperCase();
-      return '$theme · ${prefs.accent.label(l)} · $language';
+      final accent = kKeyboardTestTheme
+          ? 'MD3 Expressive'
+          : prefs.accent.label(l);
+      return '$theme · $accent · $language';
     }
 
     return Scaffold(
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 32),
+        padding: const EdgeInsets.only(bottom: kShellBottomInset),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 56, 20, 12),
@@ -46,39 +53,45 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           SettingsSection(
-            title: l.settingsTitle,
+            title: kKeyboardTestTheme ? '' : l.settingsTitle,
             children: [
               _CategoryTile(
+                index: 0,
                 icon: Icons.palette_outlined,
                 title: l.settingsSectionAppearance,
                 subtitle: appearanceSummary(),
                 page: const _AppearancePage(),
               ),
               _CategoryTile(
+                index: 1,
                 icon: Icons.graphic_eq_rounded,
                 title: l.settingsSectionSound,
                 subtitle: '${l.settingsQuality}: ${prefs.qualityLabel(l)}',
                 page: const _SoundPage(),
               ),
               _CategoryTile(
+                index: 2,
                 icon: Icons.lyrics_rounded,
                 title: l.settingsSectionKaraoke,
                 subtitle: l.settingsLyricsSource,
                 page: const _KaraokeSettingsPage(),
               ),
               _CategoryTile(
+                index: 3,
                 icon: Icons.sd_storage_rounded,
                 title: l.settingsSectionStorage,
                 subtitle: l.settingsData,
                 page: const _StoragePage(),
               ),
               _CategoryTile(
+                index: 4,
                 icon: Icons.account_circle_outlined,
                 title: l.settingsSectionAccount,
                 subtitle: l.settingsAccount,
                 page: const _AccountPage(),
               ),
               _CategoryTile(
+                index: 5,
                 icon: Icons.info_outline_rounded,
                 title: l.settingsSectionAbout,
                 subtitle: l.appTitle,
@@ -98,23 +111,69 @@ class _CategoryTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.page,
+    required this.index,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final Widget page;
+  final int index;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-    title: Text(title),
-    subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-    trailing: const Icon(Icons.chevron_right_rounded),
-    onTap: () =>
-        Navigator.of(context)
-            .push(MaterialPageRoute<void>(builder: (context) => page)),
-  );
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (kKeyboardTestTheme) {
+      final (background, foreground) = switch (index % 3) {
+        0 => (scheme.primaryContainer, scheme.onPrimaryContainer),
+        1 => (scheme.secondaryContainer, scheme.onSecondaryContainer),
+        _ => (scheme.tertiaryContainer, scheme.onTertiaryContainer),
+      };
+      return SettingsGroupItem(
+        onTap: () => Navigator.of(context).push(slideUpRoute(page)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: background,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: foreground, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium
+                          ?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+            ],
+          ),
+        ),
+      );
+    }
+    return ListTile(
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+      title: Text(title),
+      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () => Navigator.of(context).push(slideUpRoute(page)),
+    );
+  }
 }
 
 class _AppearancePage extends ConsumerWidget {
@@ -132,6 +191,18 @@ class _AppearancePage extends ConsumerWidget {
         SettingsSection(
           title: l.settingsAppearance,
           children: [
+            if (kKeyboardTestTheme)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                child: Text(
+                  Localizations.localeOf(context).languageCode == 'en'
+                      ? 'Test build: MD3 palette, accent and corner radius are fixed.'
+                      : 'Тестовая сборка: палитра, акцент и радиусы зафиксированы.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
             // Тема — сегментированная кнопка: это ровно тот M3-компонент,
             // который для взаимоисключающего выбора и предназначен.
             Padding(
@@ -148,17 +219,23 @@ class _AppearancePage extends ConsumerWidget {
                     segments: [
                       ButtonSegment(
                         value: ThemeMode.system,
-                        icon: const Icon(Icons.brightness_auto_rounded),
+                        icon: kKeyboardTestTheme
+                            ? null
+                            : const Icon(Icons.brightness_auto_rounded),
                         label: Text(l.themeSystem),
                       ),
                       ButtonSegment(
                         value: ThemeMode.light,
-                        icon: const Icon(Icons.light_mode_rounded),
+                        icon: kKeyboardTestTheme
+                            ? null
+                            : const Icon(Icons.light_mode_rounded),
                         label: Text(l.themeLight),
                       ),
                       ButtonSegment(
                         value: ThemeMode.dark,
-                        icon: const Icon(Icons.dark_mode_rounded),
+                        icon: kKeyboardTestTheme
+                            ? null
+                            : const Icon(Icons.dark_mode_rounded),
                         label: Text(l.themeDark),
                       ),
                     ],
@@ -183,51 +260,54 @@ class _AppearancePage extends ConsumerWidget {
               onPick: (value) =>
                   controller.setLocaleCode(value == 'system' ? null : value),
             ),
-            ChoiceRow<AppPalette>(
-              label: l.settingsPalette,
-              values: AppPalette.values,
-              current: prefs.palette,
-              columns: 2,
-              labelOf: (palette) => switch (palette) {
-                AppPalette.brand => l.paletteBrand,
-                AppPalette.dynamic => l.paletteDynamic,
-                AppPalette.mono => l.paletteMono,
-                AppPalette.amoled => l.paletteAmoled,
-              },
-              note: switch (prefs.palette) {
-                AppPalette.dynamic => l.paletteDynamicNote,
-                AppPalette.amoled => l.paletteAmoledNote,
-                _ => null,
-              },
-              onPick: controller.setPalette,
-            ),
-            AccentRow(
-              label: l.settingsAccent,
-              current: prefs.accent,
-              labelOf: (accent) => accent.label(l),
-              onPick: controller.setAccent,
-            ),
-            ChoiceRow<Contrast>(
-              label: l.settingsContrast,
-              values: Contrast.values,
-              current: prefs.contrast,
-              columns: 2,
-              labelOf: (value) =>
-                  value == Contrast.normal ? l.contrastNormal : l.contrastHigh,
-              onPick: controller.setContrast,
-            ),
-            ChoiceRow<CornerRadius>(
-              label: l.settingsCorners,
-              values: CornerRadius.values,
-              current: prefs.corner,
-              columns: 3,
-              labelOf: (value) => switch (value) {
-                CornerRadius.soft => l.cornerSoft,
-                CornerRadius.round => l.cornerRound,
-                CornerRadius.pill => l.cornerPill,
-              },
-              onPick: controller.setCorner,
-            ),
+            if (!kKeyboardTestTheme) ...[
+              ChoiceRow<AppPalette>(
+                label: l.settingsPalette,
+                values: AppPalette.values,
+                current: prefs.palette,
+                columns: 2,
+                labelOf: (palette) => switch (palette) {
+                  AppPalette.brand => l.paletteBrand,
+                  AppPalette.dynamic => l.paletteDynamic,
+                  AppPalette.mono => l.paletteMono,
+                  AppPalette.amoled => l.paletteAmoled,
+                },
+                note: switch (prefs.palette) {
+                  AppPalette.dynamic => l.paletteDynamicNote,
+                  AppPalette.amoled => l.paletteAmoledNote,
+                  _ => null,
+                },
+                onPick: controller.setPalette,
+              ),
+              AccentRow(
+                label: l.settingsAccent,
+                current: prefs.accent,
+                labelOf: (accent) => accent.label(l),
+                onPick: controller.setAccent,
+              ),
+              ChoiceRow<Contrast>(
+                label: l.settingsContrast,
+                values: Contrast.values,
+                current: prefs.contrast,
+                columns: 2,
+                labelOf: (value) => value == Contrast.normal
+                    ? l.contrastNormal
+                    : l.contrastHigh,
+                onPick: controller.setContrast,
+              ),
+              ChoiceRow<CornerRadius>(
+                label: l.settingsCorners,
+                values: CornerRadius.values,
+                current: prefs.corner,
+                columns: 3,
+                labelOf: (value) => switch (value) {
+                  CornerRadius.soft => l.cornerSoft,
+                  CornerRadius.round => l.cornerRound,
+                  CornerRadius.pill => l.cornerPill,
+                },
+                onPick: controller.setCorner,
+              ),
+            ],
             ChoiceRow<ArtworkShape>(
               label: l.artworkShape,
               values: ArtworkShape.values,
@@ -244,7 +324,7 @@ class _AppearancePage extends ConsumerWidget {
               label: l.settingsMotion,
               values: AnimationsSpeed.values,
               current: prefs.animations,
-              columns: 4,
+              columns: kKeyboardTestTheme ? 2 : 4,
               labelOf: (value) => switch (value) {
                 AnimationsSpeed.off => l.motionOff,
                 AnimationsSpeed.fast => l.motionFast,
@@ -306,15 +386,29 @@ class _AppearancePage extends ConsumerWidget {
               },
               onPick: controller.setHomeCoverTone,
             ),
-            SwitchRow(
-              label: l.homeCoverBlur,
-              value: prefs.homeCoverBlur,
-              note: l.homeCoverBlurNote,
-              onChanged: controller.setHomeCoverBlur,
+          ],
+        ),
+        SettingsSection(
+          title: l.settingsBlur,
+          children: [
+            _BlurChoice(
+              label: l.blurBottom,
+              note: l.blurBottomNote,
+              current: prefs.blurBottom,
+              onPick: controller.setBlurBottom,
             ),
-            // Частота кадров относится к экрану, а не к звуку: раньше она
-            // лежала в разделе «Звук» и путала.
-            const FrameTile(),
+            _BlurChoice(
+              label: l.blurTop,
+              note: l.blurTopNote,
+              current: prefs.blurTop,
+              onPick: controller.setBlurTop,
+            ),
+            _BlurChoice(
+              label: l.blurCovers,
+              note: l.blurCoversNote,
+              current: prefs.blurCover,
+              onPick: controller.setBlurCover,
+            ),
           ],
         ),
         SettingsSection(
@@ -376,10 +470,376 @@ class _SoundPage extends ConsumerWidget {
             const PriorityTile(),
           ],
         ),
+        const _EqualizerSection(),
       ],
     );
   }
 }
+
+class _EqualizerSection extends ConsumerWidget {
+  const _EqualizerSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final prefs = ref.watch(prefsProvider);
+    final controller = ref.read(prefsProvider.notifier);
+    final presetLabel = prefs.eqPreset == equalizerCustomId
+        ? l.equalizerCustom
+        : _presetLabel(l, prefs.eqPreset);
+
+    return SettingsSection(
+      title: l.settingsEqualizer,
+      children: [
+        SwitchRow(
+          label: l.equalizerEnabled,
+          value: prefs.eqEnabled,
+          note: l.equalizerNote,
+          onChanged: controller.setEqEnabled,
+        ),
+        ListTile(
+          title: Text(l.equalizerTune),
+          subtitle: Text(presetLabel),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => showModalBottomSheet<void>(
+            context: context,
+            showDragHandle: true,
+            isScrollControlled: true,
+            builder: (_) => const _EqualizerSheet(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EqualizerSheet extends ConsumerStatefulWidget {
+  const _EqualizerSheet();
+
+  @override
+  ConsumerState<_EqualizerSheet> createState() => _EqualizerSheetState();
+}
+
+class _EqualizerSheetState extends ConsumerState<_EqualizerSheet> {
+  late String _preset;
+  late List<double> _gains;
+  late double _level;
+
+  @override
+  void initState() {
+    super.initState();
+    final prefs = ref.read(prefsProvider);
+    _preset = prefs.eqPreset;
+    if (_preset == equalizerCustomId) {
+      _gains = List.of(prefs.eqCustomGains);
+      _level = prefs.eqCustomLevel;
+    } else {
+      final preset = equalizerPresetById(_preset);
+      _gains = List.of(preset.gainsDb);
+      _level = preset.preampDb;
+    }
+  }
+
+  /// Первое движение любого слайдера превращает пресет в свою настройку:
+  /// дальше полосы живут отдельно от выбранного пресета.
+  void _touch() {
+    if (_preset != equalizerCustomId) _preset = equalizerCustomId;
+  }
+
+  Future<void> _commitCustom() async {
+    if (_preset != equalizerCustomId) return;
+    await ref.read(prefsProvider.notifier).setEqCustom(List.of(_gains), _level);
+  }
+
+  void _pickPreset(String? id) {
+    if (id == null) return;
+    final prefs = ref.read(prefsProvider);
+    final controller = ref.read(prefsProvider.notifier);
+    if (id == equalizerCustomId) {
+      setState(() {
+        _preset = id;
+        _gains = List.of(prefs.eqCustomGains);
+        _level = prefs.eqCustomLevel;
+      });
+    } else {
+      final preset = equalizerPresetById(id);
+      setState(() {
+        _preset = id;
+        _gains = List.of(preset.gainsDb);
+        _level = preset.preampDb;
+      });
+    }
+    controller.setEqPreset(id);
+  }
+
+  Future<void> _openPresetPicker() async {
+    final l = AppLocalizations.of(context);
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                l.equalizerPreset,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final id in [
+                    equalizerCustomId,
+                    for (final preset in equalizerPresets) preset.id,
+                  ])
+                    ListTile(
+                      title: Text(
+                        id == equalizerCustomId
+                            ? l.equalizerCustom
+                            : _presetLabel(l, id),
+                      ),
+                      trailing: id == _preset
+                          ? Icon(
+                              Icons.check_rounded,
+                              color: Theme.of(context).colorScheme.primary,
+                            )
+                          : null,
+                      onTap: () => Navigator.of(sheetContext).pop(id),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || picked == null) return;
+    _pickPreset(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final prefs = ref.watch(prefsProvider);
+    final controller = ref.read(prefsProvider.notifier);
+    final height = MediaQuery.of(context).size.height;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: height * 0.82),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l.settingsEqualizer,
+                      style: theme.textTheme.titleLarge,
+                    ),
+                  ),
+                  Switch(
+                    value: prefs.eqEnabled,
+                    onChanged: controller.setEqEnabled,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _EqualizerSliders(
+                gains: _gains,
+                level: _level,
+                onGain: (index, value) {
+                  _touch();
+                  setState(() => _gains[index] = value);
+                },
+                onLevel: (value) {
+                  _touch();
+                  setState(() => _level = value);
+                },
+                onCommit: _commitCustom,
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                height: 56,
+                child: Material(
+                  color: theme.colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(18),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: _openPresetPicker,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _preset == equalizerCustomId
+                                  ? l.equalizerCustom
+                                  : _presetLabel(l, _preset),
+                            ),
+                          ),
+                          const Icon(Icons.expand_more_rounded),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Слайдеры: уровень слева и десять полос; значение сверху, частота снизу.
+class _EqualizerSliders extends StatelessWidget {
+  const _EqualizerSliders({
+    required this.gains,
+    required this.level,
+    required this.onGain,
+    required this.onLevel,
+    required this.onCommit,
+  });
+
+  final List<double> gains;
+  final double level;
+  final void Function(int index, double value) onGain;
+  final ValueChanged<double> onLevel;
+  final VoidCallback onCommit;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return SizedBox(
+      height: 300,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _VerticalBand(
+            label: l.equalizerLevel,
+            value: level,
+            onChanged: onLevel,
+            onCommit: onCommit,
+          ),
+          for (var i = 0; i < gains.length; i++)
+            _VerticalBand(
+              label: _hzLabel(equalizerBandHz[i]),
+              value: gains[i],
+              onChanged: (value) => onGain(i, value),
+              onCommit: onCommit,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VerticalBand extends StatelessWidget {
+  const _VerticalBand({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.onCommit,
+  });
+
+  final String label;
+  final double value;
+  final ValueChanged<double> onChanged;
+  final VoidCallback onCommit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final clamped = value.clamp(-12.0, 12.0).toDouble();
+    return Expanded(
+      child: Column(
+        children: [
+          SizedBox(
+            height: 18,
+            child: Text(
+              _dbLabel(clamped),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            child: RotatedBox(
+              quarterTurns: 3,
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 2,
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 7,
+                  ),
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 14,
+                  ),
+                  showValueIndicator: ShowValueIndicator.never,
+                ),
+                child: Slider(
+                  value: clamped,
+                  min: -12,
+                  max: 12,
+                  divisions: 48,
+                  onChanged: onChanged,
+                  onChangeEnd: (_) => onCommit(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 16,
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _dbLabel(double value) {
+  if (value.abs() < 0.05) return '0';
+  final rounded = value.round();
+  return rounded > 0 ? '+$rounded' : '$rounded';
+}
+
+String _hzLabel(double hz) {
+  if (hz >= 1000) {
+    final k = hz / 1000;
+    return '${k % 1 == 0 ? k.toInt() : k.toStringAsFixed(1)}k';
+  }
+  return hz.toInt().toString();
+}
+
+String _presetLabel(AppLocalizations l, String id) => switch (id) {
+  'bass' => l.eqPresetBass,
+  'treble' => l.eqPresetTreble,
+  'rock' => l.eqPresetRock,
+  'electronic' => l.eqPresetElectronic,
+  'pop' => l.eqPresetPop,
+  'vocal' => l.eqPresetVocal,
+  'acoustic' => l.eqPresetAcoustic,
+  _ => l.eqPresetFlat,
+};
 
 class _KaraokeSettingsPage extends ConsumerWidget {
   const _KaraokeSettingsPage();
@@ -656,7 +1116,9 @@ class _Page extends StatelessWidget {
       slivers: [
         SliverAppBar(
           pinned: true,
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: kKeyboardTestTheme
+              ? Theme.of(context).colorScheme.surfaceContainer
+              : Theme.of(context).colorScheme.surface,
           leading: IconButton(
             tooltip: AppLocalizations.of(context).playerBack,
             icon: const Icon(Icons.arrow_back_rounded),
@@ -667,7 +1129,7 @@ class _Page extends StatelessWidget {
         SliverList(
           delegate: SliverChildListDelegate([
             ...children,
-            const SizedBox(height: 32),
+            const SizedBox(height: kShellBottomInset),
           ]),
         ),
       ],
@@ -698,4 +1160,38 @@ extension on Prefs {
     'high' => l.qualityHigh,
     _ => l.qualityLossless,
   };
+}
+
+class _BlurChoice extends StatelessWidget {
+  const _BlurChoice({
+    required this.label,
+    required this.note,
+    required this.current,
+    required this.onPick,
+  });
+
+  final String label;
+  final String note;
+  final double current;
+  final ValueChanged<double> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return ChoiceRow<double>(
+      label: label,
+      note: note,
+      values: const [0, 16, 24, 36],
+      current: current,
+      columns: 4,
+      labelOf: (value) => value == 0
+          ? l.blurOff
+          : value <= 16
+          ? l.blurSoft
+          : value <= 24
+          ? l.blurMedium
+          : l.blurStrong,
+      onPick: onPick,
+    );
+  }
 }

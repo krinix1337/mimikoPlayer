@@ -12,9 +12,16 @@ import '../l10n/app_localizations.dart';
 /// Скачивание и меню для трека, которого может ещё не быть в локальной базе:
 /// перед действием трек один раз сводится в БД, дальше статус берётся по id.
 class RemoteTrackActions extends ConsumerStatefulWidget {
-  const RemoteTrackActions({super.key, required this.track});
+  const RemoteTrackActions({
+    super.key,
+    required this.track,
+    this.showDownload = true,
+  });
 
   final SourceTrack track;
+
+  /// Чарт не должен предлагать скачивание: там только меню.
+  final bool showDownload;
 
   @override
   ConsumerState<RemoteTrackActions> createState() => _RemoteTrackActionsState();
@@ -199,7 +206,7 @@ class _RemoteTrackActionsState extends ConsumerState<RemoteTrackActions> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        download,
+        if (widget.showDownload) download,
         IconButton(
           tooltip: l.trackMenu,
           visualDensity: VisualDensity.compact,

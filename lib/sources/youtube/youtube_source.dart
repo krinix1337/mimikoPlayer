@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 
+import '../../core/constants.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/sources/music_source.dart';
 import '../../core/sources/source_dto.dart';
 import '../../core/sources/source_errors.dart';
 import '../../core/sources/source_id.dart';
 import '../../core/sources/stream_target.dart';
+import 'youtube_innertube.dart';
 
 /// `SearchPage` в youtube_explode не передаёт свои default-заголовки в
 /// запрос. На части сетей YouTube отвечает страницей согласия без
@@ -42,6 +44,7 @@ class YoutubeSource implements MusicSource {
   }
 
   yt.YoutubeExplode? _client;
+  final YoutubeInnertube _innertube = YoutubeInnertube();
 
   static const _streamHeaders = {
     'User-Agent':
@@ -78,6 +81,18 @@ class YoutubeSource implements MusicSource {
     final needle = query.trim();
     if (needle.isEmpty) {
       return const SearchResult(tracks: [], page: 0);
+    }
+
+    // InnerTube-поиск надёжнее встроенного: библиотека на части сетей
+    // возвращает пустую выдачу без ошибки.
+    final items = await _innertube.search(needle, limit: pageSize);
+    if (items.isNotEmpty) {
+      return SearchResult(
+        tracks: [for (final item in items) _trackOfItem(item)],
+        page: page,
+        total: items.length,
+        hasMore: false,
+      );
     }
 
     final videos = await _searchVideos(needle);
@@ -138,6 +153,16 @@ class YoutubeSource implements MusicSource {
     },
   );
 
+  SourceTrack _trackOfItem(YoutubeSearchItem item) => SourceTrack(
+    ref: RemoteTrackRef(SourceId.youtube, item.id),
+    title: item.title,
+    artists: [item.author],
+    duration: item.duration,
+    coverUrl: item.thumbnailUrl,
+    available: true,
+    raw: {'videoId': item.id},
+  );
+
   @override
   Future<SourceTrack?> getTrack(RemoteTrackRef ref) async {
     final tracks = await getTracksByIds([ref]);
@@ -175,6 +200,29 @@ class YoutubeSource implements MusicSource {
 
     try {
       AppLogger.instance.info('youtube stream ${track.ref.remoteId}');
+      // InnerTube-клиенты IOS/ANDROID отвечают там, где запросы библиотеки
+      // получают UNPLAYABLE. Сначала пробуем их.
+      final innertube = await _innertube.resolve(track.ref.remoteId);
+      if (innertube != null) {
+        final ttl = innertube.expiresAt.difference(DateTime.now());
+        return StreamReady(
+          target: StreamUrl(
+            url: innertube.url,
+            headers: {
+              'User-Agent': ?innertube.userAgent,
+              'Referer': 'https://www.youtube.com/',
+            },
+            expiresAt: innertube.expiresAt,
+            cacheKey: track.ref.remoteId,
+          ),
+          source: id,
+          quality: preferred,
+          codec: innertube.codec,
+          bitrateKbps: innertube.bitrateKbps,
+          ttlHint: ttl > streamTtlMax ? streamTtlMax : ttl,
+        );
+      }
+
       final clients = <yt.YoutubeApiClient>[
         yt.YoutubeApiClient.androidSdkless,
         yt.YoutubeApiClient.ios,
@@ -266,5 +314,6 @@ class YoutubeSource implements MusicSource {
   Future<void> dispose() async {
     _client?.close();
     _client = null;
+    await _innertube.dispose();
   }
 }

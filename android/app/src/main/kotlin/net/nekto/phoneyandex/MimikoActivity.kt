@@ -1,6 +1,7 @@
 package net.nekto.phoneyandex
 
 import android.content.ComponentName
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -20,7 +21,13 @@ import io.flutter.plugin.common.MethodChannel
  *  2) переключение значка в лаунчере через activity-alias.
  */
 class MimikoActivity : AudioServiceActivity() {
+    private var sharedChannel: MethodChannel? = null
+    private var pendingSharedLink: String? = null
+
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        // Ссылку из стартового интента забираем до super: configureFlutterEngine
+        // и первый вызов Dart идут уже внутри super.onCreate.
+        if (savedInstanceState == null) captureSharedText(intent)
         super.onCreate(savedInstanceState)
         applyFrameRate(preferredHz)
         // FlutterView появляется не в onCreate, а когда движок прицепился к
@@ -28,12 +35,20 @@ class MimikoActivity : AudioServiceActivity() {
         window.decorView.post { applyFrameRate(preferredHz) }
     }
 
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        sharedTextOf(intent)?.let { deliverSharedText(it) }
+    }
+
     override fun configureFlutterEngine(flutterEngine: io.flutter.embedding.engine.FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(
+        val channel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             CHANNEL,
-        ).setMethodCallHandler { call, result ->
+        )
+        sharedChannel = channel
+        channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "setFrameRate" -> {
                     preferredHz = (call.arguments as? Number)?.toFloat() ?: 0f
@@ -41,7 +56,21 @@ class MimikoActivity : AudioServiceActivity() {
                     result.success(actualRefreshRate())
                 }
 
-                "actualRefreshRate" -> result.success(actualRefreshRate())
+                "shareText" -> {
+                    val text = call.arguments as? String
+                    if (text.isNullOrBlank()) {
+                        result.error("bad_argument", "текст пустой", null)
+                    } else {
+                        result.success(shareText(text))
+                    }
+                }
+
+                // Холодный старт: одна ссылка, повторно не отдаём.
+                "getInitialSharedLink" -> {
+                    val text = pendingSharedLink
+                    pendingSharedLink = null
+                    result.success(text)
+                }
 
                 "getMediaInfo" -> {
                     val path = call.arguments as? String
@@ -73,6 +102,39 @@ class MimikoActivity : AudioServiceActivity() {
     }
 
     private var preferredHz = 120f
+
+    /** Стартовый интент: ссылка уходит в Dart, когда он её попросит. */
+    private fun captureSharedText(intent: Intent?) {
+        sharedTextOf(intent)?.let { pendingSharedLink = it }
+    }
+
+    /** Только «Поделиться текстом»: VIEW-ссылки Flutter сам отдаёт роутеру. */
+    private fun sharedTextOf(intent: Intent?): String? =
+        if (intent?.action == Intent.ACTION_SEND &&
+            intent.type?.startsWith("text/") == true
+        ) {
+            intent.getStringExtra(Intent.EXTRA_TEXT)
+        } else {
+            null
+        }
+
+    /** В горячий старт — колбэком; если Dart ещё не подписан — в очередь. */
+    private fun deliverSharedText(text: String) {
+        val channel = sharedChannel
+        if (channel == null) {
+            pendingSharedLink = text
+        } else {
+            channel.invokeMethod("onSharedLink", text)
+        }
+    }
+
+    private fun shareText(text: String): Boolean = runCatching {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        startActivity(Intent.createChooser(send, null))
+    }.isSuccess
 
     @Suppress("DEPRECATION")
     private fun displayOrNull(): android.view.Display? =

@@ -6,10 +6,13 @@ import '../../../app_providers.dart';
 import '../../../core/prefs/prefs.dart';
 import '../../../core/sources/source_id.dart';
 import '../../../features/downloads/download_service.dart';
+import '../../../features/home/wave_mode_label.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../theme/app_motion.dart';
+import '../../../wave_providers.dart';
 import '../../../widgets/pressable.dart';
+import '../../../widgets/track_badges.dart';
 import '../../../widgets/track_cover.dart';
 import '../../../widgets/track_tile.dart';
 import '../player_snapshot.dart';
@@ -223,6 +226,16 @@ class _TopBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final played = ref.watch(
+      playerSnapshotProviderValue.select((s) => (s.sourceTitle, s.isRadio)),
+    );
+    final waveMode =
+        played.$2 && ref.watch(stationProvider) == WaveStationIds.myVibe
+        ? waveModeLabel(ref.watch(waveSettingsProvider).value, l)
+        : null;
+    final label = played.$2
+        ? (waveMode ?? (played.$1.isNotEmpty ? played.$1 : l.playerRadio))
+        : (played.$1.isNotEmpty ? played.$1 : l.playerTitle);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
@@ -235,7 +248,7 @@ class _TopBar extends ConsumerWidget {
           ),
           Expanded(
             child: Text(
-              isRadio ? l.playerRadio : l.playerTitle,
+              label,
               style: theme.textTheme.titleMedium,
               overflow: TextOverflow.ellipsis,
             ),
@@ -305,7 +318,16 @@ class _Artwork extends ConsumerWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 12),
+            if (ref.watch(
+              playerSnapshotProviderValue.select(
+                (s) => current.explicitFlag || current.isAi || s.uncensored,
+              ),
+            )) ...[
+              const SizedBox(height: 10),
+              const _TrackFlags(),
+              const SizedBox(height: 10),
+            ] else
+              const SizedBox(height: 12),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -645,6 +667,26 @@ class _PlayToggle extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TrackFlags extends ConsumerWidget {
+  const _TrackFlags();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(
+      playerSnapshotProviderValue.select((s) => s.current),
+    );
+    final uncensored = ref.watch(
+      playerSnapshotProviderValue.select((s) => s.uncensored),
+    );
+    if (current == null) return const SizedBox.shrink();
+    return TrackBadges(
+      explicit: current.explicitFlag,
+      ai: current.isAi,
+      uncensored: uncensored,
     );
   }
 }

@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../app_providers.dart';
+import '../core/content/ai_filter.dart';
 import '../core/db/daos/library_dao.dart';
 import '../core/sources/source_id.dart';
 import '../features/catalog/ui/track_menu.dart';
 import '../features/downloads/download_service.dart';
 import '../l10n/app_localizations.dart';
 import '../router/routes.dart';
+import 'track_badges.dart';
 import 'track_cover.dart';
 
 /// Общий тег hero для обложки: список, мини-плеер и большой экран
@@ -40,10 +42,18 @@ class TrackTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final playing = ref.watch(
-      playerSnapshotProviderValue.select((s) => s.current?.localTrackId),
+    final player = ref.watch(
+      playerSnapshotProviderValue.select(
+        (s) => (s.current?.localTrackId, s.uncensored),
+      ),
     );
-    final isCurrent = playing == row.localTrackId;
+    final isCurrent = player.$1 == row.localTrackId;
+    final uncensored = isCurrent && player.$2;
+    final aiReady = ref.watch(aiBadgeReadyProvider).hasValue;
+    final isAi =
+        aiReady &&
+        AiFilter.instance.isAiRow(row.title, row.artist, row.artistRemoteIds);
+    final hasBadges = row.explicitFlag || isAi || uncensored;
     // Повтор трека в плейлисте даёт два одинаковых Hero-тега и падение при
     // переходе. Анимацию оставляем первой копии, остальным — обычную обложку.
     final heroTag =
@@ -67,16 +77,30 @@ class TrackTile extends ConsumerWidget {
             ),
         ],
       ),
-      title: Text(
-        row.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.titleMedium?.copyWith(
-          color: isCurrent
-              ? theme.colorScheme.primary
-              : theme.colorScheme.onSurface,
-          fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
-        ),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(
+              row.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: isCurrent
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface,
+                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
+              ),
+            ),
+          ),
+          if (hasBadges) ...[
+            const SizedBox(width: 6),
+            TrackBadges(
+              explicit: row.explicitFlag,
+              ai: isAi,
+              uncensored: uncensored,
+            ),
+          ],
+        ],
       ),
       subtitle: Text(
         row.artist.isEmpty ? _sourceLabel(context, row) : row.artist,

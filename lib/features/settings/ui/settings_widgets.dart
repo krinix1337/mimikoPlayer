@@ -17,6 +17,7 @@ import '../../../features/auth/ui/yandex_login.dart';
 import '../../../features/downloads/download_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_motion.dart';
+import '../../../theme/keyboard_theme.dart';
 import '../../../widgets/pressable.dart';
 
 /// Карточка-секция настроек: заголовок и группа строк в общей оболочке.
@@ -33,6 +34,36 @@ class SettingsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (kKeyboardTestTheme) {
+      final tokens = theme.extension<KeyboardTokens>();
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (title.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            for (var i = 0; i < children.length; i++) ...[
+              SettingsGroupItem(
+                radius: tokens?.itemRadius,
+                pressedRadius: tokens?.itemPressedRadius,
+                child: children[i],
+              ),
+              if (i != children.length - 1) const SizedBox(height: 2),
+            ],
+          ],
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Column(
@@ -61,6 +92,64 @@ class SettingsSection extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Пункт группы в стиле Expressive Keyboard: отдельная тональная плашка,
+/// углы мягко набухают от 6 до 22 при касании. Жест не перехватывается —
+/// внутри продолжают работать ListTile, InkWell и слайдеры.
+class SettingsGroupItem extends StatefulWidget {
+  const SettingsGroupItem({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.radius,
+    this.pressedRadius,
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final double? radius;
+  final double? pressedRadius;
+
+  @override
+  State<SettingsGroupItem> createState() => _SettingsGroupItemState();
+}
+
+class _SettingsGroupItemState extends State<SettingsGroupItem> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final tokens = Theme.of(context).extension<KeyboardTokens>();
+    final radius = _pressed
+        ? widget.pressedRadius ?? tokens?.itemPressedRadius ?? 22
+        : widget.radius ?? tokens?.itemRadius ?? 6;
+    final content = widget.onTap == null
+        ? widget.child
+        : InkWell(onTap: widget.onTap, child: widget.child);
+    return Listener(
+      onPointerDown: (_) {
+        if (!_pressed) setState(() => _pressed = true);
+      },
+      onPointerUp: (_) {
+        if (_pressed) setState(() => _pressed = false);
+      },
+      onPointerCancel: (_) {
+        if (_pressed) setState(() => _pressed = false);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutBack,
+        decoration: BoxDecoration(
+          color: scheme.surfaceBright,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Material(type: MaterialType.transparency, child: content),
       ),
     );
   }
@@ -150,12 +239,21 @@ class _ChoicePill extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final radius = Motion.of(context).prefs.corner.radius * 0.7;
+    final test = kKeyboardTestTheme;
+    final radius = test
+        ? (selected ? 24.0 : 8.0)
+        : Motion.of(context).prefs.corner.radius * 0.7;
+    final background = test
+        ? (selected ? scheme.primary : scheme.secondaryContainer)
+        : (selected ? scheme.primaryContainer : scheme.surfaceContainerHigh);
+    final foreground = test
+        ? (selected ? scheme.onPrimary : scheme.onSecondaryContainer)
+        : (selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant);
     return SizedBox(
       width: width,
       height: 46,
       child: Material(
-        color: selected ? scheme.primaryContainer : scheme.surfaceContainerHigh,
+        color: background,
         borderRadius: BorderRadius.circular(radius),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -163,18 +261,36 @@ class _ChoicePill extends StatelessWidget {
           child: Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: selected
-                      ? scheme.onPrimaryContainer
-                      : scheme.onSurfaceVariant,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
+              // Одиночное слово не рвём по буквам («Выключен-ы»): ужимаем
+              // его целиком. Фразы из нескольких слов переносим по словам.
+              child: label.contains(' ')
+                  ? Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: foreground,
+                        fontWeight: selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    )
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        softWrap: false,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: foreground,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ),
             ),
           ),
         ),
@@ -261,12 +377,30 @@ class _SliderRowState extends State<SliderRow> {
               Expanded(
                 child: Text(widget.label, style: theme.textTheme.titleMedium),
               ),
-              Text(
-                widget.display(_value),
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.primary,
+              if (kKeyboardTestTheme)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    widget.display(_value),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                )
+              else
+                Text(
+                  widget.display(_value),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
-              ),
             ],
           ),
           Slider(
@@ -435,7 +569,9 @@ class LauncherIconRow extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.all(2),
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
+                            // Значок лаунчера квадратный со скруглением, а не
+                            // круг: превью должно повторять его форму.
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: icon == current
                                   ? theme.colorScheme.primary
@@ -443,11 +579,13 @@ class LauncherIconRow extends ConsumerWidget {
                               width: 3,
                             ),
                           ),
-                          child: ClipOval(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(13),
                             child: Image.asset(
                               _assetFor[icon]!,
-                              width: 46,
-                              height: 46,
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
                             ),
                           ),
                         ),
@@ -486,52 +624,6 @@ class LauncherIconRow extends ConsumerWidget {
     }
     await ref.read(prefsProvider.notifier).setLauncherIcon(icon);
     messenger.showSnackBar(SnackBar(content: Text(l.launcherIconApplied)));
-  }
-}
-
-/// Частота кадров: запрос уходит в окно, но показываем и то, что система
-/// реально дала — на бюджетных HyperOS сторонние приложения держат на 60.
-class FrameTile extends ConsumerStatefulWidget {
-  const FrameTile({super.key});
-
-  @override
-  ConsumerState<FrameTile> createState() => _FrameTileState();
-}
-
-class _FrameTileState extends ConsumerState<FrameTile> {
-  double _actual = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final value = await MimikoPlatform.actualRefreshRate();
-      if (mounted) setState(() => _actual = value);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    final prefs = ref.watch(prefsProvider);
-
-    return ChoiceRow<double>(
-      label: l.settingsFrame,
-      values: const [0, 60, 90, 120],
-      current: prefs.frameHz,
-      labelOf: (value) => switch (value.toInt()) {
-        0 => l.frameSystem,
-        60 => l.frame60,
-        90 => l.frame90,
-        _ => l.frame120,
-      },
-      note: _actual == 0 ? null : '${l.settingsFrame}: ${_actual.round()} Гц',
-      onPick: (value) async {
-        await ref.read(prefsProvider.notifier).setFrameHz(value);
-        final actual = await MimikoPlatform.requestFrameRate(value);
-        if (mounted) setState(() => _actual = actual);
-      },
-    );
   }
 }
 

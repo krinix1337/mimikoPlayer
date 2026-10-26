@@ -7,6 +7,7 @@ import '../../../core/db/daos/library_dao.dart';
 import '../../../core/prefs/prefs.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
+import '../../../theme/app_insets.dart';
 import '../../../theme/app_motion.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/track_cover.dart';
@@ -75,7 +76,12 @@ class CollectionScreen extends ConsumerWidget {
                     onTap: () => context.push(Routes.collectionLiked),
                     onPlay: likedRows.isEmpty
                         ? null
-                        : () => _playAll(ref, likedRows, CollectionKind.liked),
+                        : () => _playAll(
+                            ref,
+                            likedRows,
+                            CollectionKind.liked,
+                            title: l.collectionLiked,
+                          ),
                   ),
                 ),
                 RiseIn(
@@ -105,6 +111,7 @@ class CollectionScreen extends ConsumerWidget {
                     downloaded: downloaded.value?.length,
                   ),
                 ),
+                const SizedBox(height: kShellBottomInset),
               ],
             ),
           ),
@@ -146,13 +153,14 @@ class CollectionScreen extends ConsumerWidget {
   Future<void> _playAll(
     WidgetRef ref,
     List<CollectionRow> rows,
-    CollectionKind kind,
-  ) async {
+    CollectionKind kind, {
+    required String title,
+  }) async {
     await ref
         .read(playbackControllerProvider)
         .playQueue(
           [for (final row in rows) row.localTrackId],
-          sourceHint: {'kind': kind.name},
+          sourceHint: {'kind': kind.name, 'title': title},
         );
   }
 }
@@ -414,7 +422,10 @@ class _RecentCarousel extends StatelessWidget {
         .playQueue(
           [for (final item in rows) item.localTrackId],
           startIndex: rows.indexOf(row),
-          sourceHint: {'kind': 'library'},
+          sourceHint: {
+            'kind': 'library',
+            'title': AppLocalizations.of(context).collectionLiked,
+          },
         );
     router.push(Routes.player);
   }

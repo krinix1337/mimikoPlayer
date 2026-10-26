@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import '../../core/content/censor_base.dart';
 import '../../core/sources/music_source.dart';
@@ -548,18 +549,9 @@ class YandexSource implements MusicSource {
         SourceFailure(source: id, reason: SourceFailReason.notInCatalog),
       );
     }
-    if (!track.available) {
-      return StreamFailed(
-        SourceFailure(
-          source: id,
-          reason: SourceFailReason.unavailable,
-          message: 'трек снят с публикации',
-        ),
-      );
-    }
-
     // База FckCensorData: незацензуренная версия важнее того, что отдаёт
-    // Яндекс, и не требует его токена. Проверка ссылки кэшируется.
+    // Яндекс, и не требует его токена. Проверка ссылки кэшируется. Стоит до
+    // гейта available: снятый с публикации трек тоже может иметь файл в базе.
     if (CensorBase.instance.enabled) {
       final replacement = await CensorBase.instance.replacementFor(
         track.ref.remoteId,
@@ -577,6 +569,16 @@ class YandexSource implements MusicSource {
           ttlHint: const Duration(days: 3650),
         );
       }
+    }
+
+    if (!track.available) {
+      return StreamFailed(
+        SourceFailure(
+          source: id,
+          reason: SourceFailReason.unavailable,
+          message: 'трек снят с публикации',
+        ),
+      );
     }
 
     if (!_hasAuth) {
@@ -629,6 +631,54 @@ class YandexSource implements MusicSource {
         'http=${result.failure?.httpStatus}',
       );
     }
+  }
+
+  /// Добавить трек в свой плейлист. Правка идёт через `change` с diff, и
+  /// сервер принимает её только с актуальной revision - поэтому сначала
+  /// читаем плейлист (заодно узнаём позицию вставки: в конец).
+  Future<bool> addTrackToPlaylist({
+    required String kind,
+    required String trackId,
+    required String albumId,
+  }) async {
+    final uid = auth is AuthReady ? (auth as AuthReady).uid : null;
+    if (uid == null) return false;
+
+    final current = await _api.get('/users/$uid/playlists', {'kinds': kind});
+    if (!current.isOk) return false;
+    final fetched = current.asList.where(
+      (item) => item['kind'].toString() == kind,
+    );
+    final first = fetched.isEmpty ? null : fetched.first;
+    if (first == null) return false;
+
+    final revision = (first['revision'] as num?)?.toInt() ?? 1;
+    final tracks = first['tracks'];
+    final at =
+        (first['trackCount'] as num?)?.toInt() ??
+        (tracks is List ? tracks.length : 0);
+    final diff = jsonEncode([
+      {
+        'op': 'insert',
+        'at': at,
+        'tracks': [
+          {'id': trackId, 'album_id': albumId},
+        ],
+      },
+    ]);
+
+    final result = await _api.post(
+      '/users/$uid/playlists/$kind/change',
+      body: {'kind': kind, 'revision': revision, 'diff': diff},
+      form: true,
+    );
+    if (!result.isOk) {
+      AppLogger.instance.warn(
+        'добавление в плейлист не принято: ${result.failure?.reason.name} '
+        'http=${result.failure?.httpStatus}',
+      );
+    }
+    return result.isOk;
   }
 
   @override

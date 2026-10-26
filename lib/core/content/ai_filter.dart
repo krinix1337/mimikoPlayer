@@ -174,6 +174,12 @@ class AiFilter {
     return matches(title, [artist]);
   }
 
+  /// Для плеера: название и все исполнители, id — из локальной базы.
+  bool isAiLocal(String title, List<String> artists, List<String> remoteIds) {
+    if (_hasBlockedArtistId(remoteIds)) return true;
+    return matches(title, artists);
+  }
+
   bool _hasBlockedArtistId(Iterable<String> ids) {
     if (_artistIds.isEmpty) return false;
     for (final id in ids) {

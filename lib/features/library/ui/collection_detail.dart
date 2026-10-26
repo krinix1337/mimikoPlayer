@@ -4,12 +4,16 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app_providers.dart';
 import '../../../core/db/daos/library_dao.dart';
+import '../../../core/platform/mimiko_platform.dart';
+import '../../../core/sources/source_dto.dart';
 import '../../../features/player/player_snapshot.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
+import '../../../theme/app_insets.dart';
 import '../../../theme/app_motion.dart';
 import '../../../features/downloads/download_service.dart';
 import '../../../features/player/ui/mini_player.dart';
+import '../../../widgets/glass_top_bar.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/track_cover.dart';
 import '../../../widgets/track_tile.dart';
@@ -36,6 +40,9 @@ class CollectionKindScreen extends ConsumerWidget {
     };
 
     return Scaffold(
+      // Пилюля плавает над списком: без extendBody над ней остаётся полоса,
+      // которая режет обложки и строки.
+      extendBody: true,
       // Пилюля уважает настройку и не заезжает под системную навигацию.
       bottomNavigationBar: SafeArea(
         top: false,
@@ -105,7 +112,9 @@ class CollectionKindScreen extends ConsumerWidget {
                 ),
               ),
             ],
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            const SliverToBoxAdapter(
+              child: SizedBox(height: kMiniPlayerBottomInset),
+            ),
           ],
         ),
       ),
@@ -140,10 +149,21 @@ class CollectionKindScreen extends ConsumerWidget {
   }) async {
     final router = GoRouter.of(context);
     final controller = ref.read(playbackControllerProvider);
+    final title = switch (kind) {
+      CollectionKind.liked => AppLocalizations.of(context).collectionLiked,
+      CollectionKind.disliked => AppLocalizations.of(
+        context,
+      ).collectionDisliked,
+      CollectionKind.files => AppLocalizations.of(context).collectionFiles,
+      CollectionKind.recent => AppLocalizations.of(context).collectionRecent,
+      CollectionKind.downloaded => AppLocalizations.of(
+        context,
+      ).collectionDownloaded,
+    };
     await controller.playQueue(
       [for (final row in rows) row.localTrackId],
       startIndex: index,
-      sourceHint: {'kind': kind.name},
+      sourceHint: {'kind': kind.name, 'title': title},
     );
     if (shuffle) {
       await controller.setShuffle(PlaybackShuffle.shuffled);
@@ -522,6 +542,8 @@ class PlaylistsScreen extends ConsumerWidget {
     final playlists = ref.watch(playlistsProvider);
 
     return Scaffold(
+      // Обложки уходят под плавающую пилюлю, а не режутся полосой над ней.
+      extendBody: true,
       // Пилюля уважает настройку и не заезжает под системную навигацию.
       bottomNavigationBar: SafeArea(
         top: false,
@@ -533,10 +555,11 @@ class PlaylistsScreen extends ConsumerWidget {
       ),
       body: CustomScrollView(
         slivers: [
-          SliverAppBar.large(
+          SliverAppBar(
             pinned: true,
             backgroundColor: Theme.of(context).colorScheme.surface,
             title: Text(l.collectionPlaylists),
+            titleTextStyle: Theme.of(context).textTheme.headlineSmall,
           ),
           switch (playlists) {
             AsyncError(:final error) => SliverFillRemaining(
@@ -581,6 +604,9 @@ class PlaylistsScreen extends ConsumerWidget {
               ),
             ),
           },
+          const SliverToBoxAdapter(
+            child: SizedBox(height: kMiniPlayerBottomInset),
+          ),
         ],
       ),
     );
@@ -622,15 +648,28 @@ class _PlaylistCard extends StatelessWidget {
 }
 
 /// Плейлист целиком: обложка, кнопки, треки в порядке источника.
-class PlaylistScreen extends ConsumerWidget {
+class PlaylistScreen extends ConsumerStatefulWidget {
   const PlaylistScreen({super.key, required this.playlistId});
 
   final String playlistId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PlaylistScreen> createState() => _PlaylistScreenState();
+}
+
+class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
+  final ScrollController _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final detail = ref.watch(playlistProvider(playlistId));
+    final detail = ref.watch(playlistProvider(widget.playlistId));
 
     return Scaffold(
       // Фон с оттенком обложки должен уходить под мини-плеер, иначе вокруг
@@ -658,34 +697,48 @@ class PlaylistScreen extends ConsumerWidget {
             return _statusView(
               context,
               l,
-              Center(child: Text(l.collectionEmptyPlaylists)),
+              Center(child: Text(l.playlistNotFound)),
             );
           }
           final rows = value.rows;
+          final scheme = Theme.of(context).colorScheme;
           return Stack(
             fit: StackFit.expand,
             children: [
               // Лёгкий оттенок обложки на всей странице: низ больше не
               // выглядит чёрной дырой вокруг мини-плеера и панели.
               BlurredCover(url: value.overview.coverUrl, opacity: 0.16),
+              // Hero заканчивается плотной поверхностью, а страница под ним
+              // подсвечена обложкой: без моста на стыке видна тёмная полоса.
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 470,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          scheme.surface,
+                          scheme.surface,
+                          scheme.surface.withValues(alpha: 0),
+                        ],
+                        stops: const [0, 380 / 470, 1],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               CustomScrollView(
+                controller: _scroll,
                 slivers: [
-                  SliverAppBar(
-                    pinned: true,
-                    // Без непрозрачного фона свёрнутая шапка просвечивала
-                    // списком треков прямо под заголовком.
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                    expandedHeight: 380,
-                    flexibleSpace: FlexibleSpaceBar(
-                      titlePadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                      title: Text(
-                        value.overview.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      background: _PlaylistBackdrop(
-                        coverUrl: value.overview.coverUrl,
-                      ),
+                  SliverToBoxAdapter(
+                    child: _PlaylistHero(
+                      title: value.overview.title,
+                      coverUrl: value.overview.coverUrl,
                     ),
                   ),
                   SliverToBoxAdapter(
@@ -701,7 +754,13 @@ class PlaylistScreen extends ConsumerWidget {
                               FilledButton.icon(
                                 onPressed: rows.isEmpty
                                     ? null
-                                    : () => _play(context, ref, rows, 0),
+                                    : () => _play(
+                                        context,
+                                        ref,
+                                        rows,
+                                        0,
+                                        title: value.overview.title,
+                                      ),
                                 icon: const Icon(Icons.play_arrow_rounded),
                                 label: Text(l.collectionPlayAll),
                               ),
@@ -714,6 +773,7 @@ class PlaylistScreen extends ConsumerWidget {
                                         ref,
                                         rows,
                                         0,
+                                        title: value.overview.title,
                                         shuffle: true,
                                       ),
                                 icon: const Icon(Icons.shuffle_rounded),
@@ -736,8 +796,35 @@ class PlaylistScreen extends ConsumerWidget {
                   ),
                   // Место под плавающую пилюлю мини-плеера: с extendBody
                   // список уезжает под неё.
-                  const SliverToBoxAdapter(child: SizedBox(height: 108)),
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: kMiniPlayerBottomInset),
+                  ),
                 ],
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: GlassTopBar(
+                  title: value.overview.title,
+                  controller: _scroll,
+                  revealAt: 300,
+                  actions: [
+                    if (value.overview.source == 'yandex')
+                      IconButton(
+                        tooltip: l.collectionShare,
+                        icon: const Icon(Icons.share_rounded),
+                        onPressed: () => _share(context, ref, value.overview),
+                      ),
+                    IconButton(
+                      tooltip: l.collectionDownloadAllLikes,
+                      icon: const Icon(Icons.download_rounded),
+                      onPressed: rows.isEmpty
+                          ? null
+                          : () => _downloadAll(context, ref, rows),
+                    ),
+                  ],
+                ),
               ),
             ],
           );
@@ -769,6 +856,7 @@ class PlaylistScreen extends ConsumerWidget {
     WidgetRef ref,
     List<CollectionRow> rows,
     int index, {
+    required String title,
     bool shuffle = false,
   }) async {
     final router = GoRouter.of(context);
@@ -776,12 +864,95 @@ class PlaylistScreen extends ConsumerWidget {
     await controller.playQueue(
       [for (final row in rows) row.localTrackId],
       startIndex: index,
-      sourceHint: {'kind': 'playlist', 'playlist': playlistId},
+      sourceHint: {
+        'kind': 'playlist',
+        'playlist': widget.playlistId,
+        'title': title,
+      },
     );
     if (shuffle) {
       await controller.setShuffle(PlaybackShuffle.shuffled);
     }
     router.push(Routes.player);
+  }
+
+  /// Ссылка на плейлист Яндекса: `ownerUid:kind` уже внутри локального id,
+  /// а для своих плейлистов владелец - текущий аккаунт.
+  String? _shareLink(WidgetRef ref, PlaylistOverview overview) {
+    final raw = overview.id.startsWith('yandex:')
+        ? overview.id.substring(7)
+        : overview.id;
+    final parts = raw.split(':');
+    final String owner;
+    final String kind;
+    if (parts.length == 2) {
+      owner = parts.first;
+      kind = parts.last;
+    } else {
+      final auth = ref.read(appServicesProvider).yandex?.auth;
+      if (auth is! AuthReady) return null;
+      owner = auth.uid;
+      kind = raw;
+    }
+    return 'https://music.yandex.ru/users/$owner/playlists/$kind';
+  }
+
+  Future<void> _share(
+    BuildContext context,
+    WidgetRef ref,
+    PlaylistOverview overview,
+  ) async {
+    final link = _shareLink(ref, overview);
+    if (link == null) return;
+    await MimikoPlatform.shareText('${overview.title}\n$link');
+  }
+
+  Future<void> _downloadAll(
+    BuildContext context,
+    WidgetRef ref,
+    List<CollectionRow> rows,
+  ) async {
+    final l = AppLocalizations.of(context);
+    final queued = await ref
+        .read(downloadControllerProvider.notifier)
+        .downloadAllTracks([for (final row in rows) row.localTrackId]);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l.collectionDownloadQueued(queued))));
+  }
+}
+
+class _PlaylistHero extends StatelessWidget {
+  const _PlaylistHero({required this.title, this.coverUrl});
+
+  final String title;
+  final String? coverUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 380,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // BlurredCover растянут на 1.2 и без клипа вылезает за героя.
+          ClipRect(child: _PlaylistBackdrop(coverUrl: coverUrl)),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 14,
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.headlineMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

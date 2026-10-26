@@ -1,12 +1,12 @@
 import 'dart:ui' as ui;
 
-import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../app_providers.dart';
 import '../core/db/daos/library_dao.dart';
+import '../core/links/yandex_playlist_link.dart';
 import '../core/logging/log_screen.dart';
 import '../features/catalog/ui/catalog_screens.dart';
 import '../features/discover/ui/discover_screen.dart';
@@ -20,8 +20,11 @@ import '../features/search/ui/search_screen.dart';
 import '../features/settings/ui/settings_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_motion.dart';
+import '../theme/blur_settings.dart';
+import '../theme/keyboard_theme.dart';
 import '../theme/surface.dart';
 import 'routes.dart';
+import 'slide_up_route.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 
@@ -49,28 +52,41 @@ final shellTabProvider = NotifierProvider<ShellTabController, int>(
 final appRouterProvider = GoRouter(
   navigatorKey: _rootKey,
   initialLocation: Routes.home,
+  // Внешняя ссылка music.yandex.* приходит как platform default location
+  // (или route information при горячем старте). Переводим её в наш маршрут
+  // плейлиста; остальные внешние адреса не показываем как ошибку.
+  redirect: (context, state) {
+    final link =
+        YandexPlaylistLink.fromUri(state.uri) ??
+        YandexPlaylistLink.tryParse(state.uri.toString());
+    if (link != null) {
+      return Routes.playlist('yandex:${link.remotePlaylistId}');
+    }
+    return state.uri.hasScheme ? Routes.home : null;
+  },
   routes: [
     ShellRoute(
       builder: (context, state, child) => AppShell(child: child),
       routes: [
         GoRoute(
           path: Routes.home,
-          pageBuilder: (context, state) => _tabPage(state, const HomeScreen()),
+          pageBuilder: (context, state) =>
+              slideUpPage(state, const HomeScreen()),
         ),
         GoRoute(
           path: Routes.discover,
           pageBuilder: (context, state) =>
-              _tabPage(state, const DiscoverScreen()),
+              slideUpPage(state, const DiscoverScreen()),
         ),
         GoRoute(
           path: Routes.library,
           pageBuilder: (context, state) =>
-              _tabPage(state, const CollectionScreen()),
+              slideUpPage(state, const CollectionScreen()),
           routes: [
             GoRoute(
               path: 'liked',
               parentNavigatorKey: _rootKey,
-              pageBuilder: (context, state) => _slideUp(
+              pageBuilder: (context, state) => slideUpPage(
                 state,
                 const CollectionKindScreen(kind: CollectionKind.liked),
               ),
@@ -78,7 +94,7 @@ final appRouterProvider = GoRouter(
             GoRoute(
               path: 'disliked',
               parentNavigatorKey: _rootKey,
-              pageBuilder: (context, state) => _slideUp(
+              pageBuilder: (context, state) => slideUpPage(
                 state,
                 const CollectionKindScreen(kind: CollectionKind.disliked),
               ),
@@ -86,7 +102,7 @@ final appRouterProvider = GoRouter(
             GoRoute(
               path: 'files',
               parentNavigatorKey: _rootKey,
-              pageBuilder: (context, state) => _slideUp(
+              pageBuilder: (context, state) => slideUpPage(
                 state,
                 const CollectionKindScreen(kind: CollectionKind.files),
               ),
@@ -94,7 +110,7 @@ final appRouterProvider = GoRouter(
             GoRoute(
               path: 'recent',
               parentNavigatorKey: _rootKey,
-              pageBuilder: (context, state) => _slideUp(
+              pageBuilder: (context, state) => slideUpPage(
                 state,
                 const CollectionKindScreen(kind: CollectionKind.recent),
               ),
@@ -102,7 +118,7 @@ final appRouterProvider = GoRouter(
             GoRoute(
               path: 'downloaded',
               parentNavigatorKey: _rootKey,
-              pageBuilder: (context, state) => _slideUp(
+              pageBuilder: (context, state) => slideUpPage(
                 state,
                 const CollectionKindScreen(kind: CollectionKind.downloaded),
               ),
@@ -111,12 +127,12 @@ final appRouterProvider = GoRouter(
               path: 'playlists',
               parentNavigatorKey: _rootKey,
               pageBuilder: (context, state) =>
-                  _slideUp(state, const PlaylistsScreen()),
+                  slideUpPage(state, const PlaylistsScreen()),
               routes: [
                 GoRoute(
                   path: ':id',
                   parentNavigatorKey: _rootKey,
-                  pageBuilder: (context, state) => _slideUp(
+                  pageBuilder: (context, state) => slideUpPage(
                     state,
                     PlaylistScreen(
                       playlistId: Uri.decodeComponent(
@@ -132,36 +148,37 @@ final appRouterProvider = GoRouter(
         GoRoute(
           path: Routes.settings,
           pageBuilder: (context, state) =>
-              _tabPage(state, const SettingsScreen()),
+              slideUpPage(state, const SettingsScreen()),
         ),
         GoRoute(
           path: Routes.chart,
-          pageBuilder: (context, state) => _slideUp(state, const ChartScreen()),
+          pageBuilder: (context, state) =>
+              slideUpPage(state, const ChartScreen()),
         ),
         GoRoute(
           path: Routes.artist,
-          pageBuilder: (context, state) => _slideUp(
+          pageBuilder: (context, state) => slideUpPage(
             state,
             ArtistScreen(artistId: state.uri.queryParameters['id'] ?? ''),
           ),
         ),
         GoRoute(
           path: Routes.artistTracks,
-          pageBuilder: (context, state) => _slideUp(
+          pageBuilder: (context, state) => slideUpPage(
             state,
             ArtistTracksScreen(artistId: state.uri.queryParameters['id'] ?? ''),
           ),
         ),
         GoRoute(
           path: Routes.artistAlbums,
-          pageBuilder: (context, state) => _slideUp(
+          pageBuilder: (context, state) => slideUpPage(
             state,
             ArtistAlbumsScreen(artistId: state.uri.queryParameters['id'] ?? ''),
           ),
         ),
         GoRoute(
           path: Routes.album,
-          pageBuilder: (context, state) => _slideUp(
+          pageBuilder: (context, state) => slideUpPage(
             state,
             AlbumScreen(albumId: state.uri.queryParameters['id'] ?? ''),
           ),
@@ -173,13 +190,13 @@ final appRouterProvider = GoRouter(
     GoRoute(
       path: Routes.search,
       parentNavigatorKey: _rootKey,
-      pageBuilder: (context, state) => _slideUp(state, const SearchScreen()),
+      pageBuilder: (context, state) => slideUpPage(state, const SearchScreen()),
     ),
     GoRoute(
       path: Routes.newReleases,
       parentNavigatorKey: _rootKey,
       pageBuilder: (context, state) =>
-          _slideUp(state, const NewReleasesScreen()),
+          slideUpPage(state, const NewReleasesScreen()),
     ),
     // Плеер и караоке — корневые маршруты, открываются через push():
     // оболочка остаётся внизу стека, поэтому панель исчезает, а свайп
@@ -187,12 +204,12 @@ final appRouterProvider = GoRouter(
     GoRoute(
       path: Routes.player,
       parentNavigatorKey: _rootKey,
-      pageBuilder: (context, state) => _slideUp(state, const PlayerScreen()),
+      pageBuilder: (context, state) => slideUpPage(state, const PlayerScreen()),
     ),
     GoRoute(
       path: Routes.karaoke,
       parentNavigatorKey: _rootKey,
-      pageBuilder: (context, state) => _slideUp(
+      pageBuilder: (context, state) => slideUpPage(
         state,
         KaraokeScreen(trackId: state.uri.queryParameters['track'] ?? ''),
       ),
@@ -200,7 +217,7 @@ final appRouterProvider = GoRouter(
     GoRoute(
       path: Routes.logs,
       parentNavigatorKey: _rootKey,
-      builder: (context, state) => const LogScreen(),
+      pageBuilder: (context, state) => slideUpPage(state, const LogScreen()),
     ),
   ],
 );
@@ -237,7 +254,9 @@ class AppShell extends ConsumerWidget {
     final isHome = location == Routes.home;
 
     return Scaffold(
-      extendBody: isHome,
+      // Контент всегда уходит под плавающие пилюли: иначе над мини-плеером
+      // видна ровная полоса, которая режет карточки и обложки.
+      extendBody: true,
       backgroundColor: isHome
           ? Colors.transparent
           : Theme.of(context).scaffoldBackgroundColor,
@@ -262,9 +281,15 @@ class AppShell extends ConsumerWidget {
                 0,
               ),
               child: AppSurface(
-                radius: currentMotion.prefs.corner.radius,
-                color: Theme.of(context).colorScheme.surfaceContainerHigh
-                    .withValues(alpha: 0.92),
+                radius: kKeyboardTestTheme
+                    ? 28
+                    : currentMotion.prefs.corner.radius,
+                color: kKeyboardTestTheme
+                    ? Theme.of(context).colorScheme.surfaceContainerHigh
+                    : Theme.of(context).colorScheme.surfaceContainerHigh
+                          .withValues(
+                            alpha: currentBlur.hasBottom ? 0.66 : 0.96,
+                          ),
                 shadow: false,
                 child: _PillNavBar(
                   height: barHeight,
@@ -286,58 +311,6 @@ class AppShell extends ConsumerWidget {
       ),
     );
   }
-}
-
-/// Вкладки: короткий fade-through с непрозрачной подложкой. Направленная
-/// ось раньше показывала белый кадр, а полный fade без фона — просвет окна.
-Page<void> _tabPage(GoRouterState state, Widget child) {
-  final duration = currentMotion.micro(220);
-  if (duration == Duration.zero) {
-    return NoTransitionPage<void>(key: state.pageKey, child: child);
-  }
-  return CustomTransitionPage<void>(
-    key: state.pageKey,
-    child: child,
-    transitionDuration: duration,
-    reverseTransitionDuration: duration,
-    transitionsBuilder: (context, animation, secondary, page) => ColoredBox(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: FadeThroughTransition(
-        animation: animation,
-        secondaryAnimation: secondary,
-        fillColor: Colors.transparent,
-        child: page,
-      ),
-    ),
-  );
-}
-
-/// Полноэкранные страницы (плеер, разделы) выезжают снизу с пружиной.
-CustomTransitionPage<void> _slideUp(GoRouterState state, Widget child) {
-  final motion = currentMotion;
-  return CustomTransitionPage<void>(
-    key: state.pageKey,
-    child: child,
-    transitionDuration: motion.morph,
-    reverseTransitionDuration: motion.exit,
-    transitionsBuilder: (context, animation, secondary, child) {
-      final curved = CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeInCubic,
-      );
-      return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween(
-            begin: const Offset(0, 0.06),
-            end: Offset.zero,
-          ).animate(curved),
-          child: child,
-        ),
-      );
-    },
-  );
 }
 
 /// Панель навигации с точной геометрией: индикатор 56×32 по центру, подпись
@@ -365,6 +338,12 @@ class _PillNavBar extends StatelessWidget {
     final indicatorWidth = 56.0;
     final indicatorHeight = showLabels ? 32.0 : 36.0;
     final contentHeight = indicatorHeight + (showLabels ? 14.0 : 0.0);
+    final selectedIconColor = kKeyboardTestTheme
+        ? scheme.onSecondaryContainer
+        : scheme.primary;
+    final selectedLabelColor = kKeyboardTestTheme
+        ? scheme.onSurface
+        : scheme.primary;
 
     return SizedBox(
       height: height,
@@ -416,7 +395,7 @@ class _PillNavBar extends StatelessWidget {
                                         destinations[i].icon,
                                         size: showLabels ? 22 : 24,
                                         color: i == selected
-                                            ? scheme.primary
+                                            ? selectedIconColor
                                             : scheme.onSurfaceVariant,
                                       ),
                                     ),
@@ -435,7 +414,7 @@ class _PillNavBar extends StatelessWidget {
                                           ? FontWeight.w700
                                           : FontWeight.w500,
                                       color: i == selected
-                                          ? scheme.primary
+                                          ? selectedLabelColor
                                           : scheme.onSurfaceVariant,
                                     ),
                                   ),
@@ -465,7 +444,15 @@ class _GlassIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final radius = BorderRadius.circular(18);
+    final radius = BorderRadius.circular(kKeyboardTestTheme ? 16 : 18);
+    if (kKeyboardTestTheme) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: scheme.secondaryContainer,
+          borderRadius: radius,
+        ),
+      );
+    }
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,

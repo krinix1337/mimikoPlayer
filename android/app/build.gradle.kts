@@ -4,6 +4,11 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Вторая, тестовая установка: тот же код, но отдельный applicationId и имя.
+// Включается только сборкой с ORG_GRADLE_PROJECT_md3test=true; обычный APK
+// остаётся пакетом net.nekto.phoneyandex.
+val md3Test = project.findProperty("md3test")?.toString()?.toBoolean() ?: false
+
 android {
     namespace = "net.nekto.phoneyandex"
     compileSdk = 37
@@ -22,6 +27,11 @@ android {
         applicationId = "net.nekto.phoneyandex"
         minSdk = flutter.minSdkVersion
         targetSdk = 37
+        manifestPlaceholders["appLabel"] = if (md3Test) {
+            "mimikoPlayer MD3"
+        } else {
+            "mimikoPlayer"
+        }
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
         // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
@@ -31,7 +41,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            if (md3Test) applicationIdSuffix = ".md3test"
+        }
         release {
+            if (md3Test) applicationIdSuffix = ".md3test"
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")

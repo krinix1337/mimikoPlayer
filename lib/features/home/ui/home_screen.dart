@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,9 +13,11 @@ import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../sources/yandex/yandex_station.dart';
 import '../../../theme/app_motion.dart';
+import '../../../theme/blur_settings.dart';
 import '../../../wave_providers.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/track_cover.dart';
+import '../wave_mode_label.dart';
 
 /// Главная: живой цвет волны во весь экран, крупное название, круглая кнопка
 /// запуска и пилюля «что играет».
@@ -28,7 +32,17 @@ class HomeScreen extends ConsumerWidget {
     final stationTitle = title.isEmpty ? l.waveTitle : title;
     final station = ref.watch(stationProvider);
     final modeLabel = station == WaveStationIds.myVibe
-        ? _waveModeLabel(ref.watch(waveSettingsProvider).value, l)
+        ? waveModeLabel(ref.watch(waveSettingsProvider).value, l)
+        : null;
+    // Что играет и откуда: «Любимое», артист, плейлист. Для волны эту роль
+    // играет modeLabel, поэтому её заголовок не перекрываем.
+    final played = ref.watch(
+      playerSnapshotProviderValue.select(
+        (s) => (s.sourceTitle, s.isRadio, s.current != null),
+      ),
+    );
+    final contextTitle = !played.$2 && played.$3 && played.$1.isNotEmpty
+        ? played.$1
         : null;
     final wave = ref.watch(waveTracksProvider);
     // select: без него весь экран перестраивался на каждый тик позиции.
@@ -54,8 +68,8 @@ class HomeScreen extends ConsumerWidget {
         fit: StackFit.expand,
         children: [
           ColoredBox(color: scheme.surface),
-          // Пятна цвета дают движение, обложка — оттенок. Ни там, ни там нет
-          // блюр-шейдера, и на дешёвом железе кадр не проседает.
+          // Пятна цвета дают движение, обложка — оттенок. Силу размытия
+          // обложки задаёт общий раздел «Размытие».
           if (prefs.homeBackground != HomeBackground.cover)
             ColorBlobs(
               colors: [scheme.primary, scheme.tertiary, scheme.secondary],
@@ -69,7 +83,7 @@ class HomeScreen extends ConsumerWidget {
                 HomeCoverTone.normal => 0.42,
                 HomeCoverTone.lighter => 0.55,
               },
-              blur: prefs.homeCoverBlur,
+              blur: currentBlur.hasCover,
             ),
           DecoratedBox(
             decoration: BoxDecoration(
@@ -114,7 +128,7 @@ class HomeScreen extends ConsumerWidget {
                         tooltip: l.waveTune,
                       ),
                       Expanded(
-                        child: modeLabel == null
+                        child: modeLabel == null && contextTitle == null
                             ? Text(
                                 stationTitle,
                                 style: theme.textTheme.displaySmall,
@@ -124,8 +138,12 @@ class HomeScreen extends ConsumerWidget {
                               )
                             : Center(
                                 child: _WaveModePill(
-                                  label: modeLabel,
-                                  onClear: () => _resetWaveMode(context, ref),
+                                  label: modeLabel ?? contextTitle!,
+                                  onClear: modeLabel != null
+                                      ? () => _resetWaveMode(context, ref)
+                                      : () => ref
+                                            .read(playbackControllerProvider)
+                                            .stop(),
                                 ),
                               ),
                       ),
@@ -156,34 +174,6 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  static String? _waveModeLabel(WaveSettings? settings, AppLocalizations l) {
-    if (settings == null) return null;
-    final parts = <String>[];
-    final mood = switch (settings.moodEnergy) {
-      'active' => l.moodEnergyActive,
-      'fun' => l.moodEnergyFun,
-      'calm' => l.moodEnergyCalm,
-      'sad' => l.moodEnergySad,
-      _ => null,
-    };
-    if (mood != null) parts.add(mood);
-    final character = switch (settings.diversity) {
-      'favorite' => l.diversityFavorite,
-      'discover' => l.diversityDiscover,
-      'popular' => l.diversityPopular,
-      _ => null,
-    };
-    if (character != null) parts.add(character);
-    final language = switch (settings.language) {
-      'russian' => l.languageRussian,
-      'not-russian' => l.languageForeign,
-      'without-words' => l.languageInstrumental,
-      _ => null,
-    };
-    if (language != null) parts.add(language);
-    return parts.isEmpty ? null : parts.join(' · ');
   }
 
   static Future<void> _resetWaveMode(
@@ -332,21 +322,25 @@ class _WaveStage extends ConsumerWidget {
     }
 
     // Вся обложка ведёт в плеер: отдельной кнопки поверх картинки нет.
+    // Обложка квадратная со скруглением, как в плеере и карточках.
     return GestureDetector(
       onTap: () => context.push(Routes.player),
-      child: ClipOval(
+      child: SizedBox(
+        width: 116,
+        height: 116,
         child: cover == null
             ? Container(
-                width: 116,
-                height: 116,
-                color: scheme.surfaceContainerHigh,
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(26),
+                ),
                 child: Icon(
                   Icons.music_note_rounded,
                   size: 44,
                   color: scheme.onSurfaceVariant,
                 ),
               )
-            : TrackCover(url: cover, size: 116, radius: 58),
+            : TrackCover(url: cover, size: 116, radius: 26),
       ),
     );
   }
@@ -541,6 +535,7 @@ Future<void> showWaveSettingsSheet(BuildContext context, WidgetRef ref) =>
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      showDragHandle: true,
       builder: (context) => const _WaveSettingsSheet(),
     );
 
@@ -560,30 +555,22 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
   /// выбранный режим, поэтому крутить можно в обе стороны без упора.
   int _page = _ring;
   late final PageController _wheel = PageController(
-    viewportFraction: 0.4,
+    // 0.2 — в кадре пять карточек: видно, что пресетов больше трёх.
+    viewportFraction: 0.2,
     initialPage: _page,
   );
 
   /// Стартуем в середине ленты: первый свайп назад не должен упираться в край.
-  static const int _ring = 5000;
+  /// Кратно числу режимов: 5500 % 11 == 0, поэтому в центре «Обычная волна».
+  static const int _ring = 5500;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final loaded = await ref.read(waveSettingsProvider.future);
-      if (!mounted) return;
-      final modes = _modes(AppLocalizations.of(context));
-      final index = modes.indexWhere(
-        (mode) => _same(mode.settings, loaded ?? const WaveSettings()),
-      );
-      // Контроллер создаётся вместе с колесом (оно появляется только после
-      // _loaded), поэтому начальная страница берётся из _page без прыжка.
-      setState(() {
-        _page = _ring + (index < 0 ? 0 : index);
-        _loaded = true;
-      });
-    });
+    // Лист всегда открывается на «обычной волне»: настройки на сервере могли
+    // остаться от другого клиента, и показывать их выбранными нечестно.
+    _page = _ring;
+    _loaded = true;
   }
 
   @override
@@ -591,11 +578,6 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
     _wheel.dispose();
     super.dispose();
   }
-
-  static bool _same(WaveSettings a, WaveSettings b) =>
-      a.moodEnergy == b.moodEnergy &&
-      a.diversity == b.diversity &&
-      a.language == b.language;
 
   List<_WaveModeOption> _modes(AppLocalizations l) => [
     _WaveModeOption(
@@ -825,18 +807,33 @@ class _ModeCard extends StatelessWidget {
         final page = controller.hasClients
             ? (controller.page ?? controller.initialPage.toDouble())
             : controller.initialPage.toDouble();
-        final delta = (page - index).abs().clamp(0.0, 1.0);
+        final delta = (page - index).abs();
+        // Крайние карточки (1-я и 5-я) уходят в мягкое размытие: это намёк,
+        // что колесо продолжается в обе стороны.
+        final blur = (delta - 1).clamp(0.0, 1.0) * 2.6;
         return Transform.scale(
-          scale: 1 - 0.14 * delta,
-          child: Opacity(opacity: 1 - 0.38 * delta, child: child),
+          scale: 1 - 0.08 * delta.clamp(0.0, 2.0),
+          child: Opacity(
+            opacity: (1 - 0.16 * delta).clamp(0.35, 1.0),
+            child: blur == 0
+                ? child
+                : ImageFiltered(
+                    imageFilter: ui.ImageFilter.blur(
+                      sigmaX: blur,
+                      sigmaY: blur,
+                      tileMode: TileMode.decal,
+                    ),
+                    child: child,
+                  ),
+          ),
         );
       },
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -859,27 +856,45 @@ class _ModeCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 58,
-                height: 58,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(option.icon, size: 30, color: Colors.white),
+                child: Icon(option.icon, size: 20, color: Colors.white),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 7),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Text(
-                  option.label,
-                  maxLines: 2,
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                // Одиночное слово ужимаем целиком, фразу переносим по словам:
+                // пять карточек оставляют мало ширины.
+                child: option.label.contains(' ')
+                    ? Text(
+                        option.label,
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontSize: 11,
+                          height: 1.1,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      )
+                    : FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          option.label,
+                          maxLines: 1,
+                          softWrap: false,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
               ),
             ],
           ),

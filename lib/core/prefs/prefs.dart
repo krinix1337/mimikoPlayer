@@ -26,7 +26,6 @@ final class Prefs {
     this.compactUi = true,
     this.showMiniPlayer = true,
     this.homeBackground = HomeBackground.both,
-    this.frameHz = 120,
     this.waveOnWifiOnly = false,
     this.showNavLabels = true,
     this.artworkShape = ArtworkShape.rounded,
@@ -34,13 +33,19 @@ final class Prefs {
     this.censorBypass = true,
     this.searchHistory = const [],
     this.homeCoverTone = HomeCoverTone.normal,
-    this.homeCoverBlur = false,
+    this.blurBottom = 16,
+    this.blurTop = 24,
+    this.blurCover = 24,
     this.showDjInfo = true,
     this.autoDownloadLikes = false,
     this.autoDownloadWifiOnly = true,
     this.autoDownloadAllApproved = false,
     this.downloadLimitBytes = defaultDownloadLimitBytes,
     this.autoDownloadQuality = 'normal',
+    this.eqEnabled = false,
+    this.eqPreset = 'flat',
+    this.eqCustomGains = const [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    this.eqCustomLevel = 0,
   });
 
   final ThemeMode themeMode;
@@ -57,8 +62,6 @@ final class Prefs {
   /// Плавное поднятие/опускание громкости при старте, паузе и смене трека.
   final bool fade;
 
-  /// Запрошенная частота кадров окна. 0 — не вмешиваться в выбор системы.
-  final double frameHz;
   final bool waveOnWifiOnly;
 
   /// Размер строк в караоке и приглушение неактивных строк.
@@ -92,8 +95,10 @@ final class Prefs {
   /// Тон фоновой обложки на главной.
   final HomeCoverTone homeCoverTone;
 
-  /// Растянутая (размытая) или резкая фоновая обложка.
-  final bool homeCoverBlur;
+  /// Размытие нижних пилюль, верхних панелей и фоновых обложек; 0 — выкл.
+  final double blurBottom;
+  final double blurTop;
+  final double blurCover;
 
   /// Показывать BPM и тональность в сведениях о треке.
   final bool showDjInfo;
@@ -112,6 +117,14 @@ final class Prefs {
 
   /// low | normal | high — отдельно от качества потокового воспроизведения.
   final String autoDownloadQuality;
+
+  /// Эквалайзер: пресет и включённость. Пресеты живут в features/player.
+  final bool eqEnabled;
+  final String eqPreset;
+
+  /// Своя настройка: 10 полос (по reference-частотам) и уровень в дБ.
+  final List<double> eqCustomGains;
+  final double eqCustomLevel;
 
   Locale? get locale => localeCode == null ? null : Locale(localeCode!);
 
@@ -137,7 +150,6 @@ final class Prefs {
     CollectionSort? collectionSort,
     LauncherIcon? launcherIcon,
     String? quality,
-    double? frameHz,
     bool? fade,
     bool? waveOnWifiOnly,
     LyricsSize? lyricsSize,
@@ -151,7 +163,9 @@ final class Prefs {
     bool? censorBypass,
     List<String>? searchHistory,
     HomeCoverTone? homeCoverTone,
-    bool? homeCoverBlur,
+    double? blurBottom,
+    double? blurTop,
+    double? blurCover,
     bool? showDjInfo,
     bool? autoDownloadLikes,
     bool? autoDownloadWifiOnly,
@@ -159,6 +173,10 @@ final class Prefs {
     int? downloadLimitBytes,
     bool clearDownloadLimit = false,
     String? autoDownloadQuality,
+    bool? eqEnabled,
+    String? eqPreset,
+    List<double>? eqCustomGains,
+    double? eqCustomLevel,
   }) => Prefs(
     themeMode: themeMode ?? this.themeMode,
     palette: palette ?? this.palette,
@@ -170,7 +188,6 @@ final class Prefs {
     collectionSort: collectionSort ?? this.collectionSort,
     launcherIcon: launcherIcon ?? this.launcherIcon,
     quality: quality ?? this.quality,
-    frameHz: frameHz ?? this.frameHz,
     fade: fade ?? this.fade,
     waveOnWifiOnly: waveOnWifiOnly ?? this.waveOnWifiOnly,
     lyricsSize: lyricsSize ?? this.lyricsSize,
@@ -184,7 +201,9 @@ final class Prefs {
     censorBypass: censorBypass ?? this.censorBypass,
     searchHistory: searchHistory ?? this.searchHistory,
     homeCoverTone: homeCoverTone ?? this.homeCoverTone,
-    homeCoverBlur: homeCoverBlur ?? this.homeCoverBlur,
+    blurBottom: blurBottom ?? this.blurBottom,
+    blurTop: blurTop ?? this.blurTop,
+    blurCover: blurCover ?? this.blurCover,
     showDjInfo: showDjInfo ?? this.showDjInfo,
     autoDownloadLikes: autoDownloadLikes ?? this.autoDownloadLikes,
     autoDownloadWifiOnly: autoDownloadWifiOnly ?? this.autoDownloadWifiOnly,
@@ -194,6 +213,10 @@ final class Prefs {
         ? null
         : (downloadLimitBytes ?? this.downloadLimitBytes),
     autoDownloadQuality: autoDownloadQuality ?? this.autoDownloadQuality,
+    eqEnabled: eqEnabled ?? this.eqEnabled,
+    eqPreset: eqPreset ?? this.eqPreset,
+    eqCustomGains: eqCustomGains ?? this.eqCustomGains,
+    eqCustomLevel: eqCustomLevel ?? this.eqCustomLevel,
   );
 
   Map<String, Object?> toJson() => {
@@ -208,7 +231,6 @@ final class Prefs {
     'launcher_icon': launcherIcon.component,
     'quality': quality,
     'fade': fade,
-    'frame_hz': frameHz,
     'wave_on_wifi_only': waveOnWifiOnly,
     'lyrics_size': lyricsSize.name,
     'lyrics_dim': lyricsDimOthers,
@@ -221,13 +243,19 @@ final class Prefs {
     'censor_bypass': censorBypass,
     'search_history': searchHistory,
     'home_cover_tone': homeCoverTone.name,
-    'home_cover_blur': homeCoverBlur,
+    'blur_bottom': blurBottom,
+    'blur_top': blurTop,
+    'blur_cover': blurCover,
     'show_dj_info': showDjInfo,
     'auto_download_likes': autoDownloadLikes,
     'auto_download_wifi_only': autoDownloadWifiOnly,
     'auto_download_all_approved': autoDownloadAllApproved,
     'download_limit_bytes': downloadLimitBytes,
     'auto_download_quality': autoDownloadQuality,
+    'eq_enabled': eqEnabled,
+    'eq_preset': eqPreset,
+    'eq_custom_gains': eqCustomGains,
+    'eq_custom_level': eqCustomLevel,
   };
 
   static Prefs fromJson(Map<String, Object?> json) {
@@ -272,9 +300,6 @@ final class Prefs {
       ),
       quality: json['quality'] is String ? json['quality']! as String : 'auto',
       fade: json['fade'] != false,
-      frameHz: json['frame_hz'] is num
-          ? (json['frame_hz']! as num).toDouble()
-          : 120,
       waveOnWifiOnly: json['wave_on_wifi_only'] == true,
       lyricsSize: required('lyrics_size', LyricsSize.values, LyricsSize.normal),
       lyricsDimOthers: json['lyrics_dim'] != false,
@@ -293,7 +318,18 @@ final class Prefs {
         HomeCoverTone.values,
         HomeCoverTone.normal,
       ),
-      homeCoverBlur: json['home_cover_blur'] == true,
+      blurBottom: switch (json['blur_bottom']) {
+        final num value => value.toDouble().clamp(0.0, 40.0).toDouble(),
+        _ => 16,
+      },
+      blurTop: switch (json['blur_top']) {
+        final num value => value.toDouble().clamp(0.0, 40.0).toDouble(),
+        _ => 24,
+      },
+      blurCover: switch (json['blur_cover']) {
+        final num value => value.toDouble().clamp(0.0, 40.0).toDouble(),
+        _ => 24,
+      },
       showDjInfo: json['show_dj_info'] != false,
       autoDownloadLikes: json['auto_download_likes'] == true,
       autoDownloadWifiOnly: json['auto_download_wifi_only'] != false,
@@ -308,6 +344,21 @@ final class Prefs {
         'low' => 'low',
         'high' => 'high',
         _ => 'normal',
+      },
+      eqEnabled: json['eq_enabled'] == true,
+      eqPreset: json['eq_preset'] is String
+          ? json['eq_preset']! as String
+          : 'flat',
+      eqCustomGains: switch (json['eq_custom_gains']) {
+        final List<Object?> items when items.length == 10 => [
+          for (final item in items)
+            ((item as num?)?.toDouble() ?? 0).clamp(-12.0, 12.0).toDouble(),
+        ],
+        _ => const [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      },
+      eqCustomLevel: switch (json['eq_custom_level']) {
+        final num value => value.toDouble().clamp(-12.0, 12.0).toDouble(),
+        _ => 0,
       },
       searchHistory: switch (json['search_history']) {
         final List<Object?> items => [

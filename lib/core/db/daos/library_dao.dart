@@ -183,6 +183,7 @@ class LibraryDao {
             title: track.title,
             artist: artists[id] ?? '',
             artistRemoteIds: artistRemoteIds[id] ?? const [],
+            explicitFlag: track.explicitFlag,
             coverUrl: track.coverUrl,
             coverPath: localCovers[id],
             durationSec: track.durationSec,
@@ -391,6 +392,7 @@ class LibraryDao {
             title: track.title,
             artist: artists[track.id] ?? '',
             artistRemoteIds: artistRemoteIds[track.id] ?? const [],
+            explicitFlag: track.explicitFlag,
             coverUrl: track.coverUrl,
             coverPath: localCovers[track.id],
             durationSec: track.durationSec,
@@ -535,6 +537,7 @@ final class CollectionRow {
     this.coverPath,
     this.markedAt,
     this.artistRemoteIds = const [],
+    this.explicitFlag = false,
   });
 
   final String localTrackId;
@@ -543,6 +546,9 @@ final class CollectionRow {
 
   /// id артистов в их источниках: по ним AI-фильтр сверяется со списком.
   final List<String> artistRemoteIds;
+
+  /// Явный контент (18+). Приходит из метаданных источника при ingest.
+  final bool explicitFlag;
   final int durationSec;
   final SourceId source;
   final String? coverUrl;

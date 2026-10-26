@@ -177,29 +177,36 @@ class _LyricsBody extends StatelessWidget {
           Scrollable.ensureVisible(
             key.currentContext!,
             alignment: 0.32,
-            duration: const Duration(milliseconds: 420),
-            curve: Curves.easeOutCubic,
+            duration: const Duration(milliseconds: 560),
+            curve: Curves.easeInOutCubic,
           );
         }
       });
     }
 
-    return ListView.builder(
-      controller: scroll,
-      padding: const EdgeInsets.fromLTRB(24, 40, 24, 120),
-      itemCount: lyrics.lines.length,
-      itemBuilder: (context, index) {
-        final line = lyrics.lines[index];
-        final isActive = index == active;
-        return _LyricLineView(
-          key: isActive ? keys.putIfAbsent(index, () => GlobalKey()) : null,
-          line: line,
-          active: isActive && lyrics.synced,
-          dimmed: lyrics.synced && !isActive,
-          progress: isActive && lyrics.synced ? line.progressAt(at) : 0,
-          onTap: onSeek == null ? null : () => onSeek!(line),
-        );
-      },
+    return Stack(
+      children: [
+        ListView.builder(
+          controller: scroll,
+          padding: const EdgeInsets.fromLTRB(24, 40, 24, 120),
+          itemCount: lyrics.lines.length,
+          itemBuilder: (context, index) {
+            final line = lyrics.lines[index];
+            final isActive = index == active;
+            return _LyricLineView(
+              key: isActive ? keys.putIfAbsent(index, () => GlobalKey()) : null,
+              line: line,
+              active: isActive && lyrics.synced,
+              dimmed: lyrics.synced && !isActive,
+              progress: isActive && lyrics.synced ? line.progressAt(at) : 0,
+              onTap: onSeek == null ? null : () => onSeek!(line),
+            );
+          },
+        ),
+        // Мягкие края: строки не обрезаются резкой границей экрана.
+        const _EdgeFade(alignment: Alignment.topCenter, height: 56),
+        const _EdgeFade(alignment: Alignment.bottomCenter, height: 104),
+      ],
     );
   }
 }
@@ -226,66 +233,100 @@ class _LyricLineView extends StatelessWidget {
     final prefs = motion.prefs;
     final scheme = Theme.of(context).colorScheme;
     final scale = prefs.lyricsSize.scale;
-    final base = Theme.of(context).textTheme.headlineSmall!
-        .copyWith(fontWeight: FontWeight.w700, height: 1.25);
+    final base = Theme.of(context).textTheme.headlineSmall!.copyWith(
+      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+      height: 1.35,
+      letterSpacing: -0.1,
+    );
 
-    final dimAlpha = prefs.lyricsDimOthers ? 0.38 : 0.72;
+    final dimAlpha = prefs.lyricsDimOthers ? 0.5 : 0.74;
     final color = active
         ? scheme.primary
         : dimmed
         ? scheme.onSurface.withValues(alpha: dimAlpha)
-        : scheme.onSurface.withValues(alpha: 0.8);
+        : scheme.onSurface.withValues(alpha: 0.82);
+    final size = (active ? 29.0 : 23.0) * scale;
 
-    final text = Text(line.text, style: base.copyWith(color: color));
+    // Заливка строки непрерывная, с мягким краем: раньше слова
+    // переключались по одному и это выглядело резко.
+    final content = active && progress > 0.001
+        ? _progressText(
+            line.text,
+            progress,
+            base.copyWith(fontSize: size, color: Colors.white),
+            scheme.primary,
+          )
+        : Text(
+            line.text,
+            style: base.copyWith(fontSize: size, color: color),
+          );
 
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedDefaultTextStyle(
-        duration: motion.micro(280),
-        curve: Curves.easeOut,
-        style: base.copyWith(
-          color: color,
-          fontSize:
-              (active
-                  ? 30
-                  : dimmed
-                  ? 24
-                  : 26) *
-              scale,
-        ),
+        duration: motion.micro(320),
+        curve: Curves.easeOutCubic,
+        style: base.copyWith(fontSize: size, color: color),
         child: AnimatedPadding(
-          duration: motion.micro(280),
-          padding: EdgeInsets.symmetric(vertical: active ? 12 : 8),
-          // Подсветка пословная: источник отдаёт тайминг строки, поэтому
-          // внутри строки слова идут равномерно по длине. Клип по ширине
-          // выглядел как «буква за буквой», здесь слогается целое слово.
-          child: active ? _wordProgress(line.text, progress, scheme) : text,
+          duration: motion.micro(320),
+          curve: Curves.easeOutCubic,
+          padding: EdgeInsets.symmetric(vertical: active ? 11 : 7),
+          child: content,
         ),
       ),
     );
   }
 }
 
-/// Слова строки, подсвеченные по прогрессу: спетое — полным цветом акцента,
-/// остальное — тем же цветом, но приглушённо.
-Widget _wordProgress(String line, double progress, ColorScheme scheme) {
-  final words = line.split(' ');
-  if (words.isEmpty) return Text(line);
-  final lit = (progress.clamp(0.0, 1.0) * words.length).floor();
-  return Text.rich(
-    TextSpan(
-      children: [
-        for (var i = 0; i < words.length; i++)
-          TextSpan(
-            text: i == 0 ? words[i] : ' ${words[i]}',
-            style: TextStyle(
-              color: i < lit
-                  ? scheme.primary
-                  : scheme.primary.withValues(alpha: 0.34),
-            ),
+/// Непрерывная заливка спетой части строки.
+Widget _progressText(
+  String line,
+  double progress,
+  TextStyle style,
+  Color accent,
+) {
+  final value = progress.clamp(0.0, 1.0);
+  if (value >= 0.995) {
+    return Text(line, style: style.copyWith(color: accent));
+  }
+  const edge = 0.07;
+  final start = (value - edge).clamp(0.0, 1.0);
+  final end = (value + edge).clamp(0.0, 1.0);
+  final dim = accent.withValues(alpha: 0.42);
+  return ShaderMask(
+    blendMode: BlendMode.srcIn,
+    shaderCallback: (bounds) => LinearGradient(
+      colors: [accent, accent, dim, dim],
+      stops: [0.0, start, end, 1.0],
+    ).createShader(bounds),
+    child: Text(line, style: style.copyWith(color: Colors.white)),
+  );
+}
+
+class _EdgeFade extends StatelessWidget {
+  const _EdgeFade({required this.alignment, required this.height});
+
+  final Alignment alignment;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: Align(
+      alignment: alignment,
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: alignment,
+            end: Alignment(alignment.x, -alignment.y),
+            colors: [
+              Colors.black.withValues(alpha: 0.52),
+              Colors.black.withValues(alpha: 0),
+            ],
           ),
-      ],
+        ),
+      ),
     ),
   );
 }

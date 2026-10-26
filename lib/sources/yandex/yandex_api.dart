@@ -34,6 +34,8 @@ class YandexApi {
 
   Map<String, dynamic> get _headers => {
     if (token != null) 'Authorization': 'OAuth $token',
+    // Без клиентского заголовка часть write-эндпоинтов отвечает отказом.
+    'X-Yandex-Music-Client': 'YandexMusicAndroid/24023621',
   };
 
   /// GET с ответом `{result: …}`. Ошибку отдаёт значением, не бросает.

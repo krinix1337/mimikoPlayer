@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 import '../../app_services.dart';
 import '../../core/constants.dart';
 import '../../core/content/ai_filter.dart';
+import '../../core/content/censor_base.dart';
 import '../../core/db/daos/queue_dao.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/sources/cross_source.dart';
@@ -14,6 +15,7 @@ import '../../core/sources/source_errors.dart';
 import '../../core/sources/source_id.dart';
 import '../../core/sources/stream_resolver.dart';
 import '../../core/sources/stream_target.dart';
+import 'equalizer_presets.dart';
 import 'playback_controller.dart';
 import 'player_snapshot.dart';
 import 'queue_manager.dart';
@@ -27,12 +29,17 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   MusicBackgroundAudioHandler(this._services) {
     instance = this;
     _bindPlayer();
+    _services.onEqualizerChanged = _syncEqualizer;
+    unawaited(_syncEqualizer());
   }
 
   static MusicBackgroundAudioHandler? instance;
 
   final AppServices _services;
-  final AudioPlayer _player = AudioPlayer();
+  final AndroidEqualizer _equalizer = AndroidEqualizer();
+  late final AudioPlayer _player = AudioPlayer(
+    audioPipeline: AudioPipeline(androidAudioEffects: [_equalizer]),
+  );
   final QueueManager _queue = QueueManager();
   final StreamController<PlayerSnapshot> _snapshots =
       StreamController<PlayerSnapshot>.broadcast();
@@ -89,6 +96,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     _publish(
       _snapshot.copyWith(
         sourceKind: '${sourceHint?['kind'] ?? ''}',
+        sourceTitle: '${sourceHint?['title'] ?? ''}',
         isRadio: sourceHint?['kind'] == 'radio',
       ),
     );
@@ -247,6 +255,8 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         position: Duration.zero,
         resolving: false,
         clearCurrent: true,
+        sourceKind: '',
+        sourceTitle: '',
       ),
     );
     _emitServiceState(stopped: true);
@@ -461,6 +471,12 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         : localTrackId;
     final artist = artists.isEmpty ? 'Локальный файл' : artists.join(', ');
     final liked = await db.libraryDao.likeState(localTrackId) == 1;
+    final artistRemoteIds =
+        (await db.libraryDao.artistRemoteIdsForTracks([
+          localTrackId,
+        ]))[localTrackId] ??
+        const <String>[];
+    final isAi = AiFilter.instance.isAiLocal(title, artists, artistRemoteIds);
 
     mediaItem.add(
       MediaItem(
@@ -480,10 +496,13 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
           title: title,
           artist: artist,
           coverUrl: track?.coverUrl,
+          explicitFlag: track?.explicitFlag ?? false,
+          isAi: isAi,
         ),
         queue: _queue.displayOrder,
         index: _queue.displayPosition,
         resolving: true,
+        uncensored: false,
         duration: Duration(seconds: track?.durationSec ?? 0),
         liked: liked,
         clearIssue: true,
@@ -499,12 +518,14 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
 
     var playback = result.playback;
     if (playback == null &&
-        variants.any((variant) => variant.ref.source == SourceId.youtube)) {
+        !result.needsUserAction &&
+        result.failures.any(worthCrossSource)) {
       playback = await _crossSourcePlayback(
         localTrackId,
         title: title,
         artists: artists,
         duration: Duration(seconds: track?.durationSec ?? 0),
+        skip: {for (final failure in result.failures) failure.source},
       );
     }
 
@@ -557,6 +578,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         resolving: false,
         usedSource: playback.usedSource,
         quality: playback.quality,
+        uncensored: _playsUncensored(variants),
       ),
     );
     _startPlayback();
@@ -718,63 +740,87 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     }
   }
 
-  /// Watchdog буфера: на Android 17 аудио-API отказывают молча, поэтому
-  /// «тихо и бафферится» считаем симптомом протухшей подписи и перевалидируем.
-  /// Если YouTube не отдаёт поток в этой сети, ищем ту же песню в Яндексе.
-  /// Сравнение строгое: название + исполнитель + близкая длительность.
+  /// Ищет ту же песню в других playable-источниках (SoundCloud/YouTube/
+  /// Яндекс), когда трек снят или источник его не отдаёт. Сравнение строгое:
+  /// название + исполнитель + близкая длительность.
   Future<ResolvedPlayback?> _crossSourcePlayback(
     String localTrackId, {
     required String title,
     required List<String> artists,
     required Duration duration,
+    required Set<SourceId> skip,
   }) async {
-    final yandex = _services.yandex;
-    if (yandex == null || !yandex.auth.isReady) return null;
-    var match = _crossSourceMatches[localTrackId];
-    if (match == null) {
-      if (_crossSourceSearched.contains(localTrackId)) return null;
+    if (_crossSourceMatches[localTrackId] case final cached?) {
+      return _playCrossMatch(localTrackId, cached);
+    }
+    if (_crossSourceSearched.contains(localTrackId)) return null;
+
+    final query = crossSourceQuery(title, artists);
+    for (final source in _services.registry.streamableSources) {
+      if (skip.contains(source.id)) continue;
+      if (source.capabilities.requiresAuth && !source.auth.isReady) continue;
       try {
-        final found = await yandex.search(
-          crossSourceQuery(title, artists),
-          pageSize: 10,
-        );
-        match = pickCrossSourceMatch(
+        final found = await source
+            .search(query, pageSize: 10)
+            .timeout(const Duration(seconds: 10));
+        final match = pickCrossSourceMatch(
           found.tracks,
           title: title,
           artists: artists,
           duration: duration,
         );
+        if (match == null) continue;
+        final playback = await _playCrossMatch(localTrackId, match);
+        if (playback != null) {
+          _crossSourceMatches[localTrackId] = match;
+          return playback;
+        }
       } on Object catch (error) {
-        // Сетевую ошибку не запоминаем: при следующем треке можно повторить.
-        AppLogger.instance.warn('youtube fallback: поиск не удался: $error');
-        return null;
+        AppLogger.instance.warn(
+          'cross-source ${source.id.wire}: поиск не удался: $error',
+        );
       }
-      if (match == null) {
-        _crossSourceSearched.add(localTrackId);
-        AppLogger.instance.info('youtube fallback: в Яндексе не нашлось');
-        return null;
-      }
-      _crossSourceMatches[localTrackId] = match;
     }
+    _crossSourceSearched.add(localTrackId);
+    AppLogger.instance.info('cross-source: нигде не нашлось');
+    return null;
+  }
+
+  /// У трека есть незацензуренная версия в базе и переключатель включён:
+  /// плеер показывает это бейджем.
+  static bool _playsUncensored(List<SourceTrack> variants) =>
+      CensorBase.instance.enabled &&
+      variants.any(
+        (variant) =>
+            variant.ref.source == SourceId.yandex &&
+            CensorBase.instance.hasReplacement(variant.ref.remoteId),
+      );
+
+  Future<ResolvedPlayback?> _playCrossMatch(
+    String localTrackId,
+    SourceTrack match,
+  ) async {
+    final source = _services.registry.byId(match.ref.source);
+    if (source == null) return null;
     try {
-      final ready = await yandex.resolveStream(
+      final ready = await source.resolveStream(
         match,
         preferred: _services.defaultQuality,
       );
       if (ready is StreamReady) {
         AppLogger.instance.info(
-          'youtube недоступен: играю yandex ${match.ref.remoteId}',
+          'cross-source: играю ${match.ref.source.wire} ${match.ref.remoteId}',
         );
         return ResolvedPlayback(
           localTrackId: localTrackId,
-          usedSource: SourceId.yandex,
+          usedSource: ready.source,
           quality: ready.quality,
           target: ready.target,
           expiresAt: DateTime.now().add(ready.ttlHint ?? defaultStreamTtl),
         );
       }
     } on Object catch (error) {
-      AppLogger.instance.warn('youtube fallback: поток не получен: $error');
+      AppLogger.instance.warn('cross-source: поток не получен: $error');
     }
     return null;
   }
@@ -952,10 +998,44 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     _sleepTimer?.cancel();
     _snapshotTimer?.cancel();
     _periodicSnapshot?.cancel();
+    _services.onEqualizerChanged = null;
     await _saveSnapshotNow();
     await _snapshots.close();
     await _player.dispose();
     instance = null;
+  }
+
+  /// Пресет пересчитывается под реальные полосы устройства. `parameters`
+  /// разрешается после активации аудиосессии, поэтому вызов можно делать
+  /// до старта воспроизведения: гейны применятся, как только появится плеер.
+  Future<void> _syncEqualizer() async {
+    final enabled = _services.eqEnabled;
+    await _equalizer.setEnabled(enabled);
+    if (!enabled) return;
+    final custom = _services.eqPreset == equalizerCustomId;
+    try {
+      final params = await _equalizer.parameters;
+      final centers = [for (final band in params.bands) band.centerFrequency];
+      final gains = custom
+          ? equalizerGainsFromCurve(
+              _services.eqCustomGains,
+              level: _services.eqCustomLevel,
+              centersHz: centers,
+              minDb: params.minDecibels,
+              maxDb: params.maxDecibels,
+            )
+          : equalizerGains(
+              equalizerPresetById(_services.eqPreset),
+              centersHz: centers,
+              minDb: params.minDecibels,
+              maxDb: params.maxDecibels,
+            );
+      for (var i = 0; i < params.bands.length && i < gains.length; i++) {
+        await params.bands[i].setGain(gains[i]);
+      }
+    } on Object catch (error) {
+      AppLogger.instance.warn('эквалайзер не применился: $error');
+    }
   }
 
   static AudioServiceRepeatMode _repeatToService(PlaybackRepeat value) =>

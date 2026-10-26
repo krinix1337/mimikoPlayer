@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app_providers.dart';
+import '../../../core/db/daos/library_dao.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../core/sources/source_id.dart';
 import '../../../features/downloads/download_service.dart';
 import '../../../l10n/app_localizations.dart';
@@ -25,6 +29,9 @@ Future<void> showTrackMenu(
   final l = AppLocalizations.of(context);
   final services = ref.read(appServicesProvider);
   final controller = ref.read(playbackControllerProvider);
+  // Меню закрывается до сетевого запроса; контекст его билдера к тому
+  // моменту уже не смонтирован, поэтому запоминаем контекст страницы.
+  final hostContext = context;
 
   return showModalBottomSheet<void>(
     context: context,
@@ -41,10 +48,24 @@ Future<void> showTrackMenu(
           );
           final variants = await services.db.tracksDao.variantsOf(localTrackId);
           final hasRemote = variants.any((v) => v.ref.source != SourceId.local);
+          final remoteRefs = variants
+              .where((v) => v.ref.source != SourceId.local)
+              .toList();
+          final remoteTrackId = remoteRefs.isEmpty
+              ? null
+              : remoteRefs.first.ref.remoteId;
           final downloaded = await services.db.streamsDao.downloadedFilePath(
             localTrackId,
           );
-          return (track, liked, artist, albumId, hasRemote, downloaded != null);
+          return (
+            track,
+            liked,
+            artist,
+            albumId,
+            hasRemote,
+            downloaded != null,
+            remoteTrackId,
+          );
         }(),
         builder: (context, snapshot) {
           final data = snapshot.data;
@@ -54,6 +75,7 @@ Future<void> showTrackMenu(
           final albumId = data?.$4;
           final hasRemote = data?.$5 ?? false;
           final wasDownloaded = data?.$6 ?? false;
+          final remoteTrackId = data?.$7;
           final shownTitle = track?.title.isNotEmpty == true
               ? track!.title
               : (title?.isNotEmpty == true ? title! : localTrackId);
@@ -169,6 +191,24 @@ Future<void> showTrackMenu(
                     controller.enqueue(localTrackId);
                   },
                 ),
+                if (remoteTrackId != null &&
+                    albumId != null &&
+                    albumId.isNotEmpty)
+                  ListTile(
+                    leading: const Icon(Icons.playlist_add_rounded),
+                    title: Text(l.menuAddToPlaylist),
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      unawaited(
+                        _showAddToPlaylist(
+                          hostContext,
+                          ref,
+                          remoteTrackId,
+                          albumId,
+                        ),
+                      );
+                    },
+                  ),
                 Consumer(
                   builder: (context, ref, _) {
                     final status = ref.watch(
@@ -301,6 +341,99 @@ Future<void> showTrackMenu(
       ),
     ),
   );
+}
+
+/// Выбор своего плейлиста и запись трека на сервер. Чужие и локальные
+/// плейлисты не предлагаем: писать можно только в свои.
+Future<void> _showAddToPlaylist(
+  BuildContext context,
+  WidgetRef ref,
+  String remoteTrackId,
+  String albumId,
+) async {
+  final l = AppLocalizations.of(context);
+  final services = ref.read(appServicesProvider);
+  final all = await services.db.libraryDao.playlistsOverview();
+  final own = [
+    for (final playlist in all)
+      if (playlist.source == SourceId.yandex.wire &&
+          !playlist.id.substring('yandex:'.length).contains(':'))
+        playlist,
+  ];
+  if (!context.mounted) return;
+  if (own.isEmpty) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(l.addToPlaylistEmpty)));
+    return;
+  }
+
+  final chosen = await showModalBottomSheet<PlaylistOverview>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (sheetContext) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(sheetContext).size.height * 0.6,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                l.menuAddToPlaylist,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: own.length,
+                itemBuilder: (context, index) {
+                  final playlist = own[index];
+                  return ListTile(
+                    leading: const Icon(Icons.queue_music_rounded),
+                    title: Text(
+                      playlist.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text('${playlist.trackCount}'),
+                    onTap: () => Navigator.of(sheetContext).pop(playlist),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  if (chosen == null || !context.mounted) return;
+
+  final ok =
+      await services.yandex?.addTrackToPlaylist(
+        kind: chosen.id.substring('yandex:'.length),
+        trackId: remoteTrackId,
+        albumId: albumId,
+      ) ??
+      false;
+  if (!context.mounted) return;
+  if (ok) {
+    ref.invalidate(playlistProvider(chosen.id));
+    ref.invalidate(playlistsProvider);
+    AppLogger.instance.info(
+      'в плейлист ${chosen.id} добавлен трек $remoteTrackId',
+    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l.addToPlaylistDone(chosen.title))));
+  } else {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(l.addToPlaylistFailed)));
+  }
 }
 
 class _MenuCircle extends StatelessWidget {

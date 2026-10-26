@@ -14,7 +14,9 @@ void main() {
       localeCode: 'en',
       collectionSort: CollectionSort.artist,
       quality: 'lossless',
-      frameHz: 90,
+      blurBottom: 24,
+      blurTop: 36,
+      blurCover: 16,
       showNavLabels: false,
       artworkShape: ArtworkShape.circle,
       hideAiTracks: true,
@@ -23,7 +25,6 @@ void main() {
       launcherIcon: LauncherIcon.forest,
       searchHistory: ['queen', 'joji'],
       homeCoverTone: HomeCoverTone.darker,
-      homeCoverBlur: true,
       showDjInfo: false,
       autoDownloadLikes: true,
       autoDownloadWifiOnly: false,
@@ -44,14 +45,15 @@ void main() {
     expect(restored.collectionSort, CollectionSort.artist);
     expect(restored.launcherIcon, LauncherIcon.forest);
     expect(restored.quality, 'lossless');
-    expect(restored.frameHz, 90);
+    expect(restored.blurBottom, 24);
+    expect(restored.blurTop, 36);
+    expect(restored.blurCover, 16);
     expect(restored.showNavLabels, isFalse);
     expect(restored.artworkShape, ArtworkShape.circle);
     expect(restored.hideAiTracks, isTrue);
     expect(restored.censorBypass, isFalse);
     expect(restored.searchHistory, ['queen', 'joji']);
     expect(restored.homeCoverTone, HomeCoverTone.darker);
-    expect(restored.homeCoverBlur, isTrue);
     expect(restored.showDjInfo, isFalse);
     expect(restored.autoDownloadLikes, isTrue);
     expect(restored.autoDownloadWifiOnly, isFalse);
@@ -104,12 +106,14 @@ void main() {
       'palette': 'neon',
       'corner': 'square',
       'quality': 42,
-      'frame_hz': 'много',
+      'blur_bottom': 'много',
+      'blur_cover': -5,
     });
     expect(restored.palette, AppPalette.brand);
     expect(restored.corner, CornerRadius.round);
     expect(restored.quality, 'auto');
-    expect(restored.frameHz, 120);
+    expect(restored.blurBottom, 16);
+    expect(restored.blurCover, 0);
   });
 
   test('анимации «выключены» дают нулевую длительность', () {

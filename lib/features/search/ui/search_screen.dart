@@ -5,11 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app_providers.dart';
+import '../../../core/content/ai_filter.dart';
 import '../../../core/sources/source_dto.dart';
 import '../../../features/auth/ui/yandex_login.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../widgets/remote_track_actions.dart';
+import '../../../widgets/track_badges.dart';
 import '../../../widgets/track_cover.dart';
 import '../../../widgets/track_tile.dart';
 
@@ -190,13 +192,29 @@ class _HitTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final track = hit.track;
+    final aiReady = ref.watch(aiBadgeReadyProvider).hasValue;
+    final isAi = aiReady && AiFilter.instance.isAiTrack(track);
     return ListTile(
       onTap: () => _play(context, ref),
       leading: Hero(
         tag: coverHeroTag('${track.ref.source.wire}:${track.ref.remoteId}'),
         child: TrackCover(url: track.coverUrl, size: 52),
       ),
-      title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(
+              track.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (track.explicitFlag || isAi) ...[
+            const SizedBox(width: 6),
+            TrackBadges(explicit: track.explicitFlag, ai: isAi),
+          ],
+        ],
+      ),
       subtitle: Text(
         track.artists.isEmpty
             ? track.ref.source.wire
@@ -221,6 +239,7 @@ class _HitTile extends ConsumerWidget {
     final services = ref.read(appServicesProvider);
     final prefs = ref.read(prefsProvider.notifier);
     final controller = ref.read(playbackControllerProvider);
+    final searchLabel = AppLocalizations.of(context).navSearch;
     await prefs.rememberSearch(query);
     final ids = await services.db.tracksDao.ingestAll([
       for (final hit in all) hit.track,
@@ -228,7 +247,11 @@ class _HitTile extends ConsumerWidget {
     await controller.playQueue(
       ids,
       startIndex: index,
-      sourceHint: {'kind': 'search', 'query': hit.track.title},
+      sourceHint: {
+        'kind': 'search',
+        'query': hit.track.title,
+        'title': searchLabel,
+      },
     );
     router.push(Routes.player);
   }

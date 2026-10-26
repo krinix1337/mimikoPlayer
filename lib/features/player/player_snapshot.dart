@@ -22,11 +22,13 @@ final class PlayerSnapshot {
     this.shuffle = PlaybackShuffle.ordered,
     this.usedSource,
     this.quality,
+    this.uncensored = false,
     this.issue,
     this.resolving = false,
     this.isRadio = false,
     this.liked = false,
     this.sourceKind = '',
+    this.sourceTitle = '',
   });
 
   final NowPlaying? current;
@@ -49,6 +51,9 @@ final class PlayerSnapshot {
   /// «переключились на другой источник».
   final SourceId? usedSource;
   final Quality? quality;
+
+  /// Сейчас играет версия из базы без цензуры, а не оригинал Яндекса.
+  final bool uncensored;
   final bool resolving;
 
   /// Последняя типизированная ошибка цепочки, либо null.
@@ -63,6 +68,10 @@ final class PlayerSnapshot {
   /// Откуда пришла очередь: library, playlist, search, chart, radio…
   final String sourceKind;
 
+  /// Человеческий заголовок источника: «Любимое», имя артиста, название
+  /// плейлиста. Пусто — UI показывает нейтральный заголовок.
+  final String sourceTitle;
+
   PlayerSnapshot copyWith({
     NowPlaying? current,
     List<String>? queue,
@@ -75,6 +84,7 @@ final class PlayerSnapshot {
     PlaybackShuffle? shuffle,
     SourceId? usedSource,
     Quality? quality,
+    bool? uncensored,
     bool? resolving,
     PlayerIssue? issue,
     bool clearIssue = false,
@@ -82,6 +92,7 @@ final class PlayerSnapshot {
     bool? isRadio,
     bool? liked,
     String? sourceKind,
+    String? sourceTitle,
   }) => PlayerSnapshot(
     current: clearCurrent ? null : (current ?? this.current),
     queue: queue ?? this.queue,
@@ -94,11 +105,13 @@ final class PlayerSnapshot {
     shuffle: shuffle ?? this.shuffle,
     usedSource: usedSource ?? this.usedSource,
     quality: quality ?? this.quality,
+    uncensored: uncensored ?? this.uncensored,
     resolving: resolving ?? this.resolving,
     issue: clearIssue ? null : (issue ?? this.issue),
     isRadio: isRadio ?? this.isRadio,
     liked: liked ?? this.liked,
     sourceKind: sourceKind ?? this.sourceKind,
+    sourceTitle: sourceTitle ?? this.sourceTitle,
   );
 
   bool get hasTrack => current != null;
@@ -110,12 +123,20 @@ final class NowPlaying {
     required this.title,
     required this.artist,
     this.coverUrl,
+    this.explicitFlag = false,
+    this.isAi = false,
   });
 
   final String localTrackId;
   final String title;
   final String artist;
   final String? coverUrl;
+
+  /// Явный контент: бейдж 18+.
+  final bool explicitFlag;
+
+  /// Трек/артист есть в списке ИИ-исполнителей.
+  final bool isAi;
 }
 
 final class PlayerIssue {

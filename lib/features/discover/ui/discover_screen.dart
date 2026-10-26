@@ -9,7 +9,9 @@ import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../sources/yandex/yandex_source.dart';
 import '../../../sources/yandex/yandex_station.dart';
+import '../../../theme/app_insets.dart';
 import '../../../wave_providers.dart';
+import '../../../widgets/chart_rank_cover.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/remote_track_actions.dart';
 import '../../../widgets/track_cover.dart';
@@ -54,7 +56,7 @@ class DiscoverScreen extends ConsumerWidget {
                   const _NewReleasesSection(),
                   const _StationsSection(),
                   const _ArtistsSection(),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: kShellBottomInset),
                 ],
               ),
             ),
@@ -87,39 +89,9 @@ class _ChartSection extends ConsumerWidget {
         for (var i = 0; i < top.length; i++)
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-            leading: SizedBox(
-              width: 48,
-              height: 48,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: TrackCover(
-                      url: top[i].track.coverUrl,
-                      size: 48,
-                      radius: 9,
-                    ),
-                  ),
-                  Positioned(
-                    left: 2,
-                    top: 2,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.62),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: Text(
-                        '${top[i].position}',
-                        style: Theme.of(context).textTheme.labelSmall
-                            ?.copyWith(color: Colors.white, fontSize: 10),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            leading: ChartRankCover(
+              position: top[i].position,
+              coverUrl: top[i].track.coverUrl,
             ),
             title: Text(
               top[i].track.title,
@@ -131,7 +103,11 @@ class _ChartSection extends ConsumerWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            trailing: RemoteTrackActions(track: top[i].track),
+            // В чартах нет ручной загрузки: только воспроизведение и меню.
+            trailing: RemoteTrackActions(
+              track: top[i].track,
+              showDownload: false,
+            ),
             onTap: () => _play(
               context,
               ref,
@@ -151,8 +127,15 @@ class _NewReleasesSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    final albums = ref.watch(newReleasesProvider).value ?? const <AlbumBrief>[];
-    if (albums.isEmpty) return const SizedBox.shrink();
+    final releases = ref.watch(newReleasesProvider);
+    final albums = releases.value ?? const <AlbumBrief>[];
+    // Пока грузится, держим место и показываем скелет: иначе секция
+    // появляется позже экрана и сдвигает уже показанные карточки.
+    if (albums.isEmpty) {
+      return releases.isLoading
+          ? const _NewReleasesSkeleton()
+          : const SizedBox.shrink();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,6 +181,49 @@ class _NewReleasesSection extends ConsumerWidget {
                 ),
               );
             },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NewReleasesSkeleton extends StatelessWidget {
+  const _NewReleasesSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final box = BoxDecoration(
+      color: scheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(16),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        _SectionTitle(title: l.discoverNewReleases),
+        SizedBox(
+          height: 208,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: 3,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (context, index) => SizedBox(
+              width: 136,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(height: 136, decoration: box),
+                  const SizedBox(height: 8),
+                  Container(height: 12, width: 112, decoration: box),
+                  const SizedBox(height: 6),
+                  Container(height: 10, width: 84, decoration: box),
+                ],
+              ),
+            ),
           ),
         ),
       ],
@@ -440,8 +466,19 @@ Future<void> _play(
   final services = ref.read(appServicesProvider);
   final ids = await services.db.tracksDao.ingestAll(tracks);
   if (!context.mounted) return;
+  final l = AppLocalizations.of(context);
+  final title = switch (kind) {
+    'chart' => l.discoverChart,
+    'artist' => l.discoverArtists,
+    'newReleases' => l.discoverNewReleases,
+    _ => null,
+  };
   await ref
       .read(playbackControllerProvider)
-      .playQueue(ids, startIndex: index, sourceHint: {'kind': kind});
+      .playQueue(
+        ids,
+        startIndex: index,
+        sourceHint: {'kind': kind, 'title': ?title},
+      );
   if (context.mounted) context.push(Routes.player);
 }

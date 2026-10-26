@@ -82,4 +82,27 @@ void main() {
     expect(LrcLib.parse(null).isEmpty, isTrue);
     expect(LrcLib.parse({'syncedLyrics': '   '}).isEmpty, isTrue);
   });
+
+  test('поиск LRCLIB добирает таймкоды при расхождении длительности', () {
+    final data = [
+      {'duration': 135.0, 'syncedLyrics': '[00:10.00]близкая версия'},
+      {'duration': 210.0, 'syncedLyrics': '[00:10.00]чужая версия'},
+    ];
+
+    final lyrics = LrcLib.pickSearchResult(data, const Duration(seconds: 134));
+
+    expect(lyrics.synced, isTrue);
+    expect(lyrics.lines.first.text, 'близкая версия');
+  });
+
+  test('вариант с чужой длительностью не даёт таймкодов', () {
+    final data = [
+      {'duration': 210.0, 'syncedLyrics': '[00:10.00]чужая версия'},
+    ];
+
+    expect(
+      LrcLib.pickSearchResult(data, const Duration(seconds: 134)).synced,
+      isFalse,
+    );
+  });
 }

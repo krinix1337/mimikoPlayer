@@ -98,10 +98,11 @@ class TracksDao {
     final fillTitle = row.title.trim().isEmpty && track.title.trim().isNotEmpty;
     final fillCover = row.coverUrl == null && track.coverUrl != null;
     final fillDuration = row.durationSec == 0 && track.duration.inSeconds > 0;
+    final fillExplicit = track.explicitFlag && !row.explicitFlag;
     final fillSource =
         row.metadataSource == SourceId.local.wire &&
         track.ref.source != SourceId.local;
-    if (fillTitle || fillCover || fillDuration || fillSource) {
+    if (fillTitle || fillCover || fillDuration || fillExplicit || fillSource) {
       await (_db.update(
         _db.tracks,
       )..where((t) => t.id.equals(localTrackId))).write(
@@ -114,6 +115,7 @@ class TracksDao {
           durationSec: fillDuration
               ? Value(track.duration.inSeconds)
               : const Value.absent(),
+          explicitFlag: fillExplicit ? const Value(true) : const Value.absent(),
           metadataSource: fillSource
               ? Value(track.ref.source.wire)
               : const Value.absent(),
@@ -179,6 +181,11 @@ class TracksDao {
               coverUrl: track.coverUrl == null
                   ? const Value.absent()
                   : Value(track.coverUrl),
+              // Явный контент только накапливаем: источник без флага не
+              // должен стирать уже известный 18+.
+              explicitFlag: track.explicitFlag
+                  ? const Value(true)
+                  : const Value.absent(),
               updatedAt: Value(now),
               lastSeenAt: Value(now),
             ),

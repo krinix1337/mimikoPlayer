@@ -95,10 +95,25 @@
   "collectionCount": "Total: {count}",
   "collectionSort": "Sort",
   "collectionDownloadAllLikes": "Download all tracks",
+  "collectionShare": "Share",
+  "playlistNotFound": "Couldn't open the playlist. Check the link.",
+  "menuAddToPlaylist": "Add to playlist",
+  "addToPlaylistDone": "Added to \"{title}\"",
+  "@addToPlaylistDone": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "addToPlaylistFailed": "Couldn't add the track to the playlist",
+  "addToPlaylistEmpty": "You don't have your own playlists yet",
   "collectionDownloadQueued": "Queued for download: {count}",
   "@collectionDownloadQueued": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "sortAdded": "Recently added",
@@ -199,6 +214,17 @@
   "cornerPill": "Pill",
   "settingsMotion": "Motion",
   "uiSection": "Interface",
+  "settingsBlur": "Blur",
+  "blurBottom": "Bottom bar and mini player",
+  "blurTop": "Top bars",
+  "blurCovers": "Backdrop covers",
+  "blurOff": "Off",
+  "blurSoft": "Soft",
+  "blurMedium": "Medium",
+  "blurStrong": "Strong",
+  "blurBottomNote": "Glass under the pills: content keeps showing through",
+  "blurTopNote": "Back bars on screens with artwork",
+  "blurCoversNote": "Blur strength for backdrop covers across screens",
   "compactUi": "Compact panel",
   "compactUiNote": "Smaller and denser bottom navigation and mini player.",
   "showMiniPlayer": "Mini player",
@@ -217,6 +243,21 @@
   "bgBoth": "Cover and blobs",
   "settingsFade": "Fade in / out",
   "settingsFadeNote": "Volume ramps up on start and down on pause, seek and track change.",
+  "settingsEqualizer": "Equalizer",
+  "equalizerEnabled": "Enable equalizer",
+  "equalizerNote": "The preset applies to current playback immediately.",
+  "equalizerPreset": "Preset",
+  "equalizerTune": "Customize",
+  "equalizerCustom": "Custom",
+  "equalizerLevel": "lvl",
+  "eqPresetFlat": "Flat",
+  "eqPresetBass": "Bass",
+  "eqPresetTreble": "Treble",
+  "eqPresetRock": "Rock",
+  "eqPresetElectronic": "Electronic",
+  "eqPresetPop": "Pop",
+  "eqPresetVocal": "Vocal",
+  "eqPresetAcoustic": "Acoustic",
   "censorBypass": "Uncensored version",
   "censorBypassNote": "Replace tracks from the FckCensorData base (GitHub) with their uncensored version. The base is downloaded over the network; if a file is missing, the Yandex version plays.",
   "settingsReset": "Reset settings",
@@ -244,11 +285,6 @@
   "roleStream": "plays audio",
   "roleCatalog": "catalog only",
   "roleAbsent": "not connected",
-  "settingsFrame": "Frame rate",
-  "frameSystem": "Match system",
-  "frame120": "120 Hz",
-  "frame90": "90 Hz",
-  "frame60": "60 Hz",
   "settingsStorage": "Storage",
   "settingsCache": "Artwork cache",
   "settingsCacheClear": "Clear cache",
@@ -327,11 +363,12 @@
   "homeCoverDarker": "Darker",
   "homeCoverNormal": "Normal",
   "homeCoverLighter": "Lighter",
-  "homeCoverBlur": "Blur cover",
-  "homeCoverBlurNote": "Soft backdrop instead of a detailed image",
   "djInfo": "DJ info",
   "djInfoNote": "BPM and key in track details",
   "trackUnknownArtist": "Unknown artist",
+  "badgeExplicit": "18+",
+  "badgeAi": "AI",
+  "badgeUncensored": "Uncensored",
   "sourceYandex": "Yandex Music",
   "sourceYoutube": "YouTube",
   "sourceLocalFile": "File",
@@ -359,21 +396,31 @@
   "downloadsSummary": "Downloaded: {count} · {size}",
   "@downloadsSummary": {
     "placeholders": {
-      "count": { "type": "int" },
-      "size": { "type": "String" }
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
     }
   },
   "downloadsQueueSummary": "Queued: {queued} · paused: {paused}",
   "@downloadsQueueSummary": {
     "placeholders": {
-      "queued": { "type": "int" },
-      "paused": { "type": "int" }
+      "queued": {
+        "type": "int"
+      },
+      "paused": {
+        "type": "int"
+      }
     }
   },
   "downloadsSkipped": "Skipped as unavailable offline: {count}",
   "@downloadsSkipped": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "downloadsAutoLikes": "Download likes automatically",
@@ -388,7 +435,9 @@
   "downloadsGb": "{value} GB",
   "@downloadsGb": {
     "placeholders": {
-      "value": { "type": "int" }
+      "value": {
+        "type": "int"
+      }
     }
   },
   "downloadsQuality": "Auto-download quality",
@@ -399,7 +448,9 @@
   "downloadsFreeSpace": "Free: {size}",
   "@downloadsFreeSpace": {
     "placeholders": {
-      "size": { "type": "String" }
+      "size": {
+        "type": "String"
+      }
     }
   }
 }

@@ -84,6 +84,7 @@ class LrcLib {
     required String? album,
     required Duration duration,
   }) async {
+    Lyrics direct = const Lyrics(lines: [], synced: false);
     try {
       final response = await _dio.get<dynamic>(
         '/get',
@@ -94,15 +95,61 @@ class LrcLib {
           'duration': duration.inSeconds,
         },
       );
-      return parse(response.data);
-    } on DioException catch (error) {
-      if (error.response?.statusCode == 404) {
-        return const Lyrics(lines: [], synced: false);
-      }
-      return const Lyrics(lines: [], synced: false);
+      direct = parse(response.data);
+      if (direct.synced) return direct;
+    } on DioException {
+      // 404 у `/get` — обычное дело при расхождении длительности; пробуем
+      // поиск ниже.
+    } on Object {
+      // Текст не обязателен: каскад продолжит поиск.
+    }
+
+    // `/get` строг к длительности: расхождение в 1 секунду даёт 404, хотя та
+    // же запись в `/search` находится. Таймкоды важнее обычного текста.
+    final found = await _search(
+      title: title,
+      artist: artist,
+      duration: duration,
+    );
+    if (found.synced) return found;
+    return direct.isEmpty ? found : direct;
+  }
+
+  Future<Lyrics> _search({
+    required String title,
+    required String artist,
+    required Duration duration,
+  }) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/search',
+        queryParameters: {'track_name': title, 'artist_name': artist},
+      );
+      return pickSearchResult(response.data, duration);
     } on Object {
       return const Lyrics(lines: [], synced: false);
     }
+  }
+
+  /// Выбирает ближайший по длительности вариант с таймкодами (допуск 5 с).
+  /// Без близкой длительности лучше не красить строки по чужим таймингам.
+  static Lyrics pickSearchResult(Object? data, Duration duration) {
+    if (data is! List) return const Lyrics(lines: [], synced: false);
+    Map? best;
+    var bestDelta = 1 << 30;
+    for (final item in data) {
+      if (item is! Map) continue;
+      final synced = item['syncedLyrics'];
+      if (synced is! String || synced.trim().isEmpty) continue;
+      final raw = item['duration'];
+      final seconds = raw is num ? raw.round() : int.tryParse('$raw');
+      if (seconds == null) continue;
+      final delta = (seconds - duration.inSeconds).abs();
+      if (delta > 5 || delta >= bestDelta) continue;
+      bestDelta = delta;
+      best = item;
+    }
+    return best == null ? const Lyrics(lines: [], synced: false) : parse(best);
   }
 
   /// Разбор вынесен отдельно: живого ответа может ещё не быть, а формат LRC

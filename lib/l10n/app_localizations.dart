@@ -542,6 +542,42 @@ abstract class AppLocalizations {
   /// **'Скачать все треки'**
   String get collectionDownloadAllLikes;
 
+  /// No description provided for @collectionShare.
+  ///
+  /// In ru, this message translates to:
+  /// **'Поделиться'**
+  String get collectionShare;
+
+  /// No description provided for @playlistNotFound.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось открыть плейлист. Проверьте ссылку.'**
+  String get playlistNotFound;
+
+  /// No description provided for @menuAddToPlaylist.
+  ///
+  /// In ru, this message translates to:
+  /// **'Добавить в плейлист'**
+  String get menuAddToPlaylist;
+
+  /// No description provided for @addToPlaylistDone.
+  ///
+  /// In ru, this message translates to:
+  /// **'Добавлено в «{title}»'**
+  String addToPlaylistDone(String title);
+
+  /// No description provided for @addToPlaylistFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось добавить трек в плейлист'**
+  String get addToPlaylistFailed;
+
+  /// No description provided for @addToPlaylistEmpty.
+  ///
+  /// In ru, this message translates to:
+  /// **'Своих плейлистов пока нет'**
+  String get addToPlaylistEmpty;
+
   /// No description provided for @collectionDownloadQueued.
   ///
   /// In ru, this message translates to:
@@ -1136,6 +1172,72 @@ abstract class AppLocalizations {
   /// **'Интерфейс'**
   String get uiSection;
 
+  /// No description provided for @settingsBlur.
+  ///
+  /// In ru, this message translates to:
+  /// **'Размытие'**
+  String get settingsBlur;
+
+  /// No description provided for @blurBottom.
+  ///
+  /// In ru, this message translates to:
+  /// **'Нижняя панель и мини-плеер'**
+  String get blurBottom;
+
+  /// No description provided for @blurTop.
+  ///
+  /// In ru, this message translates to:
+  /// **'Верхние панели'**
+  String get blurTop;
+
+  /// No description provided for @blurCovers.
+  ///
+  /// In ru, this message translates to:
+  /// **'Фоновые обложки'**
+  String get blurCovers;
+
+  /// No description provided for @blurOff.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выкл'**
+  String get blurOff;
+
+  /// No description provided for @blurSoft.
+  ///
+  /// In ru, this message translates to:
+  /// **'Мягкое'**
+  String get blurSoft;
+
+  /// No description provided for @blurMedium.
+  ///
+  /// In ru, this message translates to:
+  /// **'Среднее'**
+  String get blurMedium;
+
+  /// No description provided for @blurStrong.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сильное'**
+  String get blurStrong;
+
+  /// No description provided for @blurBottomNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Стекло под пилюлями: видно, что список продолжается'**
+  String get blurBottomNote;
+
+  /// No description provided for @blurTopNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Панели с кнопками «назад» на страницах с обложкой'**
+  String get blurTopNote;
+
+  /// No description provided for @blurCoversNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сила размытия фоновых обложек на всех экранах'**
+  String get blurCoversNote;
+
   /// No description provided for @compactUi.
   ///
   /// In ru, this message translates to:
@@ -1243,6 +1345,96 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Громкость плавно поднимается при старте и опускается при паузе, перемотке и смене трека.'**
   String get settingsFadeNote;
+
+  /// No description provided for @settingsEqualizer.
+  ///
+  /// In ru, this message translates to:
+  /// **'Эквалайзер'**
+  String get settingsEqualizer;
+
+  /// No description provided for @equalizerEnabled.
+  ///
+  /// In ru, this message translates to:
+  /// **'Включить эквалайзер'**
+  String get equalizerEnabled;
+
+  /// No description provided for @equalizerNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пресет применяется к текущему воспроизведению сразу.'**
+  String get equalizerNote;
+
+  /// No description provided for @equalizerPreset.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пресет'**
+  String get equalizerPreset;
+
+  /// No description provided for @equalizerTune.
+  ///
+  /// In ru, this message translates to:
+  /// **'Настроить'**
+  String get equalizerTune;
+
+  /// No description provided for @equalizerCustom.
+  ///
+  /// In ru, this message translates to:
+  /// **'Своя настройка'**
+  String get equalizerCustom;
+
+  /// No description provided for @equalizerLevel.
+  ///
+  /// In ru, this message translates to:
+  /// **'ур.'**
+  String get equalizerLevel;
+
+  /// No description provided for @eqPresetFlat.
+  ///
+  /// In ru, this message translates to:
+  /// **'Ровный'**
+  String get eqPresetFlat;
+
+  /// No description provided for @eqPresetBass.
+  ///
+  /// In ru, this message translates to:
+  /// **'Бас'**
+  String get eqPresetBass;
+
+  /// No description provided for @eqPresetTreble.
+  ///
+  /// In ru, this message translates to:
+  /// **'Верх'**
+  String get eqPresetTreble;
+
+  /// No description provided for @eqPresetRock.
+  ///
+  /// In ru, this message translates to:
+  /// **'Рок'**
+  String get eqPresetRock;
+
+  /// No description provided for @eqPresetElectronic.
+  ///
+  /// In ru, this message translates to:
+  /// **'Электро'**
+  String get eqPresetElectronic;
+
+  /// No description provided for @eqPresetPop.
+  ///
+  /// In ru, this message translates to:
+  /// **'Поп'**
+  String get eqPresetPop;
+
+  /// No description provided for @eqPresetVocal.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вокал'**
+  String get eqPresetVocal;
+
+  /// No description provided for @eqPresetAcoustic.
+  ///
+  /// In ru, this message translates to:
+  /// **'Акустика'**
+  String get eqPresetAcoustic;
 
   /// No description provided for @censorBypass.
   ///
@@ -1405,36 +1597,6 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'не подключён'**
   String get roleAbsent;
-
-  /// No description provided for @settingsFrame.
-  ///
-  /// In ru, this message translates to:
-  /// **'Частота кадров'**
-  String get settingsFrame;
-
-  /// No description provided for @frameSystem.
-  ///
-  /// In ru, this message translates to:
-  /// **'Как в системе'**
-  String get frameSystem;
-
-  /// No description provided for @frame120.
-  ///
-  /// In ru, this message translates to:
-  /// **'120 Гц'**
-  String get frame120;
-
-  /// No description provided for @frame90.
-  ///
-  /// In ru, this message translates to:
-  /// **'90 Гц'**
-  String get frame90;
-
-  /// No description provided for @frame60.
-  ///
-  /// In ru, this message translates to:
-  /// **'60 Гц'**
-  String get frame60;
 
   /// No description provided for @settingsStorage.
   ///
@@ -1904,18 +2066,6 @@ abstract class AppLocalizations {
   /// **'Светлее'**
   String get homeCoverLighter;
 
-  /// No description provided for @homeCoverBlur.
-  ///
-  /// In ru, this message translates to:
-  /// **'Размытие обложки'**
-  String get homeCoverBlur;
-
-  /// No description provided for @homeCoverBlurNote.
-  ///
-  /// In ru, this message translates to:
-  /// **'Мягкий фон вместо детальной картинки'**
-  String get homeCoverBlurNote;
-
   /// No description provided for @djInfo.
   ///
   /// In ru, this message translates to:
@@ -1933,6 +2083,24 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Неизвестный исполнитель'**
   String get trackUnknownArtist;
+
+  /// No description provided for @badgeExplicit.
+  ///
+  /// In ru, this message translates to:
+  /// **'18+'**
+  String get badgeExplicit;
+
+  /// No description provided for @badgeAi.
+  ///
+  /// In ru, this message translates to:
+  /// **'ИИ'**
+  String get badgeAi;
+
+  /// No description provided for @badgeUncensored.
+  ///
+  /// In ru, this message translates to:
+  /// **'Без цензуры'**
+  String get badgeUncensored;
 
   /// No description provided for @sourceYandex.
   ///

@@ -245,6 +245,27 @@ class AppLocalizationsRu extends AppLocalizations {
   String get collectionDownloadAllLikes => 'Скачать все треки';
 
   @override
+  String get collectionShare => 'Поделиться';
+
+  @override
+  String get playlistNotFound =>
+      'Не удалось открыть плейлист. Проверьте ссылку.';
+
+  @override
+  String get menuAddToPlaylist => 'Добавить в плейлист';
+
+  @override
+  String addToPlaylistDone(String title) {
+    return 'Добавлено в «$title»';
+  }
+
+  @override
+  String get addToPlaylistFailed => 'Не удалось добавить трек в плейлист';
+
+  @override
+  String get addToPlaylistEmpty => 'Своих плейлистов пока нет';
+
+  @override
   String collectionDownloadQueued(int count) {
     return 'В очереди на загрузку: $count';
   }
@@ -574,6 +595,40 @@ class AppLocalizationsRu extends AppLocalizations {
   String get uiSection => 'Интерфейс';
 
   @override
+  String get settingsBlur => 'Размытие';
+
+  @override
+  String get blurBottom => 'Нижняя панель и мини-плеер';
+
+  @override
+  String get blurTop => 'Верхние панели';
+
+  @override
+  String get blurCovers => 'Фоновые обложки';
+
+  @override
+  String get blurOff => 'Выкл';
+
+  @override
+  String get blurSoft => 'Мягкое';
+
+  @override
+  String get blurMedium => 'Среднее';
+
+  @override
+  String get blurStrong => 'Сильное';
+
+  @override
+  String get blurBottomNote =>
+      'Стекло под пилюлями: видно, что список продолжается';
+
+  @override
+  String get blurTopNote => 'Панели с кнопками «назад» на страницах с обложкой';
+
+  @override
+  String get blurCoversNote => 'Сила размытия фоновых обложек на всех экранах';
+
+  @override
   String get compactUi => 'Компактная панель';
 
   @override
@@ -628,6 +683,52 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get settingsFadeNote =>
       'Громкость плавно поднимается при старте и опускается при паузе, перемотке и смене трека.';
+
+  @override
+  String get settingsEqualizer => 'Эквалайзер';
+
+  @override
+  String get equalizerEnabled => 'Включить эквалайзер';
+
+  @override
+  String get equalizerNote =>
+      'Пресет применяется к текущему воспроизведению сразу.';
+
+  @override
+  String get equalizerPreset => 'Пресет';
+
+  @override
+  String get equalizerTune => 'Настроить';
+
+  @override
+  String get equalizerCustom => 'Своя настройка';
+
+  @override
+  String get equalizerLevel => 'ур.';
+
+  @override
+  String get eqPresetFlat => 'Ровный';
+
+  @override
+  String get eqPresetBass => 'Бас';
+
+  @override
+  String get eqPresetTreble => 'Верх';
+
+  @override
+  String get eqPresetRock => 'Рок';
+
+  @override
+  String get eqPresetElectronic => 'Электро';
+
+  @override
+  String get eqPresetPop => 'Поп';
+
+  @override
+  String get eqPresetVocal => 'Вокал';
+
+  @override
+  String get eqPresetAcoustic => 'Акустика';
 
   @override
   String get censorBypass => 'Версия без цензуры';
@@ -716,21 +817,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get roleAbsent => 'не подключён';
-
-  @override
-  String get settingsFrame => 'Частота кадров';
-
-  @override
-  String get frameSystem => 'Как в системе';
-
-  @override
-  String get frame120 => '120 Гц';
-
-  @override
-  String get frame90 => '90 Гц';
-
-  @override
-  String get frame60 => '60 Гц';
 
   @override
   String get settingsStorage => 'Хранилище';
@@ -988,12 +1074,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get homeCoverLighter => 'Светлее';
 
   @override
-  String get homeCoverBlur => 'Размытие обложки';
-
-  @override
-  String get homeCoverBlurNote => 'Мягкий фон вместо детальной картинки';
-
-  @override
   String get djInfo => 'DJ-сведения';
 
   @override
@@ -1001,6 +1081,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get trackUnknownArtist => 'Неизвестный исполнитель';
+
+  @override
+  String get badgeExplicit => '18+';
+
+  @override
+  String get badgeAi => 'ИИ';
+
+  @override
+  String get badgeUncensored => 'Без цензуры';
 
   @override
   String get sourceYandex => 'Яндекс Музыка';

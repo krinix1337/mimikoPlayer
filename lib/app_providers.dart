@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_services.dart';
@@ -132,9 +133,22 @@ class PrefsController extends Notifier<Prefs> {
   Future<void> setQuality(String quality) =>
       _write(state.copyWith(quality: quality));
 
-  Future<void> setFrameHz(double hz) => _write(state.copyWith(frameHz: hz));
-
   Future<void> setFade(bool value) => _write(state.copyWith(fade: value));
+
+  Future<void> setEqEnabled(bool value) =>
+      _write(state.copyWith(eqEnabled: value));
+
+  Future<void> setEqPreset(String value) =>
+      _write(state.copyWith(eqPreset: value));
+
+  /// Своя кривая: слайдеры уже прислали итоговые дБ, пресет — custom.
+  Future<void> setEqCustom(List<double> gains, double level) => _write(
+    state.copyWith(
+      eqPreset: 'custom',
+      eqCustomGains: List<double>.unmodifiable(gains),
+      eqCustomLevel: level,
+    ),
+  );
 
   Future<void> setLyricsSize(LyricsSize size) =>
       _write(state.copyWith(lyricsSize: size));
@@ -162,8 +176,14 @@ class PrefsController extends Notifier<Prefs> {
   Future<void> setHomeCoverTone(HomeCoverTone tone) =>
       _write(state.copyWith(homeCoverTone: tone));
 
-  Future<void> setHomeCoverBlur(bool value) =>
-      _write(state.copyWith(homeCoverBlur: value));
+  Future<void> setBlurBottom(double value) =>
+      _write(state.copyWith(blurBottom: value));
+
+  Future<void> setBlurTop(double value) =>
+      _write(state.copyWith(blurTop: value));
+
+  Future<void> setBlurCover(double value) =>
+      _write(state.copyWith(blurCover: value));
 
   Future<void> setShowDjInfo(bool value) =>
       _write(state.copyWith(showDjInfo: value));
@@ -261,6 +281,12 @@ final trackCoverProvider = FutureProvider.autoDispose.family<String?, String>((
 ///
 /// Отдаём результаты по мере готовности, а не ждём самый медленный источник:
 /// иначе медленный YouTube держал пустой экран, хотя Яндекс уже ответил.
+/// Загружает список ИИ-исполнителей для бейджей «ИИ» в списках.
+/// Один общий future: строки только смотрят на его готовность.
+final aiBadgeReadyProvider = FutureProvider<void>((ref) async {
+  await AiFilter.instance.ensureLoaded();
+});
+
 final combinedSearchProvider = StreamProvider.autoDispose
     .family<List<SourceSearchHit>, String>((ref, query) {
       final registry = ref.watch(appServicesProvider).registry;
@@ -523,9 +549,7 @@ final albumProvider = FutureProvider.autoDispose.family<AlbumSnapshot?, String>(
 );
 
 /// Новинки лендинга для раздела «Что послушать».
-final newReleasesProvider = FutureProvider.autoDispose<List<AlbumBrief>>((
-  ref,
-) async {
+final newReleasesProvider = FutureProvider<List<AlbumBrief>>((ref) async {
   final source = ref.watch(yandexSourceProvider);
   if (source == null || !ref.watch(yandexReadyProvider)) return const [];
   final albums = await source.newReleases(limit: 12);
@@ -573,6 +597,66 @@ final chartProvider = FutureProvider<List<ChartEntry>>((ref) async {
 /// Без неё лайки остаются в том объёме, каким их застал прошлый импорт, —
 /// именно из-за этого в коллекции висело 500 из 1028.
 const String _likesSyncedKey = 'likes_synced_at_v2';
+
+/// Прогрев «Обзора»: чарт и новинки качаются сразу после входа, а не в
+/// момент открытия вкладки. Без этого секция новинок появлялась позже всех
+/// и сдвигала уже показанный экран.
+final discoverWarmupProvider = FutureProvider<void>((ref) async {
+  if (!ref.watch(yandexReadyProvider)) return;
+  await Future.wait([
+    ref
+        .watch(chartProvider.future)
+        .catchError((Object _) => const <ChartEntry>[]),
+    ref
+        .watch(newReleasesProvider.future)
+        .catchError((Object _) => const <AlbumBrief>[]),
+  ]);
+});
+
+/// Прогрев обложек коллекции в дисковом кэше: карточки «Любимого» и
+/// недавних треков открываются без серых квадратов. Сами строки из базы
+/// не держим — они перечитываются быстро, дорогие здесь только картинки.
+final collectionWarmupProvider = FutureProvider<void>((ref) async {
+  Future<List<CollectionRow>> rows(Future<List<CollectionRow>> future) async {
+    try {
+      return await future;
+    } on Object {
+      return const [];
+    }
+  }
+
+  final liked = await rows(
+    ref.read(collectionProvider(CollectionKind.liked).future),
+  );
+  final recent = await rows(
+    ref.read(collectionProvider(CollectionKind.recent).future),
+  );
+  final artists = await _safeArtists(ref);
+  final urls = <String>[
+    for (final row in [...liked.take(4), ...recent.take(8)])
+      if (row.coverUrl != null && row.coverUrl!.isNotEmpty) row.coverUrl!,
+    for (final artist in artists.take(6))
+      if (artist.coverUrl != null && artist.coverUrl!.isNotEmpty)
+        artist.coverUrl!,
+  ];
+  if (urls.isEmpty) return;
+  final manager = DefaultCacheManager();
+  for (final url in urls) {
+    try {
+      await manager.getSingleFile(url);
+    } on Object {
+      // Одна неудачная обложка не должна останавливать прогрев.
+    }
+  }
+});
+
+Future<List<ArtistPlaycount>> _safeArtists(Ref ref) async {
+  try {
+    return await ref.read(topArtistsProvider.future);
+  } on Object {
+    return const [];
+  }
+}
 
 final librarySyncProvider = FutureProvider<void>((ref) async {
   final services = ref.watch(appServicesProvider);

@@ -53,6 +53,10 @@ class CensorBase {
 
   int get tracksCount => _map.length;
 
+  /// Есть ли в базе незацензуренная версия этого трека. Синхронно, для UI.
+  bool hasReplacement(String yandexTrackId) =>
+      enabled && _map.containsKey(yandexTrackId);
+
   Future<void> ensureLoaded({bool force = false}) {
     if (force) {
       _attempted = false;
