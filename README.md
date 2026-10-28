@@ -7,7 +7,7 @@
 
 <br>
 
-<a href="https://github.com/krinix1337/mimikoPlayer/releases/latest"><img alt="Версия 1.3.3" src="https://img.shields.io/badge/версия-1.3.3-D8F544?style=for-the-badge&labelColor=1C1B1F"></a>
+<a href="https://github.com/krinix1337/mimikoPlayer/releases/latest"><img alt="Версия 1.3.4" src="https://img.shields.io/badge/версия-1.3.4-D8F544?style=for-the-badge&labelColor=1C1B1F"></a>
 <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white&labelColor=1C1B1F">
 <a href="https://flutter.dev"><img alt="Flutter 3.47" src="https://img.shields.io/badge/Flutter-3.47-02569B?style=for-the-badge&logo=flutter&logoColor=white&labelColor=1C1B1F"></a>
 <img alt="191 тест" src="https://img.shields.io/badge/тесты-191-22C7A9?style=for-the-badge&labelColor=1C1B1F">
@@ -119,7 +119,7 @@
 
 ## 📦 Установка
 
-1. Скачайте `mimikoPlayer-1.3.3.apk` со страницы **[Releases](https://github.com/krinix1337/mimikoPlayer/releases/latest)**.
+1. Скачайте `mimikoPlayer-1.3.4.apk` со страницы **[Releases](https://github.com/krinix1337/mimikoPlayer/releases/latest)**.
 2. Откройте файл и разрешите установку из этого источника.
 3. Войдите в Яндекс в разделе **Настройки → Аккаунт и сервисы**. SoundCloud и локальные файлы работают без входа.
 
