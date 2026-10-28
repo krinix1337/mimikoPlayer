@@ -40,7 +40,21 @@ part 'database.g.dart';
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(driftDatabase(name: 'phoneyandex'));
+  AppDatabase()
+    : super(
+        driftDatabase(
+          name: 'phoneyandex',
+          native: const DriftNativeOptions(setup: _configureConnection),
+        ),
+      );
+
+  /// Фоновая автозагрузка живёт в отдельном Flutter-движке и держит своё
+  /// соединение с тем же файлом. Без ожидания блокировки запись из окна
+  /// сразу падала с «database is locked» ещё до первого кадра — оставался
+  /// чёрный экран. Ждём до 10 с, пока соседнее соединение допишет.
+  static void _configureConnection(dynamic db) {
+    db.execute('PRAGMA busy_timeout = 10000');
+  }
 
   /// Для unit-тестов поверх NativeDatabase.memory().
   AppDatabase.forTesting(super.executor);

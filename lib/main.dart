@@ -16,18 +16,20 @@ import 'features/downloads/download_worker.dart';
 import 'features/player/audio_handler.dart';
 
 Future<void> main() async {
+  final startup = Stopwatch()..start();
+  void step(String name) => AppLogger.instance.info(
+    'старт: $name за ${startup.elapsedMilliseconds} мс',
+  );
+
   WidgetsFlutterBinding.ensureInitialized();
   FrameStats.install();
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  try {
-    await Workmanager().initialize(downloadCallbackDispatcher);
-  } on Object catch (error) {
-    AppLogger.instance.warn('WorkManager не инициализирован: $error');
-  }
 
   final services = AppServices.ensure();
   await services.applyPreferences();
+  step('настройки');
   initialPrefs = await loadPrefs(services.db);
+  step('база');
 
   // Инициализация сервиса до runApp: после смерти процесса этот же вызов
   // поднимает плеер в headless-движке, и очередь восстанавливается из БД.
@@ -54,11 +56,23 @@ Future<void> main() async {
     ),
   );
 
+  step('плеер');
+
   // Плагин при service-запуске исполняет стандартный entrypoint, то есть этот
   // же main() без окна. runApp тут безопасен: движок без поверхности просто не
   // рисует, а плеер и восстановление очереди идут от того же экземпляра.
-  await _requestNotificationPermission();
   runApp(AppRoot(controller: handler));
+  step('runApp');
+
+  // Всё, что не нужно для первого кадра, — после него. Запрос разрешения
+  // раньше стоял до runApp: в движке без окна системный диалог показать
+  // некуда, ожидание не кончалось, и окно, открытое позже, оставалось чёрным.
+  // Колбэк кадра срабатывает только когда есть поверхность, то есть окно.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    step('первый кадр');
+    unawaited(_requestNotificationPermission());
+  });
+  unawaited(_initWorkManager());
   // Аккаунт подтягиваем после первого кадра: логин нужен не для старта,
   // а для запросов к Яндексу, и не должен задерживать окно.
   unawaited(services.restoreAccount());
@@ -72,6 +86,14 @@ String _channelName(String? localeCode) =>
 String _channelDescription(String? localeCode) => localeCode == 'en'
     ? 'Background music playback'
     : 'Фоновое воспроизведение музыки';
+
+Future<void> _initWorkManager() async {
+  try {
+    await Workmanager().initialize(downloadCallbackDispatcher);
+  } on Object catch (error) {
+    AppLogger.instance.warn('WorkManager не инициализирован: $error');
+  }
+}
 
 Future<void> _requestNotificationPermission() async {
   final status = await Permission.notification.status;
