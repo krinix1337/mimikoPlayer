@@ -203,7 +203,8 @@ final appRouterProvider = GoRouter(
     GoRoute(
       path: Routes.player,
       parentNavigatorKey: _rootKey,
-      pageBuilder: (context, state) => slideUpPage(state, const PlayerScreen()),
+      pageBuilder: (context, state) =>
+          playerSheetPage(state, const PlayerScreen()),
     ),
     GoRoute(
       path: Routes.karaoke,

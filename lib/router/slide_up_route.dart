@@ -16,6 +16,31 @@ CustomTransitionPage<void> slideUpPage(GoRouterState state, Widget child) =>
           _slideUp(animation, child),
     );
 
+/// Плеер — лист снизу: выезжает на всю высоту и уезжает вниз, как его и
+/// сворачивают пальцем. Маршрут прозрачный: пока плеер тянут вниз, под
+/// ним виден экран, а не чёрная пустота.
+CustomTransitionPage<void> playerSheetPage(GoRouterState state, Widget child) =>
+    CustomTransitionPage<void>(
+      key: state.pageKey,
+      child: child,
+      opaque: false,
+      transitionDuration: const Duration(milliseconds: 380),
+      reverseTransitionDuration: const Duration(milliseconds: 280),
+      transitionsBuilder: (context, animation, secondary, child) {
+        trackRouteAnimation(animation);
+        return SlideTransition(
+          position: Tween(begin: const Offset(0, 1), end: Offset.zero).animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            ),
+          ),
+          child: child,
+        );
+      },
+    );
+
 Route<void> slideUpRoute(Widget page) => PageRouteBuilder<void>(
   pageBuilder: (context, animation, secondary) => page,
   transitionDuration: currentMotion.morph,

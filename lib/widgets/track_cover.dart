@@ -248,19 +248,16 @@ class _BlurredCoverState extends State<BlurredCover> {
       height: _side,
       policy: ResizeImagePolicy.fit,
     ).resolve(createLocalImageConfiguration(context));
-    final listener = ImageStreamListener(
-      (info, _) async {
-        _unlisten();
-        final blurred = await _blur(info.image, screen);
-        info.dispose();
-        if (blurred == null) return;
-        _cache[key] = blurred;
-        if (_cache.length > _cacheSize) _cache.remove(_cache.keys.first);
-        if (!mounted || _key != key) return;
-        setState(() => _blurred = blurred);
-      },
-      onError: (_, _) => _unlisten(),
-    );
+    final listener = ImageStreamListener((info, _) async {
+      _unlisten();
+      final blurred = await _blur(info.image, screen);
+      info.dispose();
+      if (blurred == null) return;
+      _cache[key] = blurred;
+      if (_cache.length > _cacheSize) _cache.remove(_cache.keys.first);
+      if (!mounted || _key != key) return;
+      setState(() => _blurred = blurred);
+    }, onError: (_, _) => _unlisten());
     _stream = stream;
     _listener = listener;
     stream.addListener(listener);
@@ -434,7 +431,21 @@ class _ColorBlobsState extends State<ColorBlobs>
   @override
   void didUpdateWidget(ColorBlobs oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.speed == 0) {
+    _syncAnimation();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAnimation();
+  }
+
+  /// Плеер открывается прозрачным листом поверх главной: экран под ним
+  /// продолжает рисоваться, и пятна крутились бы впустую. Пока сверху
+  /// другой маршрут — стоим.
+  void _syncAnimation() {
+    final covered = !(ModalRoute.isCurrentOf(context) ?? true);
+    if (widget.speed == 0 || covered) {
       _controller.stop();
     } else if (!_controller.isAnimating) {
       _controller.repeat();
