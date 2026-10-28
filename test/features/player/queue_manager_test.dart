@@ -73,6 +73,47 @@ void main() {
       expect(q.currentId, isNotNull);
     });
 
+    test('remove трека выше текущего не сдвигает текущий', () {
+      final q = QueueManager()..setQueue(ids(4), startIndex: 2);
+      expect(q.remove('t_0'), isFalse);
+      expect(q.currentId, 't_2');
+      expect(q.displayPosition, 1);
+      expect(q.displayOrder, ['t_1', 't_2', 't_3']);
+    });
+
+    test('remove текущего встаёт на следующий, последнего — на прошлый', () {
+      final q = QueueManager()..setQueue(ids(3), startIndex: 1);
+      expect(q.remove('t_1'), isTrue);
+      expect(q.currentId, 't_2');
+      expect(q.remove('t_2'), isTrue);
+      expect(q.currentId, 't_0');
+      expect(q.remove('t_0'), isTrue);
+      expect(q.currentId, isNull);
+    });
+
+    test('removeAt убирает ровно ту копию дубля, что выбрана', () {
+      final q = QueueManager()
+        ..setQueue(['t_0', 't_1', 't_0', 't_2'], startIndex: 3);
+      expect(q.removeAt(2), isFalse);
+      expect(q.displayOrder, ['t_0', 't_1', 't_2']);
+      expect(q.currentId, 't_2');
+      expect(q.currentBaseIndex, 2);
+    });
+
+    test('shuffle туда-обратно держит вторую копию дубля', () {
+      final q = QueueManager()..setQueue(['t_0', 't_1', 't_0'], startIndex: 2);
+      q.setShuffle(PlaybackShuffle.shuffled);
+      expect(q.currentBaseIndex, 2);
+      q.setShuffle(PlaybackShuffle.ordered);
+      expect(q.displayPosition, 2);
+    });
+
+    test('insertNext в пустую позицию встаёт на вставленный трек', () {
+      final q = QueueManager()..setQueue(const []);
+      q.insertNext('t_9');
+      expect(q.currentId, 't_9');
+    });
+
     test('jumpToPosition выбирает позицию в перемешанном порядке', () {
       final q = QueueManager()..setQueue(ids(6));
       q.setShuffle(PlaybackShuffle.shuffled);
@@ -106,6 +147,12 @@ void main() {
       expect(q.currentId, 't_4');
       expect(q.remainingAfterCurrent, 2);
       expect(q.displayOrder, [for (var i = 0; i < 7; i++) 't_$i']);
+    });
+
+    test('докачка отсеивает дубли внутри самой пачки', () {
+      final q = QueueManager()..setQueue(ids(2));
+      expect(q.appendBatch(['t_5', 't_6', 't_5', 't_0', 't_6']), isTrue);
+      expect(q.displayOrder, ['t_0', 't_1', 't_5', 't_6']);
     });
 
     test('докачка в конце очереди встаёт на первый новый трек', () {

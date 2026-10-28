@@ -330,7 +330,7 @@ class _BigSection extends StatelessWidget {
                   Text(title, style: theme.textTheme.headlineSmall),
                   if (count != null)
                     Text(
-                      '$count ${l.commonTracks}',
+                      l.commonTrackCount(count!),
                       style: theme.textTheme.bodyMedium,
                     ),
                 ],
@@ -444,7 +444,7 @@ class _RecentCarousel extends StatelessWidget {
             'title': AppLocalizations.of(context).collectionLiked,
           },
         );
-    openPlayerRouter(router);
+    openPlayerAfterPlay(router);
   }
 }
 
@@ -568,7 +568,7 @@ class _AlsoInGrid extends StatelessWidget {
       (
         title: l.collectionDisliked,
         count: disliked,
-        icon: Icons.favorite_border_rounded,
+        icon: Icons.thumb_down_alt_rounded,
         route: Routes.collectionDisliked,
       ),
     ];

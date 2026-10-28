@@ -3,9 +3,13 @@ import '../../sources/yandex/yandex_station.dart';
 
 /// Название выбранного режима «Моей волны» для пилюли и плеера. Обычная
 /// волна даёт null: отдельной плашки у неё нет.
-String? waveModeLabel(WaveSettings? settings, AppLocalizations l) {
-  if (settings == null) return null;
-  final parts = <String>[];
+String? waveModeLabel(
+  WaveSettings? settings,
+  AppLocalizations l, {
+  bool soundCloud = false,
+}) {
+  final parts = <String>[if (soundCloud) l.waveModeSoundCloud];
+  if (settings == null) return parts.isEmpty ? null : parts.join(' · ');
   final mood = switch (settings.moodEnergy) {
     'active' => l.moodEnergyActive,
     'fun' => l.moodEnergyFun,

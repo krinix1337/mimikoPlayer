@@ -147,8 +147,13 @@ class _Fallback extends StatelessWidget {
 }
 
 /// Фон из обложки: копия картинки с настоящим `ImageFilter.blur`, сила берётся
-/// из настроек «Размытие». Слой кэшируется, чтобы не пересчитывать blur.
-class BlurredCover extends StatelessWidget {
+/// из настроек «Размытие».
+///
+/// Размытие считается один раз: обложка декодируется в крошечную копию,
+/// размывается в офскрин-картинку и кэшируется. На экран идёт обычная
+/// картинка. Живой `ImageFiltered` пересчитывался на каждом кадре любой
+/// анимации (переход в плеер, свайпы) и давал до 80 мс отрисовки на кадр.
+class BlurredCover extends StatefulWidget {
   const BlurredCover({
     super.key,
     this.url,
@@ -163,46 +168,181 @@ class BlurredCover extends StatelessWidget {
   final bool blur;
 
   @override
+  State<BlurredCover> createState() => _BlurredCoverState();
+}
+
+class _BlurredCoverState extends State<BlurredCover> {
+  /// Готовые размытые картинки: фон главной, плеера и каталога часто
+  /// показывает одну и ту же обложку.
+  static final Map<String, ui.Image> _cache = {};
+  static const int _cacheSize = 16;
+
+  /// Сторона уменьшенной копии. Уменьшение само по себе размывает, а
+  /// растягивание уже размытой картинки не даёт видимых артефактов.
+  static const int _side = 96;
+
+  ui.Image? _blurred;
+  String? _key;
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+
+  double get _sigma => currentBlur.cover;
+
+  bool get _wantsBlur => widget.blur && _sigma > 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(BlurredCover oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url || oldWidget.blur != widget.blur) {
+      _resolve();
+    }
+  }
+
+  @override
+  void dispose() {
+    _unlisten();
+    super.dispose();
+  }
+
+  void _unlisten() {
+    final listener = _listener;
+    if (listener != null) _stream?.removeListener(listener);
+    _stream = null;
+    _listener = null;
+  }
+
+  void _resolve() {
+    final value = widget.url;
+    if (!_wantsBlur || value == null || value.isEmpty) {
+      _unlisten();
+      _key = null;
+      return;
+    }
+    final key = '$value|$_sigma';
+    if (key == _key) return;
+    _key = key;
+    _unlisten();
+
+    final cached = _cache[key];
+    if (cached != null) {
+      // Свежесть в LRU: недавно показанные обложки вытесняются последними.
+      _cache
+        ..remove(key)
+        ..[key] = cached;
+      _blurred = cached;
+      return;
+    }
+
+    final provider = _provider(value);
+    if (provider == null) return;
+    final screen = MediaQuery.sizeOf(context);
+    final stream = ResizeImage(
+      provider,
+      width: _side,
+      height: _side,
+      policy: ResizeImagePolicy.fit,
+    ).resolve(createLocalImageConfiguration(context));
+    final listener = ImageStreamListener(
+      (info, _) async {
+        _unlisten();
+        final blurred = await _blur(info.image, screen);
+        info.dispose();
+        if (blurred == null) return;
+        _cache[key] = blurred;
+        if (_cache.length > _cacheSize) _cache.remove(_cache.keys.first);
+        if (!mounted || _key != key) return;
+        setState(() => _blurred = blurred);
+      },
+      onError: (_, _) => _unlisten(),
+    );
+    _stream = stream;
+    _listener = listener;
+    stream.addListener(listener);
+  }
+
+  /// Сила размытия задана в логических пикселях экрана; на маленькой копии
+  /// её пересчитываем пропорционально. Край тянем clamp-ом, чтобы фон не
+  /// темнел к границам, как было с прозрачной кромкой фильтра.
+  Future<ui.Image?> _blur(ui.Image source, Size screen) async {
+    try {
+      final width = source.width;
+      final height = source.height;
+      final sigma = (_sigma * height / screen.height.clamp(1, 10000)).clamp(
+        1.0,
+        12.0,
+      );
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawImage(
+        source,
+        Offset.zero,
+        Paint()
+          ..imageFilter = ui.ImageFilter.blur(
+            sigmaX: sigma,
+            sigmaY: sigma,
+            tileMode: TileMode.clamp,
+          ),
+      );
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(width, height);
+      picture.dispose();
+      return image;
+    } on Object {
+      return null;
+    }
+  }
+
+  ImageProvider? _provider(String value) {
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return CachedNetworkImageProvider(value);
+    }
+    if (value.startsWith('data:')) {
+      final comma = value.indexOf(',');
+      if (comma == -1) return null;
+      return MemoryImage(base64Decode(value.substring(comma + 1)));
+    }
+    try {
+      return FileImage(File(Uri.parse(value).toFilePath()));
+    } on Object {
+      return null;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final value = url;
+    final value = widget.url;
     if (value == null || value.isEmpty) {
       return ColoredBox(color: scheme.surface);
     }
 
-    // Раньше blur считался на полном размере экрана: на бюджетном GPU это
-    // дорого, особенно при переходах. Теперь картинка блюрится маленьким
-    // слоем и растягивается через FittedBox: визуально то же, но в разы
-    // меньше пикселей. Края с запасом 15% обрезаются, чтобы не проступала
-    // прозрачная кромка фильтра.
-    final sigma = currentBlur.cover;
-    final screen = MediaQuery.sizeOf(context);
-    final targetHeight = (screen.height * 0.36).clamp(220.0, 360.0);
-    final targetWidth = targetHeight * (screen.width / screen.height);
-    final layerHeight = targetHeight * 1.15;
-    final layerWidth = targetWidth * 1.15;
-    final lowSigma = sigma * layerHeight / screen.height;
-    final content = blur && sigma > 0
-        ? ClipRect(
-            child: FittedBox(
-              fit: BoxFit.cover,
-              child: SizedBox(
-                width: layerWidth,
-                height: layerHeight,
-                child: ImageFiltered(
-                  imageFilter: ui.ImageFilter.blur(
-                    sigmaX: lowSigma,
-                    sigmaY: lowSigma,
-                  ),
-                  child: _image(value, scheme, cacheWidth: 256),
-                ),
-              ),
-            ),
-          )
-        : _image(value, scheme, cacheWidth: 512);
+    if (_wantsBlur) {
+      final blurred = _blurred;
+      // Пока новая обложка готовится, держим прошлую: без мигания фона.
+      if (blurred == null) return ColoredBox(color: scheme.surface);
+      return RepaintBoundary(
+        child: SizedBox.expand(
+          child: RawImage(
+            image: blurred,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
+            // Прозрачность самой картинки, без слоя Opacity на весь экран.
+            opacity: AlwaysStoppedAnimation(widget.opacity),
+          ),
+        ),
+      );
+    }
 
     return RepaintBoundary(
-      child: Opacity(opacity: opacity, child: content),
+      child: Opacity(
+        opacity: widget.opacity,
+        child: _image(value, scheme, cacheWidth: 512),
+      ),
     );
   }
 

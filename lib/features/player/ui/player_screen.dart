@@ -334,7 +334,13 @@ class _TopBar extends ConsumerWidget {
     );
     final waveMode =
         played.$2 && ref.watch(stationProvider) == WaveStationIds.myVibe
-        ? waveModeLabel(ref.watch(waveSettingsProvider).value, l)
+        ? waveModeLabel(
+            ref.watch(waveSettingsProvider).value,
+            l,
+            soundCloud: ref.watch(
+              prefsProvider.select((p) => p.waveSoundCloud),
+            ),
+          )
         : null;
     final label = played.$2
         ? (waveMode ?? (played.$1.isNotEmpty ? played.$1 : l.playerRadio))
@@ -621,7 +627,16 @@ class _Controls extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        // По три кнопки с каждой стороны: иначе play съезжал с центра.
         children: [
+          _ControlButton(
+            active: disliked,
+            icon: disliked
+                ? Icons.thumb_down_alt_rounded
+                : Icons.thumb_down_alt_outlined,
+            tooltip: disliked ? l.feedbackUndislike : l.feedbackDislike,
+            onPressed: () => _toggleFeedback(context, ref, disliked ? 0 : -1),
+          ),
           _ControlButton(
             active: shuffle == PlaybackShuffle.shuffled,
             icon: shuffle == PlaybackShuffle.shuffled
@@ -665,14 +680,6 @@ class _Controls extends ConsumerWidget {
             tooltip: liked ? l.commonUnlike : l.commonLike,
             onPressed: () => _toggleFeedback(context, ref, liked ? 0 : 1),
           ),
-          _ControlButton(
-            active: disliked,
-            icon: disliked
-                ? Icons.thumb_down_alt_rounded
-                : Icons.thumb_down_alt_outlined,
-            tooltip: disliked ? l.feedbackUndislike : l.feedbackDislike,
-            onPressed: () => _toggleFeedback(context, ref, disliked ? 0 : -1),
-          ),
         ],
       ),
     );
@@ -696,7 +703,13 @@ class _Controls extends ConsumerWidget {
     if (next == 1) {
       await downloader.trackLiked(current.localTrackId);
     }
-    await controller.refreshLikedState();
+    if (next == -1) {
+      // Дизлайк убирает трек из очереди и сразу включает следующий;
+      // дальше такой трек сам не играет ни в волне, ни в списках.
+      await controller.dropCurrent();
+    } else {
+      await controller.refreshLikedState();
+    }
     if (!ref.context.mounted) return;
     ref.invalidate(collectionProvider);
     if (context.mounted) {
@@ -1136,6 +1149,7 @@ Future<void> showSleepSheet(BuildContext context, WidgetRef ref) =>
               ),
               for (final minutes in const [15, 30, 45, 60, 90])
                 ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                   title: Text(l.playerSleepMinutes(minutes)),
                   onTap: () {
                     controller.sleepAfter(Duration(minutes: minutes));
@@ -1143,6 +1157,7 @@ Future<void> showSleepSheet(BuildContext context, WidgetRef ref) =>
                   },
                 ),
               ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                 title: Text(l.playerSleepOff),
                 onTap: () {
                   controller.sleepAfter(null);

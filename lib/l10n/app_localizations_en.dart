@@ -46,7 +46,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonRetry => 'Retry';
 
   @override
-  String get commonTracks => 'tracks';
+  String commonTrackCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tracks',
+      one: '$count track',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get commonLoading => 'Loading…';
@@ -238,11 +246,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get waveClose => 'Close';
 
   @override
-  String get waveSoundCloudTitle => 'SoundCloud in the wave';
-
-  @override
-  String get waveSoundCloudNote =>
-      'Mix SoundCloud tracks into the recommendations. Works without signing in.';
+  String get waveModeSoundCloud => 'SoundCloud';
 
   @override
   String get waveRejectedNote => 'Yandex rejected the settings — see the log';
@@ -462,6 +466,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playerTitle => 'Now playing';
+
+  @override
+  String artistListeners(String count) {
+    return '$count listeners';
+  }
 
   @override
   String get playerBack => 'Back';
@@ -1365,6 +1374,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get djInfoNote => 'BPM and key in track details';
 
   @override
+  String get settingsOpenPlayer => 'Open player on play';
+
+  @override
+  String get settingsOpenPlayerNote =>
+      'When off, the track plays in the mini player; tap it to open the full player';
+
+  @override
   String get trackUnknownArtist => 'Unknown artist';
 
   @override
@@ -1494,6 +1510,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get downloadsUnlimited => 'No limit';
+
+  @override
+  String sizeBytes(String value) {
+    return '$value B';
+  }
+
+  @override
+  String sizeKb(String value) {
+    return '$value KB';
+  }
+
+  @override
+  String sizeMb(String value) {
+    return '$value MB';
+  }
+
+  @override
+  String sizeGb(String value) {
+    return '$value GB';
+  }
 
   @override
   String downloadsGb(int value) {

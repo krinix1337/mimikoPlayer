@@ -110,6 +110,7 @@ class CollectionKindScreen extends ConsumerWidget {
                     queue: data,
                     index: index,
                     kind: kind.name,
+                    sourceTitle: title,
                   ),
                 ),
               ),
@@ -167,7 +168,7 @@ class CollectionKindScreen extends ConsumerWidget {
     if (shuffle) {
       await controller.setShuffle(PlaybackShuffle.shuffled);
     }
-    openPlayerRouter(router);
+    openPlayerAfterPlay(router);
   }
 }
 
@@ -271,7 +272,7 @@ class _HeroArtwork extends StatelessWidget {
 
   IconData get _icon => switch (kind) {
     CollectionKind.liked => Icons.favorite_rounded,
-    CollectionKind.disliked => Icons.favorite_border_rounded,
+    CollectionKind.disliked => Icons.thumb_down_alt_rounded,
     CollectionKind.files => Icons.folder_rounded,
     CollectionKind.recent => Icons.history_rounded,
     CollectionKind.downloaded => Icons.offline_pin_rounded,
@@ -835,6 +836,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
                       queue: rows,
                       index: index,
                       kind: 'playlist',
+                      sourceTitle: value.overview.title,
                     ),
                   ),
                 ],
@@ -911,7 +913,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
     if (shuffle) {
       await controller.setShuffle(PlaybackShuffle.shuffled);
     }
-    openPlayerRouter(router);
+    openPlayerAfterPlay(router);
   }
 
   /// Ссылка на плейлист Яндекса: `ownerUid:kind` уже внутри локального id,

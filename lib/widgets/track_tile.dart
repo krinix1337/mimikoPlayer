@@ -27,6 +27,7 @@ class TrackTile extends ConsumerWidget {
     required this.queue,
     required this.index,
     this.kind = 'library',
+    this.sourceTitle,
     this.trailing,
     this.showDuration = true,
   });
@@ -37,6 +38,10 @@ class TrackTile extends ConsumerWidget {
   final List<CollectionRow> queue;
   final int index;
   final String kind;
+
+  /// Название списка для шапки плеера: «Любимое», имя плейлиста. Без него
+  /// плеер после тапа по строке показывал безликое «Сейчас играет».
+  final String? sourceTitle;
   final Widget? trailing;
   final bool showDuration;
 
@@ -118,7 +123,9 @@ class TrackTile extends ConsumerWidget {
           if (row.source != SourceId.local)
             kind == 'liked'
                 ? _DownloadAction(trackId: row.localTrackId)
-                : _DownloadedMark(trackId: row.localTrackId),
+                : _DownloadedMark(trackId: row.localTrackId)
+          else
+            SizedBox(width: kind == 'liked' ? 36 : 30),
           IconButton(
             icon: const Icon(Icons.more_vert_rounded),
             tooltip: AppLocalizations.of(context).trackMenu,
@@ -146,9 +153,9 @@ class TrackTile extends ConsumerWidget {
         .playQueue(
           [for (final item in queue) item.localTrackId],
           startIndex: index,
-          sourceHint: {'kind': kind},
+          sourceHint: {'kind': kind, 'title': ?sourceTitle},
         );
-    openPlayerRouter(router);
+    openPlayerAfterPlay(router);
   }
 
   Future<void> _toggleLike(WidgetRef ref) async {
@@ -188,7 +195,9 @@ class _DownloadedMark extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stored = ref.watch(isDownloadedProvider(trackId)).value ?? false;
-    if (!stored) return const SizedBox.shrink();
+    // Место держим и без метки: иначе длительность у скачанных и нескачанных
+    // треков стояла в разных колонках.
+    if (!stored) return const SizedBox(width: 30, height: 40);
     return Tooltip(
       message: AppLocalizations.of(context).trackDownloaded,
       child: SizedBox(

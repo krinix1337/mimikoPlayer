@@ -81,7 +81,12 @@ class MimikoActivity : AudioServiceActivity() {
                     if (path.isNullOrBlank()) {
                         result.error("bad_argument", "path пустой", null)
                     } else {
-                        result.success(mediaInfo(path))
+                        // Чтение тегов — дисковый I/O: на главном потоке
+                        // скан большой фонотеки подвешивал интерфейс.
+                        mediaExecutor.execute {
+                            val info = mediaInfo(path)
+                            runOnUiThread { result.success(info) }
+                        }
                     }
                 }
 
@@ -332,6 +337,7 @@ class MimikoActivity : AudioServiceActivity() {
 
     companion object {
         private const val CHANNEL = "net.nekto.mimiko/platform"
+        private val mediaExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
         private val ALIASES = listOf(
             "MimikoLauncherDefault",
             "MimikoLauncherAcid",

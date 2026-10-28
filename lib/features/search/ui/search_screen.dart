@@ -16,6 +16,7 @@ import '../../../widgets/remote_track_actions.dart';
 import '../../../widgets/track_badges.dart';
 import '../../../widgets/track_cover.dart';
 import '../../../widgets/track_tile.dart';
+import '../../../widgets/two_line_title.dart';
 
 /// Поиск сразу по всем готовым источникам: локальные файлы и, после входа,
 /// Я.Музыка. Пустой результат — это пустой результат, а не заглушка.
@@ -215,7 +216,7 @@ class _SearchResults extends StatelessWidget {
               ),
               subtitle: artist.trackCount == null
                   ? null
-                  : Text('${artist.trackCount}'),
+                  : Text(l.commonTrackCount(artist.trackCount!.toInt())),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => context.push(Routes.artistFor(artist.remoteId)),
             ),
@@ -242,10 +243,8 @@ class _SearchResults extends StatelessWidget {
                       children: [
                         TrackCover(url: album.coverUrl, size: 128),
                         const SizedBox(height: 6),
-                        Text(
+                        TwoLineTitle(
                           album.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleSmall,
                         ),
                         Text(
@@ -360,7 +359,7 @@ class _HitTile extends ConsumerWidget {
         'title': searchLabel,
       },
     );
-    openPlayerRouter(router);
+    openPlayerAfterPlay(router);
   }
 }
 

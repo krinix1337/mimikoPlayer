@@ -15,6 +15,7 @@ import '../../core/sources/source_errors.dart';
 import '../../core/sources/source_id.dart';
 import '../../core/sources/stream_resolver.dart';
 import '../../core/sources/stream_target.dart';
+import '../../sources/soundcloud/soundcloud_source.dart';
 import '../library/library_actions.dart';
 import 'equalizer_presets.dart';
 import 'playback_controller.dart';
@@ -32,6 +33,33 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     _bindPlayer();
     _services.onEqualizerChanged = _syncEqualizer;
     unawaited(_syncEqualizer());
+    unawaited(_restoreModes());
+  }
+
+  /// Повтор и перемешивание — настройка пользователя, а не свойство одной
+  /// очереди: раньше они читались из снапшота только при восстановлении
+  /// очереди, и после перезапуска кнопка повтора была выключена.
+  Future<void> _restoreModes() async {
+    try {
+      final row = await _services.db.queueDao.load(QueueDao.kindPlayer);
+      if (row == null) return;
+      final repeat = _repeatFromWire(row.repeatMode);
+      final shuffle = row.shuffleEnabled
+          ? PlaybackShuffle.shuffled
+          : PlaybackShuffle.ordered;
+      _queue.setRepeat(repeat);
+      _queue.setShuffle(shuffle);
+      _publish(
+        _snapshot.copyWith(
+          repeat: repeat,
+          shuffle: shuffle,
+          queue: _queue.displayOrder,
+          index: _queue.displayPosition,
+        ),
+      );
+    } on Object catch (error) {
+      AppLogger.instance.warn('режимы плеера не восстановились: $error');
+    }
   }
 
   static MusicBackgroundAudioHandler? instance;
@@ -56,7 +84,18 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   Timer? _stallProbe;
   Timer? _sleepTimer;
   int _stallSeconds = 0;
-  bool _radioRefillInFlight = false;
+  Future<bool>? _radioRefill;
+
+  /// Чего хочет пользователь, а не что сейчас делает just_audio: пауза,
+  /// нажатая во время резолва, иначе терялась — трек догружался и играл.
+  bool _wantPlaying = false;
+
+  /// just_audio шлёт `completed` повторно (например, на pause() в конце
+  /// очереди) — без флага трек засчитывался дважды.
+  bool _completionHandled = false;
+
+  /// Таймер сна вышел: встаём на паузу в конце текущего трека.
+  bool _sleepAtTrackEnd = false;
   final Map<String, SourceTrack> _crossSourceMatches = {};
   final Set<String> _crossSourceSearched = {};
 
@@ -66,13 +105,15 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   @override
   Future<void> sleepAfter(Duration? delay) async {
     _sleepTimer?.cancel();
+    _sleepAtTrackEnd = false;
     if (delay == null) {
       AppLogger.instance.info('таймер сна выключен');
       return;
     }
-    _sleepTimer = Timer(delay, () async {
-      AppLogger.instance.info('таймер сна: пауза');
-      await pause();
+    _sleepTimer = Timer(delay, () {
+      if (!_wantPlaying) return;
+      AppLogger.instance.info('таймер сна: пауза после текущего трека');
+      _sleepAtTrackEnd = true;
     });
     AppLogger.instance.info('таймер сна: ${delay.inMinutes} мин');
   }
@@ -90,6 +131,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     Map<String, Object?>? sourceHint,
   }) async {
     if (localTrackIds.isEmpty) return;
+    _wantPlaying = true;
     AppLogger.instance.info(
       'playQueue x${localTrackIds.length} idx=$startIndex hint=$sourceHint',
     );
@@ -179,19 +221,71 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     final liked = feedback == 1;
     final disliked = feedback == -1;
     if (_snapshot.liked != liked || _snapshot.disliked != disliked) {
-      _publish(
-        _snapshot.copyWith(liked: liked, disliked: disliked),
-      );
+      _publish(_snapshot.copyWith(liked: liked, disliked: disliked));
       _emitServiceState();
     }
   }
 
   @override
   Future<void> skipNext() async {
+    _wantPlaying = true;
     await _reportCurrent(PlaybackEventType.skip);
-    final id = _queue.advance();
+    final id = await _nextTrack();
     if (id == null) {
-      await stop();
+      // Пропуск уже записан выше — второй отчёт из stop() давал дубль.
+      await _stop(report: false);
+      return;
+    }
+    _pendingSeek = Duration.zero;
+    _generation++;
+    await _playCurrent();
+  }
+
+  @override
+  Future<void> dropCurrent() async {
+    final position = _queue.displayPosition;
+    if (position < 0) return;
+    await _reportCurrent(PlaybackEventType.skip);
+    final next = await _nextTrack();
+    // Дизлайкнутый трек уходит из очереди в любом случае; позиция
+    // следующего сдвигается сама, если он стоял ниже.
+    _queue.removeAt(position);
+    if (next == null || _queue.currentId == null) {
+      await _stop(report: false);
+      return;
+    }
+    _pendingSeek = Duration.zero;
+    _generation++;
+    await _playCurrent();
+  }
+
+  bool get _isRadio => _sourceHint?['kind'] == 'radio';
+
+  /// Следующий трек для «вперёд» и автоперехода. Волна в конце очереди
+  /// докачивает новую пачку, а не заворачивает на первый трек (с повтором
+  /// очереди она так и крутила одни и те же песни). Дизлайкнутые треки
+  /// сами не играют — их пропускаем в любой очереди.
+  Future<String?> _nextTrack() async {
+    final limit = _queue.items.length + 1;
+    for (var guard = 0; guard <= limit; guard++) {
+      final String? id;
+      if (_isRadio && _queue.remainingAfterCurrent == 0) {
+        id = await _refillRadio(moveToFirstNew: true) ? _queue.currentId : null;
+      } else {
+        id = _queue.advance();
+      }
+      if (id == null) return null;
+      if (await _services.db.libraryDao.likeState(id) != -1) return id;
+    }
+    return null;
+  }
+
+  /// Трек не зарезолвился: идём дальше, не трогая [_wantPlaying] и не
+  /// записывая «пропуск» — трек не играл ни секунды.
+  Future<void> _skipFailed() async {
+    final id = await _nextTrack();
+    if (id == null) {
+      await _stop(report: false);
       return;
     }
     _pendingSeek = Duration.zero;
@@ -207,6 +301,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     }
     final id = _queue.rewind();
     if (id == null) return;
+    _wantPlaying = true;
     _pendingSeek = Duration.zero;
     _generation++;
     await _playCurrent();
@@ -216,6 +311,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   Future<void> skipToIndex(int displayIndex) async {
     final id = _queue.jumpToPosition(displayIndex);
     if (id == null) return;
+    _wantPlaying = true;
     _pendingSeek = Duration.zero;
     _generation++;
     await _playCurrent();
@@ -226,7 +322,8 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     _queue.setRepeat(value);
     _publish(_snapshot.copyWith(repeat: value));
     _emitServiceState();
-    _scheduleSnapshot();
+    // Сразу, без debounce: приложение могли закрыть через секунду.
+    await _saveSnapshotNow();
   }
 
   @override
@@ -240,19 +337,26 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       ),
     );
     _emitServiceState();
-    _scheduleSnapshot();
+    await _saveSnapshotNow();
   }
 
   @override
-  Future<void> stop() async {
+  Future<void> stop() => _stop();
+
+  Future<void> _stop({bool report = true}) async {
     _generation++;
+    _wantPlaying = false;
+    _sleepTimer?.cancel();
+    _sleepAtTrackEnd = false;
     _pauseWatchdog?.cancel();
     _stallProbe?.cancel();
     final played = _player.position;
     await _fadeOut();
-    await _player.setVolume(1);
     await _player.stop();
-    await _reportCurrent(PlaybackEventType.skip, forcePlayed: played);
+    await _player.setVolume(1);
+    if (report) {
+      await _reportCurrent(PlaybackEventType.skip, forcePlayed: played);
+    }
     mediaItem.add(null);
     _publish(
       _snapshot.copyWith(
@@ -276,9 +380,18 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   @override
   Future<void> play() async {
     if (_queue.currentId == null && !(await _restoreSnapshot())) return;
+    _wantPlaying = true;
+    // Новый трек ещё резолвится: он сам стартует, увидев [_wantPlaying].
+    // Иначе play() запускал старый трек, который ещё стоит в плеере.
+    if (_snapshot.resolving) return;
     if (_player.processingState == ProcessingState.idle) {
       await _playCurrent();
       return;
+    }
+    // Очередь доиграла: play() на конце файла ничего не воспроизводит,
+    // а кнопка застревала в «играет». Начинаем трек сначала.
+    if (_player.processingState == ProcessingState.completed) {
+      await _player.seek(Duration.zero);
     }
     _pauseWatchdog?.cancel();
     await _player.setVolume(0);
@@ -290,11 +403,12 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> pause() async {
-    // Гасим до паузы, а громкость возвращаем сразу: следующий старт
-    // делает собственный фейд-ин с нуля.
+    _wantPlaying = false;
+    // Гасим до паузы и возвращаем громкость уже после неё: в обратном
+    // порядке между вызовами проскакивал кусок на полной громкости.
     await _fadeOut();
-    await _player.setVolume(1);
     await _player.pause();
+    await _player.setVolume(1);
     _startPauseWatchdog();
   }
 
@@ -328,6 +442,11 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     };
     if (next == null) return null;
     await actions.setFeedback(localTrackId, next);
+    if (next == -1) {
+      // Дизлайк из уведомления работает так же, как в плеере: трек уходит.
+      await dropCurrent();
+      return null;
+    }
     await refreshLikedState();
     _emitServiceState();
   }
@@ -354,8 +473,26 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   }
 
   @override
-  Future<void> removeQueueItem(MediaItem mediaItem) async {
-    _queue.remove(mediaItem.id);
+  Future<void> removeQueueItem(MediaItem mediaItem) =>
+      _afterRemoval(_queue.remove(mediaItem.id));
+
+  @override
+  Future<void> removeQueueItemAt(int index) =>
+      _afterRemoval(_queue.removeAt(index));
+
+  /// Убрали текущий трек — переключаемся на тот, что встал на его место,
+  /// иначе плеер доигрывал уже удалённую песню.
+  Future<void> _afterRemoval(bool removedCurrent) async {
+    if (removedCurrent) {
+      if (_queue.currentId == null) {
+        await _stop(report: false);
+        return;
+      }
+      _pendingSeek = Duration.zero;
+      _generation++;
+      await _playCurrent();
+      return;
+    }
     _publish(
       _snapshot.copyWith(
         queue: _queue.displayOrder,
@@ -364,13 +501,6 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     );
     _emitServiceState();
     _scheduleSnapshot();
-  }
-
-  @override
-  Future<void> removeQueueItemAt(int index) async {
-    final order = _queue.displayOrder;
-    if (index < 0 || index >= order.length) return;
-    await removeQueueItem(MediaItem(id: order[index], title: order[index]));
   }
 
   @override
@@ -401,7 +531,12 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         ),
       );
       _emitServiceState();
-      if (completed) unawaited(_onTrackFinished());
+      if (!completed) {
+        _completionHandled = false;
+      } else if (!_completionHandled) {
+        _completionHandled = true;
+        unawaited(_onTrackFinished());
+      }
     });
 
     _player.positionStream.listen(
@@ -505,13 +640,16 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         ]))[localTrackId] ??
         const <String>[];
     final isAi = AiFilter.instance.isAiLocal(title, artists, artistRemoteIds);
+    // Пока читали базу, могли переключить трек: не перетираем его карточку.
+    if (generation != _generation) return;
 
     mediaItem.add(
       MediaItem(
         id: localTrackId,
         title: title,
         artist: artist,
-        artUri: track?.coverUrl == null ? null : Uri.parse(track!.coverUrl!),
+        // tryParse: битая ссылка на обложку не должна ронять запуск трека.
+        artUri: track?.coverUrl == null ? null : Uri.tryParse(track!.coverUrl!),
         duration: Duration(seconds: track?.durationSec ?? 0),
         extras: {'source': track?.metadataSource ?? SourceId.local.wire},
       ),
@@ -531,6 +669,9 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         index: _queue.displayPosition,
         resolving: true,
         uncensored: false,
+        // Источник прошлого трека не должен попасть в отчёт об этом:
+        // без сброса несыгравший трек писался в историю как «пропуск».
+        clearSource: true,
         duration: Duration(seconds: track?.durationSec ?? 0),
         liked: liked,
         disliked: disliked,
@@ -545,6 +686,10 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       quality: _services.defaultQuality,
     );
 
+    // Пока резолвили, пользователь мог включить другой трек: отказ этого
+    // не должен пропускать уже выбранный.
+    if (generation != _generation) return;
+
     var playback = result.playback;
     if (playback == null &&
         !result.needsUserAction &&
@@ -558,6 +703,8 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       );
     }
 
+    if (generation != _generation) return;
+
     if (playback == null) {
       _consecutiveFailures++;
       AppLogger.instance.warn(
@@ -568,11 +715,12 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       );
       if (_consecutiveFailures >= maxConsecutivePlaybackFailures) {
         // Не идём дальше по очереди из двухсот позиций без сети.
+        _wantPlaying = false;
         await _player.pause();
         _publish(_snapshot.copyWith(resolving: false, playing: false));
         return;
       }
-      await skipNext();
+      await _skipFailed();
       return;
     }
 
@@ -601,7 +749,6 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     }
     if (generation != _generation) return;
     _pendingSeek = Duration.zero;
-    await _player.setVolume(0);
     _publish(
       _snapshot.copyWith(
         resolving: false,
@@ -610,6 +757,15 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         uncensored: _playsUncensored(variants),
       ),
     );
+    if (!_wantPlaying) {
+      // Паузу нажали, пока трек грузился: оставляем его готовым, но тихим.
+      await _player.setVolume(1);
+      _startPauseWatchdog();
+      _startStallProbe();
+      _scheduleSnapshot();
+      return;
+    }
+    await _player.setVolume(0);
     _startPlayback();
     unawaited(_fadeIn());
 
@@ -619,7 +775,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       PlaybackEventType.trackStarted,
       Duration.zero,
     );
-    _startStallProbe(playback);
+    _startStallProbe();
     _scheduleSnapshot();
     unawaited(_prefetchRadio());
   }
@@ -644,21 +800,37 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   Future<void> _onTrackFinished() async {
     unawaited(_reportCurrent(PlaybackEventType.trackFinished));
     await _saveSnapshotNow();
+    if (_sleepAtTrackEnd) {
+      // Таймер сна: следующий трек ставим, но не запускаем.
+      _sleepAtTrackEnd = false;
+      _wantPlaying = false;
+      AppLogger.instance.info('таймер сна: пауза');
+      final next = _queue.repeat == PlaybackRepeat.one
+          ? _queue.currentId
+          : await _nextTrack();
+      await _player.pause();
+      if (next == null) {
+        await _player.seek(Duration.zero);
+        _publish(_snapshot.copyWith(playing: false));
+        _emitServiceState(stopped: true);
+        return;
+      }
+      _pendingSeek = Duration.zero;
+      _generation++;
+      await _playCurrent();
+      return;
+    }
     if (_queue.repeat == PlaybackRepeat.one) {
       await _player.seek(Duration.zero);
       _startPlayback();
       return;
     }
-    final id = _queue.advance(manual: false);
+    // Волна в конце очереди докачивается внутри [_nextTrack].
+    final id = await _nextTrack();
     if (id == null) {
-      // Волна не заканчивается: добираем следующую пачку у ротора, иначе
-      // после пяти треков очередь упиралась в конец и стартовала заново.
-      if (await _refillRadio(moveToFirstNew: true)) {
-        await _playCurrent();
-        return;
-      }
       // just_audio оставляет playing=true после конца очереди, и кнопка
       // play дальше ничего не делала.
+      _wantPlaying = false;
       await _player.pause();
       _publish(_snapshot.copyWith(playing: false));
       _emitServiceState(stopped: true);
@@ -677,39 +849,75 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     await _refillRadio(moveToFirstNew: false);
   }
 
-  /// Докачка очереди радио. Возвращает true, если появились новые треки.
-  /// Добавка из SoundCloud к радио: ищем ещё треки текущего исполнителя.
-  /// Если SoundCloud молчит, волна продолжает жить на Яндексе.
+  /// Докачка волны «SoundCloud»: похожие на последние треки SoundCloud в
+  /// очереди. Пустой список — пусть волна докачается Яндексом, но не встанет.
   Future<List<SourceTrack>> _soundCloudRefill() async {
     final source = _services.registry.byId(SourceId.soundcloud);
-    final artist = _snapshot.current?.artist.trim() ?? '';
-    if (source == null || artist.isEmpty) return const [];
-    try {
-      final result = await source.search(artist, pageSize: 10);
-      final tracks = [
-        for (final track in result.tracks)
-          if (track.available && track.duration.inSeconds >= 60) track,
-      ].take(3).toList();
-      if (tracks.isNotEmpty) {
-        AppLogger.instance.info('волна: SoundCloud докачал ${tracks.length}');
+    if (source is! SoundCloudSource) return const [];
+    final order = _queue.displayOrder;
+    final seeds = <String>[];
+    for (var i = order.length - 1; i >= 0 && seeds.length < 3; i--) {
+      if (order.length - i > 10) break;
+      final variants = await _services.db.tracksDao.variantsOf(order[i]);
+      for (final variant in variants) {
+        if (variant.ref.source == SourceId.soundcloud) {
+          seeds.add(variant.ref.remoteId);
+          break;
+        }
       }
-      return tracks;
-    } on Object catch (error) {
-      AppLogger.instance.warn('soundcloud refill: $error');
-      return const [];
     }
+    final queued = <String>{};
+    for (final id in order.skip(order.length > 60 ? order.length - 60 : 0)) {
+      final track = await _services.db.tracksDao.byId(id);
+      if (track == null) continue;
+      final artists = await _services.db.tracksDao.artistNamesOf(id);
+      queued.addAll(SoundCloudSource.songKeys(track.title, artists));
+    }
+    final tracks = await source.radio(
+      seedIds: seeds,
+      target: 15,
+      excludeSongs: queued,
+    );
+    AppLogger.instance.info(
+      'волна SoundCloud докачала ${tracks.length} от ${seeds.length} затравок',
+    );
+    return tracks;
   }
 
   Future<bool> _refillRadio({bool moveToFirstNew = false}) async {
-    if (_sourceHint?['kind'] != 'radio') return false;
-    if (_radioRefillInFlight) return false;
+    if (!_isRadio) return false;
+    final pending = _radioRefill;
+    if (pending != null) {
+      // Фоновая докачка уже идёт: раньше второй вызов сразу получал false,
+      // и волна, доиграв трек в этот момент, останавливалась.
+      final added = await pending;
+      if (!moveToFirstNew) return added;
+      return _queue.remainingAfterCurrent > 0 && _queue.advance() != null;
+    }
+    final future = _doRefillRadio(moveToFirstNew: moveToFirstNew);
+    _radioRefill = future;
+    try {
+      return await future;
+    } finally {
+      _radioRefill = null;
+    }
+  }
+
+  Future<bool> _doRefillRadio({required bool moveToFirstNew}) async {
     final source = _services.yandex;
     if (source == null) return false;
 
-    _radioRefillInFlight = true;
     final station = '${_sourceHint?['station'] ?? 'user:onyourwave'}';
     try {
-      final base = station.startsWith('playlist:')
+      final soundCloud =
+          _sourceHint?['soundcloud'] == true &&
+          !station.startsWith('playlist:');
+      final fromSoundCloud = soundCloud
+          ? await _soundCloudRefill()
+          : const <SourceTrack>[];
+      final fetched = fromSoundCloud.isNotEmpty
+          ? fromSoundCloud
+          : station.startsWith('playlist:')
           ? (List<SourceTrack>.of(
               await source.playlistTracks(station.substring(9)),
             )..shuffle())
@@ -717,12 +925,8 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
               station: station,
               batches: 3,
               target: 15,
+              queue: await _lastYandexTrackId(),
             );
-      final fetched =
-          _sourceHint?['soundcloud'] == true &&
-              !station.startsWith('playlist:')
-          ? [...base, ...await _soundCloudRefill()]
-          : base;
       if (_services.hideAiTracks) {
         // Волна может стартовать раньше, чем фоновая загрузка списка.
         await AiFilter.instance.ensureLoaded();
@@ -740,10 +944,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         for (final id in ids)
           if (!disliked.contains(id)) id,
       ];
-      if (!_queue.appendBatch(
-        playableIds,
-        moveToFirstNew: moveToFirstNew,
-      )) {
+      if (!_queue.appendBatch(playableIds, moveToFirstNew: moveToFirstNew)) {
         // Ротор вернул то же самое — пробуем ещё раз на следующем треке.
         return false;
       }
@@ -759,9 +960,20 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     } on Object catch (error) {
       AppLogger.instance.warn('волна не докачалась: $error');
       return false;
-    } finally {
-      _radioRefillInFlight = false;
     }
+  }
+
+  /// Последний трек Яндекса в очереди: ротор строит продолжение от него.
+  /// С постоянным `queue=1` он отдавал похожие пачки, и песни повторялись.
+  Future<String?> _lastYandexTrackId() async {
+    final order = _queue.displayOrder;
+    for (var i = order.length - 1; i >= 0 && i >= order.length - 5; i--) {
+      final variants = await _services.db.tracksDao.variantsOf(order[i]);
+      for (final variant in variants) {
+        if (variant.ref.source == SourceId.yandex) return variant.ref.remoteId;
+      }
+    }
+    return null;
   }
 
   Future<void> _reportCurrent(
@@ -893,7 +1105,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     return null;
   }
 
-  void _startStallProbe(ResolvedPlayback playback) {
+  void _startStallProbe() {
     _stallProbe?.cancel();
     _stallSeconds = 0;
     _stallProbe = Timer.periodic(const Duration(seconds: 1), (timer) async {
@@ -955,6 +1167,9 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
           quality: fresh.quality,
         ),
       );
+      // Проба гасит себя перед перевалидацией: без перезапуска второе
+      // зависание на том же треке уже не лечилось.
+      _startStallProbe();
     } on Object catch (error) {
       AppLogger.instance.warn('перевалидация не удалась: $error');
     } finally {
@@ -988,6 +1203,8 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       _snapshot.copyWith(
         queue: _queue.displayOrder,
         index: _queue.displayPosition,
+        repeat: _queue.repeat,
+        shuffle: _queue.shuffle,
       ),
     );
     return true;

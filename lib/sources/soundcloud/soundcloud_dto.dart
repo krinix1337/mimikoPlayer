@@ -40,11 +40,16 @@ final class SoundCloudDto {
     final streamable = json['streamable'] != false;
     final policy = (json['policy'] as String? ?? '').toUpperCase();
     final access = (json['access'] as String? ?? '').toLowerCase();
+    // Список транскодингов есть в поиске и рекомендациях: если в нём только
+    // зашифрованный HLS, трек не сыграет — плеер пропускал такие уже в волне.
+    final media = json['media'];
+    final hasMedia = media is Map && media['transcodings'] is List;
     final playable =
         streamable &&
         policy != 'BLOCK' &&
         access != 'blocked' &&
-        access != 'preview';
+        access != 'preview' &&
+        (!hasMedia || pickTranscoding(json) != null);
 
     final publisher = json['publisher_metadata'];
     final publisherArtist = publisher is Map

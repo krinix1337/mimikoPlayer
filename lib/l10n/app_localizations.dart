@@ -170,11 +170,11 @@ abstract class AppLocalizations {
   /// **'Повторить'**
   String get commonRetry;
 
-  /// No description provided for @commonTracks.
+  /// No description provided for @commonTrackCount.
   ///
   /// In ru, this message translates to:
-  /// **'треков'**
-  String get commonTracks;
+  /// **'{count, plural, one{{count} трек} few{{count} трека} many{{count} треков} other{{count} трека}}'**
+  String commonTrackCount(int count);
 
   /// No description provided for @commonLoading.
   ///
@@ -443,7 +443,7 @@ abstract class AppLocalizations {
   /// No description provided for @importDone.
   ///
   /// In ru, this message translates to:
-  /// **'Готово: {matched} треков, {skipped} пропущено, {playlists} плейлистов'**
+  /// **'Готово. Треков: {matched}, пропущено: {skipped}, плейлистов: {playlists}'**
   String importDone(int matched, int skipped, int playlists);
 
   /// No description provided for @importYandexRequired.
@@ -530,17 +530,11 @@ abstract class AppLocalizations {
   /// **'Закрыть'**
   String get waveClose;
 
-  /// No description provided for @waveSoundCloudTitle.
+  /// No description provided for @waveModeSoundCloud.
   ///
   /// In ru, this message translates to:
-  /// **'SoundCloud в волне'**
-  String get waveSoundCloudTitle;
-
-  /// No description provided for @waveSoundCloudNote.
-  ///
-  /// In ru, this message translates to:
-  /// **'Подмешивать треки из SoundCloud к рекомендациям. Работает без входа.'**
-  String get waveSoundCloudNote;
+  /// **'SoundCloud'**
+  String get waveModeSoundCloud;
 
   /// No description provided for @waveRejectedNote.
   ///
@@ -925,6 +919,12 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Сейчас играет'**
   String get playerTitle;
+
+  /// No description provided for @artistListeners.
+  ///
+  /// In ru, this message translates to:
+  /// **'{count} слушателей'**
+  String artistListeners(String count);
 
   /// No description provided for @playerBack.
   ///
@@ -2594,6 +2594,18 @@ abstract class AppLocalizations {
   /// **'BPM и тональность в сведениях о треке'**
   String get djInfoNote;
 
+  /// No description provided for @settingsOpenPlayer.
+  ///
+  /// In ru, this message translates to:
+  /// **'Открывать плеер при запуске'**
+  String get settingsOpenPlayer;
+
+  /// No description provided for @settingsOpenPlayerNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выключено — трек играет в мини-плеере, полный плеер открывается тапом по нему'**
+  String get settingsOpenPlayerNote;
+
   /// No description provided for @trackUnknownArtist.
   ///
   /// In ru, this message translates to:
@@ -2833,6 +2845,30 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Без лимита'**
   String get downloadsUnlimited;
+
+  /// No description provided for @sizeBytes.
+  ///
+  /// In ru, this message translates to:
+  /// **'{value} Б'**
+  String sizeBytes(String value);
+
+  /// No description provided for @sizeKb.
+  ///
+  /// In ru, this message translates to:
+  /// **'{value} КБ'**
+  String sizeKb(String value);
+
+  /// No description provided for @sizeMb.
+  ///
+  /// In ru, this message translates to:
+  /// **'{value} МБ'**
+  String sizeMb(String value);
+
+  /// No description provided for @sizeGb.
+  ///
+  /// In ru, this message translates to:
+  /// **'{value} ГБ'**
+  String sizeGb(String value);
 
   /// No description provided for @downloadsGb.
   ///

@@ -10,6 +10,7 @@ import '../../../core/sources/source_dto.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_motion.dart';
 import '../../../widgets/track_cover.dart';
+import '../../../widgets/human_bytes.dart';
 
 Future<void> showTrackDetails(
   BuildContext context,
@@ -130,7 +131,9 @@ class _TrackDetailsSheetState extends ConsumerState<_TrackDetailsSheet> {
                 ),
                 const SizedBox(height: 16),
                 _InfoRow(label: l.detailsSource, value: source),
-                if (sources.isNotEmpty)
+                // Список вариантов нужен, только когда он что-то добавляет к
+                // строке выше: «Источник: Яндекс» и «Источники: Яндекс» дублировались.
+                if (sources.isNotEmpty && sources != source)
                   _InfoRow(label: l.detailsSources, value: sources),
                 _InfoRow(label: l.detailsAlbum, value: data.album ?? '—'),
                 if (data.year != null)
@@ -146,7 +149,10 @@ class _TrackDetailsSheetState extends ConsumerState<_TrackDetailsSheet> {
                 ),
                 if (file != null) ...[
                   _InfoRow(label: l.detailsCodec, value: file.codec ?? '—'),
-                  _InfoRow(label: l.detailsSize, value: _bytes(file.sizeBytes)),
+                  _InfoRow(
+                    label: l.detailsSize,
+                    value: humanBytes(l, file.sizeBytes),
+                  ),
                   _InfoRow(label: l.detailsFile, value: file.filePath),
                 ],
                 _InfoRow(
@@ -202,12 +208,6 @@ class _TrackDetailsSheetState extends ConsumerState<_TrackDetailsSheet> {
     final minutes = seconds ~/ 60;
     final rest = seconds % 60;
     return '$minutes:${rest.toString().padLeft(2, '0')}';
-  }
-
-  static String _bytes(int value) {
-    if (value < 1024) return '$value B';
-    if (value < 1024 * 1024) return '${(value / 1024).toStringAsFixed(0)} KB';
-    return '${(value / 1024 / 1024).toStringAsFixed(1)} MB';
   }
 }
 
@@ -356,9 +356,9 @@ class _DjInfoState extends ConsumerState<_DjInfo> {
                   label: l.djBpm,
                   value: snapshot.connectionState == ConnectionState.waiting
                       ? '…'
-                      : data?.bpm == null
+                      : data?.bpm == null || data!.bpm! <= 0
                       ? '—'
-                      : '${data!.bpm!.round()}',
+                      : '${data.bpm!.round()}',
                 ),
                 _InfoRow(
                   label: l.djGain,
@@ -384,6 +384,8 @@ class _DjInfoState extends ConsumerState<_DjInfo> {
                           child: DropdownButton<String>(
                             value: _key ?? '',
                             isExpanded: true,
+                            // Тем же шрифтом, что значения строк выше.
+                            style: theme.textTheme.bodyMedium,
                             items: [
                               DropdownMenuItem<String>(
                                 value: '',

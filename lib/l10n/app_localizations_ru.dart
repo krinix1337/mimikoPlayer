@@ -46,7 +46,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get commonRetry => 'Повторить';
 
   @override
-  String get commonTracks => 'треков';
+  String commonTrackCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count трека',
+      many: '$count треков',
+      few: '$count трека',
+      one: '$count трек',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get commonLoading => 'Загружается…';
@@ -191,7 +201,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String importDone(int matched, int skipped, int playlists) {
-    return 'Готово: $matched треков, $skipped пропущено, $playlists плейлистов';
+    return 'Готово. Треков: $matched, пропущено: $skipped, плейлистов: $playlists';
   }
 
   @override
@@ -238,11 +248,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get waveClose => 'Закрыть';
 
   @override
-  String get waveSoundCloudTitle => 'SoundCloud в волне';
-
-  @override
-  String get waveSoundCloudNote =>
-      'Подмешивать треки из SoundCloud к рекомендациям. Работает без входа.';
+  String get waveModeSoundCloud => 'SoundCloud';
 
   @override
   String get waveRejectedNote => 'Яндекс не принял настройки — смотри лог';
@@ -463,6 +469,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get playerTitle => 'Сейчас играет';
+
+  @override
+  String artistListeners(String count) {
+    return '$count слушателей';
+  }
 
   @override
   String get playerBack => 'Назад';
@@ -1364,6 +1375,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get djInfoNote => 'BPM и тональность в сведениях о треке';
 
   @override
+  String get settingsOpenPlayer => 'Открывать плеер при запуске';
+
+  @override
+  String get settingsOpenPlayerNote =>
+      'Выключено — трек играет в мини-плеере, полный плеер открывается тапом по нему';
+
+  @override
   String get trackUnknownArtist => 'Неизвестный исполнитель';
 
   @override
@@ -1493,6 +1511,26 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get downloadsUnlimited => 'Без лимита';
+
+  @override
+  String sizeBytes(String value) {
+    return '$value Б';
+  }
+
+  @override
+  String sizeKb(String value) {
+    return '$value КБ';
+  }
+
+  @override
+  String sizeMb(String value) {
+    return '$value МБ';
+  }
+
+  @override
+  String sizeGb(String value) {
+    return '$value ГБ';
+  }
 
   @override
   String downloadsGb(int value) {

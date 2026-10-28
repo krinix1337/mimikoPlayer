@@ -130,6 +130,9 @@ Future<void> showTrackMenu(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    // По верху: подпись в две строки («Убрать из любимого»)
+                    // иначе опускала соседние кружки ниже.
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _MenuCircle(
                         icon: liked == 1

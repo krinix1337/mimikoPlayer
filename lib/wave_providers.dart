@@ -5,6 +5,7 @@ import 'core/content/ai_filter.dart';
 import 'core/logging/app_logger.dart';
 import 'core/sources/source_dto.dart';
 import 'core/sources/source_id.dart';
+import 'sources/soundcloud/soundcloud_source.dart';
 import 'sources/yandex/yandex_station.dart';
 
 /// Понятный список жанров вместо серверной выдачи: `/rotor/stations/list`
@@ -99,9 +100,8 @@ final waveTracksProvider = FutureProvider<List<WaveTrack>>((ref) async {
           await source.playlistTracks(WaveStationIds.coolMusicPlaylist),
         )..shuffle())
       : await source.station.waveMany(station: station);
-  final fetched =
-      withSoundCloud && station != WaveStationIds.coolMusic
-      ? await _withSoundCloud(ref, base)
+  final fetched = withSoundCloud && station != WaveStationIds.coolMusic
+      ? await _soundCloudWave(ref, base)
       : base;
   final tracks = hideAi
       ? [
@@ -111,9 +111,12 @@ final waveTracksProvider = FutureProvider<List<WaveTrack>>((ref) async {
       : fetched;
   final ids = await services.db.tracksDao.ingestAll(tracks);
   final disliked = await services.db.libraryDao.dislikedAmong(ids);
+  // Разные remote id (сингл/альбом, копия из SoundCloud) сводятся в один
+  // локальный трек: без отсева он стоял в волне дважды.
+  final seen = <String>{};
   return [
     for (var i = 0; i < tracks.length; i++)
-      if (!disliked.contains(ids[i]))
+      if (!disliked.contains(ids[i]) && seen.add(ids[i]))
         WaveTrack(localTrackId: ids[i], source: tracks[i]),
   ];
 });
@@ -151,57 +154,38 @@ Future<bool> startWave(WidgetRef ref) async {
   return true;
 }
 
-/// Подмешивает несколько треков SoundCloud к выдаче Яндекса: ищем по
-/// исполнителям, которые уже есть в волне. Параллельно и без ошибок наружу —
-/// недоступный SoundCloud оставляет обычную волну.
-Future<List<SourceTrack>> _withSoundCloud(
+/// Режим «SoundCloud»: волна целиком из SoundCloud. Затравка — исполнители
+/// из персональной волны Яндекса, дальше рекомендации SoundCloud («похожие»).
+/// Если SoundCloud недоступен, остаётся обычная волна, а не пустой экран.
+Future<List<SourceTrack>> _soundCloudWave(
   Ref ref,
   List<SourceTrack> base,
 ) async {
   final sc = ref.read(appServicesProvider).registry.byId(SourceId.soundcloud);
-  if (sc == null) return base;
+  if (sc is! SoundCloudSource) return base;
   final artists = <String>[];
   for (final track in base) {
     final artist = track.artists.isEmpty ? '' : track.artists.first.trim();
     if (artist.isNotEmpty && !artists.contains(artist)) artists.add(artist);
-    if (artists.length == 3) break;
+    if (artists.length == 4) break;
   }
   if (artists.isEmpty) return base;
 
-  Future<List<SourceTrack>> searchOne(String artist) async {
-    try {
-      return (await sc.search(artist, pageSize: 10)).tracks;
-    } on Object {
-      return const [];
-    }
+  final seeds = [
+    for (final id in await Future.wait([
+      for (final artist in artists) sc.seedFor(artist),
+    ]))
+      ?id,
+  ];
+  final tracks = await sc.radio(seedIds: seeds, target: 24);
+  if (tracks.isEmpty) {
+    AppLogger.instance.warn('волна SoundCloud пуста — играет обычная');
+    return base;
   }
-
-  final batches = await Future.wait([
-    for (final artist in artists) searchOne(artist),
-  ]);
-  final extras = <SourceTrack>[];
-  final seen = <String>{};
-  for (final batch in batches) {
-    var added = 0;
-    for (final track in batch) {
-      if (!track.available || track.duration.inSeconds < 60) continue;
-      if (!seen.add(track.ref.remoteId)) continue;
-      extras.add(track);
-      added++;
-      if (added == 2) break;
-    }
-  }
-  if (extras.isEmpty) return base;
-  AppLogger.instance.info('волна: SoundCloud +${extras.length} треков');
-
-  final mixed = <SourceTrack>[];
-  var pick = 0;
-  for (var i = 0; i < base.length; i++) {
-    mixed.add(base[i]);
-    if (i % 4 == 3 && pick < extras.length) mixed.add(extras[pick++]);
-  }
-  mixed.addAll(extras.skip(pick));
-  return mixed;
+  AppLogger.instance.info(
+    'волна SoundCloud: ${tracks.length} треков от ${seeds.length} затравок',
+  );
+  return tracks;
 }
 
 final class WaveTrack {

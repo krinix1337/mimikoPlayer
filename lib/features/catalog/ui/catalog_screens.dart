@@ -42,7 +42,7 @@ Future<void> playRemoteTracks(
     },
   );
   if (shuffle) await controller.setShuffle(PlaybackShuffle.shuffled);
-  openPlayerRouter(router);
+  openPlayerAfterPlay(router);
 }
 
 class ArtistScreen extends ConsumerStatefulWidget {
@@ -117,9 +117,9 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen> {
                             child: Text(
                               [
                                 if (artist.trackCount != null)
-                                  '${artist.trackCount} ${l.commonTracks}',
+                                  l.commonTrackCount(artist.trackCount!),
                                 if (artist.listeners != null)
-                                  '${_compact(artist.listeners!.toInt())} / ${l.playerTitle}',
+                                  l.artistListeners(_compact(artist.listeners!.toInt())),
                               ].join(' · '),
                               style: Theme.of(context).textTheme.bodySmall,
                               maxLines: 1,
@@ -649,7 +649,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen> {
                               [
                                 value.artists.join(', '),
                                 if (value.year != null) '${value.year}',
-                                '${value.tracks.length} ${l.commonTracks}',
+                                l.commonTrackCount(value.tracks.length),
                               ].where((part) => part.isNotEmpty).join(' · '),
                               style: Theme.of(context).textTheme.bodySmall,
                               maxLines: 1,

@@ -302,6 +302,11 @@ class DownloadService {
       await _delete(temp);
       throw const DownloadException('Источник вернул не аудио');
     }
+    if (total != null && received < total) {
+      // Поток закрылся без ошибки, но не дошёл до конца: обрезанный файл
+      // нельзя отмечать скачанным. `.part` остаётся — докачаем по Range.
+      throw const DownloadException('Поток оборвался, докачаю позже');
+    }
 
     if (await file.exists()) await file.delete();
     await temp.rename(file.path);

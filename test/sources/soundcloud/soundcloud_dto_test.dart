@@ -160,6 +160,14 @@ void main() {
       },
     );
 
+    test('трек только с зашифрованным HLS недоступен уже в выдаче', () {
+      expect(SoundCloudDto.track(_trackJson())!.available, isTrue);
+      expect(
+        SoundCloudDto.track(_trackJson(encryptedOnly: true))!.available,
+        isFalse,
+      );
+    });
+
     test('срок жизни медиа-URL читается из expires', () {
       final value =
           'https://cf-media.sndcdn.com/file.mp3?expires=1893456000&Policy=x';

@@ -26,6 +26,7 @@ void main() {
       searchHistory: ['queen', 'joji'],
       homeCoverTone: HomeCoverTone.darker,
       showDjInfo: false,
+      openPlayerOnPlay: true,
       autoDownloadLikes: true,
       autoDownloadWifiOnly: false,
       autoDownloadAllApproved: true,
@@ -55,6 +56,7 @@ void main() {
     expect(restored.searchHistory, ['queen', 'joji']);
     expect(restored.homeCoverTone, HomeCoverTone.darker);
     expect(restored.showDjInfo, isFalse);
+    expect(restored.openPlayerOnPlay, isTrue);
     expect(restored.autoDownloadLikes, isTrue);
     expect(restored.autoDownloadWifiOnly, isFalse);
     expect(restored.autoDownloadAllApproved, isTrue);

@@ -38,6 +38,7 @@ final class Prefs {
     this.blurTop = 24,
     this.blurCover = 24,
     this.showDjInfo = true,
+    this.openPlayerOnPlay = false,
     this.autoDownloadLikes = false,
     this.autoDownloadWifiOnly = true,
     this.autoDownloadAllApproved = false,
@@ -108,6 +109,10 @@ final class Prefs {
   /// Показывать BPM и тональность в сведениях о треке.
   final bool showDjInfo;
 
+  /// Открывать полный плеер при запуске трека из списка. По умолчанию
+  /// выключено: играет мини-плеер, полный открывается тапом по нему.
+  final bool openPlayerOnPlay;
+
   /// Автозагрузка лайков выключена, пока пользователь сам не включит её.
   final bool autoDownloadLikes;
 
@@ -177,6 +182,7 @@ final class Prefs {
     double? blurTop,
     double? blurCover,
     bool? showDjInfo,
+    bool? openPlayerOnPlay,
     bool? autoDownloadLikes,
     bool? autoDownloadWifiOnly,
     bool? autoDownloadAllApproved,
@@ -217,6 +223,7 @@ final class Prefs {
     blurTop: blurTop ?? this.blurTop,
     blurCover: blurCover ?? this.blurCover,
     showDjInfo: showDjInfo ?? this.showDjInfo,
+    openPlayerOnPlay: openPlayerOnPlay ?? this.openPlayerOnPlay,
     autoDownloadLikes: autoDownloadLikes ?? this.autoDownloadLikes,
     autoDownloadWifiOnly: autoDownloadWifiOnly ?? this.autoDownloadWifiOnly,
     autoDownloadAllApproved:
@@ -261,6 +268,7 @@ final class Prefs {
     'blur_top': blurTop,
     'blur_cover': blurCover,
     'show_dj_info': showDjInfo,
+    'open_player_on_play': openPlayerOnPlay,
     'auto_download_likes': autoDownloadLikes,
     'auto_download_wifi_only': autoDownloadWifiOnly,
     'auto_download_all_approved': autoDownloadAllApproved,
@@ -347,6 +355,7 @@ final class Prefs {
         _ => 24,
       },
       showDjInfo: json['show_dj_info'] != false,
+      openPlayerOnPlay: json['open_player_on_play'] == true,
       autoDownloadLikes: json['auto_download_likes'] == true,
       autoDownloadWifiOnly: json['auto_download_wifi_only'] != false,
       autoDownloadAllApproved: json['auto_download_all_approved'] == true,

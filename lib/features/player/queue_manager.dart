@@ -47,7 +47,7 @@ class QueueManager {
     final base = _items.length - 1;
     final orderAt = _position < 0 ? _order.length : _position + 1;
     _order = [..._order.take(orderAt), base, ..._order.skip(orderAt)];
-    if (_position < 0) _position = 0;
+    if (_position < 0) _position = orderAt;
   }
 
   /// Сколько треков осталось после текущего.
@@ -58,9 +58,12 @@ class QueueManager {
   /// иначе волна крутит одно и то же. [moveToFirstNew] нужен только когда
   /// текущая очередь закончилась; при фоновой докачке позиция не меняется.
   bool appendBatch(List<String> localTrackIds, {bool moveToFirstNew = false}) {
+    // Дубли бывают и внутри самой пачки: сингл и альбомная версия, трек из
+    // SoundCloud — разные remote id, но один локальный трек.
+    final known = _items.toSet();
     final fresh = [
       for (final id in localTrackIds)
-        if (!_items.contains(id)) id,
+        if (known.add(id)) id,
     ];
     if (fresh.isEmpty) return false;
 
@@ -79,20 +82,35 @@ class QueueManager {
     if (_position < 0) _position = _order.length - 1;
   }
 
-  void remove(String localTrackId) {
-    final index = _items.indexOf(localTrackId);
-    if (index < 0) return;
-    final wasCurrent = currentId == localTrackId;
+  /// Убрать первую копию трека в отображаемом порядке. Возвращает true,
+  /// если убрали именно текущий трек.
+  bool remove(String localTrackId) {
+    final displayIndex = displayOrder.indexOf(localTrackId);
+    return displayIndex < 0 ? false : removeAt(displayIndex);
+  }
+
+  /// Убрать строку по позиции в отображаемом порядке. Трек выше текущего
+  /// сдвигает позицию: иначе подсветка уезжала на следующую песню, пока
+  /// плеер продолжал играть прежнюю. Возвращает true, если убрали текущий.
+  bool removeAt(int displayIndex) {
+    if (displayIndex < 0 || displayIndex >= _order.length) return false;
+    final wasCurrent = displayIndex == _position;
+    final index = _order[displayIndex];
     _items = [
       for (var i = 0; i < _items.length; i++)
         if (i != index) _items[i],
     ];
     _order = [
-      for (final i in _order)
-        if (i != index) _remap(i, index),
+      for (var i = 0; i < _order.length; i++)
+        if (i != displayIndex) _remap(_order[i], index),
     ];
-    if (wasCurrent) _position = _position.clamp(0, _order.length - 1);
-    if (_order.isEmpty) _position = -1;
+    if (displayIndex < _position) _position--;
+    if (_order.isEmpty) {
+      _position = -1;
+    } else if (wasCurrent) {
+      _position = _position.clamp(0, _order.length - 1);
+    }
+    return wasCurrent;
   }
 
   static int _remap(int oldIndex, int removedIndex) =>
@@ -142,24 +160,21 @@ class QueueManager {
   PlaybackShuffle setShuffle(PlaybackShuffle mode) {
     if (_shuffle == mode) return _shuffle;
     _shuffle = mode;
-    final current = currentId;
+    // Индекс, а не id: у дублей поиск по id уводил на первую копию.
+    final current = currentBaseIndex;
     if (mode == PlaybackShuffle.shuffled) {
-      _reshuffle(keepFirst: current);
+      _reshuffle(keepFirst: current < 0 ? null : current);
     } else {
       _order = List.generate(_items.length, (i) => i);
-      _position = current == null ? -1 : _items.indexOf(current);
+      _position = current;
     }
     return _shuffle;
   }
 
-  void _reshuffle({String? keepFirst}) {
+  void _reshuffle({int? keepFirst}) {
     final indices = [for (var i = 0; i < _items.length; i++) i]..shuffle();
-    if (keepFirst != null) {
-      final base = _items.indexOf(keepFirst);
-      if (base >= 0) {
-        indices.remove(base);
-        indices.insert(0, base);
-      }
+    if (keepFirst != null && indices.remove(keepFirst)) {
+      indices.insert(0, keepFirst);
     }
     _order = indices;
     _position = indices.isEmpty ? -1 : 0;

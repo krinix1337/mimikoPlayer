@@ -17,6 +17,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_motion.dart';
 import '../../../theme/keyboard_theme.dart';
 import '../../../widgets/pressable.dart';
+import '../../../widgets/human_bytes.dart';
 
 /// Карточка-секция настроек: заголовок и группа строк в общей оболочке.
 class SettingsSection extends StatelessWidget {
@@ -875,7 +876,7 @@ class DownloadsTile extends ConsumerWidget {
         ListTile(
           leading: const Icon(Icons.download_done_rounded),
           title: Text(
-            l.downloadsSummary(summary.count, _humanBytes(summary.bytes)),
+            l.downloadsSummary(summary.count, humanBytes(l, summary.bytes)),
           ),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -915,7 +916,7 @@ class DownloadsTile extends ConsumerWidget {
             return ListTile(
               dense: true,
               leading: const Icon(Icons.sd_storage_rounded, size: 20),
-              title: Text(l.downloadsFreeSpace(_humanBytes(free))),
+              title: Text(l.downloadsFreeSpace(humanBytes(l, free))),
             );
           },
         ),
@@ -974,14 +975,6 @@ class DeleteDownloadsTile extends ConsumerWidget {
   }
 }
 
-String _humanBytes(int bytes) {
-  if (bytes < 1024) return '$bytes B';
-  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
-  if (bytes < 1024 * 1024 * 1024) {
-    return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
-  }
-  return '${(bytes / 1024 / 1024 / 1024).toStringAsFixed(1)} GB';
-}
 
 class CacheTile extends ConsumerStatefulWidget {
   const CacheTile({super.key});
@@ -1024,7 +1017,7 @@ class _CacheTileState extends ConsumerState<CacheTile> {
     final l = AppLocalizations.of(context);
     return ListTile(
       title: Text(l.settingsCache),
-      subtitle: Text(_bytes == null ? '—' : _humanBytes(_bytes!)),
+      subtitle: Text(_bytes == null ? '—' : humanBytes(l, _bytes!)),
       trailing: TextButton(
         onPressed: () async {
           await DefaultCacheManager().emptyCache();

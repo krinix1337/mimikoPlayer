@@ -249,23 +249,14 @@ class _AppearancePage extends ConsumerWidget {
                     segments: [
                       ButtonSegment(
                         value: ThemeMode.system,
-                        icon: kKeyboardTestTheme
-                            ? null
-                            : const Icon(Icons.brightness_auto_rounded),
                         label: Text(l.themeSystem),
                       ),
                       ButtonSegment(
                         value: ThemeMode.light,
-                        icon: kKeyboardTestTheme
-                            ? null
-                            : const Icon(Icons.light_mode_rounded),
                         label: Text(l.themeLight),
                       ),
                       ButtonSegment(
                         value: ThemeMode.dark,
-                        icon: kKeyboardTestTheme
-                            ? null
-                            : const Icon(Icons.dark_mode_rounded),
                         label: Text(l.themeDark),
                       ),
                     ],
@@ -524,6 +515,12 @@ class _SoundPage extends ConsumerWidget {
               value: prefs.showDjInfo,
               note: l.djInfoNote,
               onChanged: controller.setShowDjInfo,
+            ),
+            SwitchRow(
+              label: l.settingsOpenPlayer,
+              value: prefs.openPlayerOnPlay,
+              note: l.settingsOpenPlayerNote,
+              onChanged: controller.setOpenPlayerOnPlay,
             ),
             const PriorityTile(),
           ],
@@ -1508,6 +1505,9 @@ class _AboutPageState extends ConsumerState<_AboutPage> {
               leading: const Icon(Icons.music_note_rounded),
               title: const Text('Яндекс Музыка'),
               subtitle: Text(l.aboutYandexNote),
+              // Как у соседних источников: без галочки казалось, что
+              // Яндекс не подключён.
+              trailing: ref.watch(yandexReadyProvider) ? check : null,
             ),
             ListTile(
               leading: const Icon(Icons.cloud_rounded),
@@ -2338,7 +2338,13 @@ class _Page extends StatelessWidget {
             icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () => Navigator.of(context).maybePop(),
           ),
-          title: Text(title),
+          // Длинные названия («Звук и воспроизведение») уменьшаются, а не
+          // обрезаются многоточием.
+          title: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(title),
+          ),
         ),
         SliverList(
           delegate: SliverChildListDelegate([

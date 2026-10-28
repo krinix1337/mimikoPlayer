@@ -12,7 +12,8 @@
   "commonCancel": "Отмена",
   "commonSave": "Сохранить",
   "commonRetry": "Повторить",
-  "commonTracks": "треков",
+  "commonTrackCount": "{count, plural, one{{count} трек} few{{count} трека} many{{count} треков} other{{count} трека}}",
+  "@commonTrackCount": {"placeholders": {"count": {"type": "int"}}},
   "commonLoading": "Загружается…",
   "commonLike": "В любимое",
   "commonUnlike": "Убрать из любимого",
@@ -84,7 +85,7 @@
       "skipped": { "type": "int" }
     }
   },
-  "importDone": "Готово: {matched} треков, {skipped} пропущено, {playlists} плейлистов",
+  "importDone": "Готово. Треков: {matched}, пропущено: {skipped}, плейлистов: {playlists}",
   "@importDone": {
     "placeholders": {
       "matched": { "type": "int" },
@@ -106,8 +107,7 @@
   "importOtherSoundCloud": "Поиск и поток без переноса",
   "waveSettingsTitle": "Настройки волны",
   "waveClose": "Закрыть",
-  "waveSoundCloudTitle": "SoundCloud в волне",
-  "waveSoundCloudNote": "Подмешивать треки из SoundCloud к рекомендациям. Работает без входа.",
+  "waveModeSoundCloud": "SoundCloud",
   "waveRejectedNote": "Яндекс не принял настройки — смотри лог",
   "collectionTitle": "Коллекция",
   "collectionLiked": "Любимое",
@@ -256,6 +256,8 @@
     }
   },
   "playerTitle": "Сейчас играет",
+  "artistListeners": "{count} слушателей",
+  "@artistListeners": {"placeholders": {"count": {"type": "String"}}},
   "playerBack": "Назад",
   "playerQueue": "Очередь",
   "playerRepeat": "Повтор",
@@ -684,6 +686,8 @@
   "homeCoverLighter": "Светлее",
   "djInfo": "DJ-сведения",
   "djInfoNote": "BPM и тональность в сведениях о треке",
+  "settingsOpenPlayer": "Открывать плеер при запуске",
+  "settingsOpenPlayerNote": "Выключено — трек играет в мини-плеере, полный плеер открывается тапом по нему",
   "trackUnknownArtist": "Неизвестный исполнитель",
   "badgeExplicit": "18+",
   "badgeAi": "ИИ",
@@ -751,6 +755,14 @@
   "downloadsLimit": "Лимит места",
   "downloadsLimitNote": "При достижении очередь останавливается, файлы не удаляются.",
   "downloadsUnlimited": "Без лимита",
+  "sizeBytes": "{value} Б",
+  "@sizeBytes": {"placeholders": {"value": {"type": "String"}}},
+  "sizeKb": "{value} КБ",
+  "@sizeKb": {"placeholders": {"value": {"type": "String"}}},
+  "sizeMb": "{value} МБ",
+  "@sizeMb": {"placeholders": {"value": {"type": "String"}}},
+  "sizeGb": "{value} ГБ",
+  "@sizeGb": {"placeholders": {"value": {"type": "String"}}},
   "downloadsGb": "{value} ГБ",
   "@downloadsGb": {
     "placeholders": {

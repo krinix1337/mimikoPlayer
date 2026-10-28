@@ -43,4 +43,7 @@ abstract interface class PlaybackController {
 
   /// Перечитать «любимое» текущего трека после изменения из UI.
   Future<void> refreshLikedState();
+
+  /// Дизлайк: убрать текущий трек из очереди и перейти к следующему.
+  Future<void> dropCurrent();
 }

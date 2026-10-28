@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -32,8 +30,15 @@ class HomeScreen extends ConsumerWidget {
     final title = ref.watch(waveStationTitleProvider);
     final stationTitle = title.isEmpty ? l.waveTitle : title;
     final station = ref.watch(stationProvider);
+    final waveSoundCloud = ref.watch(
+      prefsProvider.select((p) => p.waveSoundCloud),
+    );
     final modeLabel = station == WaveStationIds.myVibe
-        ? waveModeLabel(ref.watch(waveSettingsProvider).value, l)
+        ? waveModeLabel(
+            ref.watch(waveSettingsProvider).value,
+            l,
+            soundCloud: waveSoundCloud,
+          )
         : null;
     // Что играет и откуда: «Любимое», артист, плейлист. Для волны эту роль
     // играет modeLabel, поэтому её заголовок не перекрываем.
@@ -183,6 +188,7 @@ class HomeScreen extends ConsumerWidget {
   ) async {
     final source = ref.read(yandexSourceProvider);
     if (source == null) return;
+    await ref.read(prefsProvider.notifier).setWaveSoundCloud(false);
     final ok = await source.station.saveSettings(
       WaveStationIds.myVibe,
       const WaveSettings(),
@@ -558,8 +564,8 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
   );
 
   /// Стартуем в середине ленты: первый свайп назад не должен упираться в край.
-  /// Кратно числу режимов: 5500 % 11 == 0, поэтому в центре «Обычная волна».
-  static const int _ring = 5500;
+  /// Кратно числу режимов: 5400 % 12 == 0, поэтому в центре «Обычная волна».
+  static const int _ring = 5400;
 
   @override
   void initState() {
@@ -582,6 +588,15 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
       icon: Icons.restart_alt_rounded,
       color: const Color(0xFF8E8E93),
       settings: const WaveSettings(),
+    ),
+    // Обычная волна с подмешанными треками SoundCloud — режим колеса, а не
+    // отдельный переключатель: выбирается и сбрасывается как остальные.
+    _WaveModeOption(
+      label: l.waveModeSoundCloud,
+      icon: Icons.cloud_rounded,
+      color: const Color(0xFFFF5500),
+      settings: const WaveSettings(),
+      soundCloud: true,
     ),
     _WaveModeOption(
       label: l.diversityFavorite,
@@ -697,32 +712,6 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 10),
-            Material(
-              color: theme.colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(20),
-              clipBehavior: Clip.antiAlias,
-              child: SwitchListTile.adaptive(
-                value: ref.watch(
-                  prefsProvider.select((p) => p.waveSoundCloud),
-                ),
-                onChanged: (value) {
-                  ref
-                      .read(prefsProvider.notifier)
-                      .setWaveSoundCloud(value);
-                  ref.invalidate(waveTracksProvider);
-                },
-                secondary: CircleAvatar(
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  child: Icon(
-                    Icons.cloud_rounded,
-                    color: theme.colorScheme.onPrimaryContainer,
-                  ),
-                ),
-                title: Text(l.waveSoundCloudTitle),
-                subtitle: Text(l.waveSoundCloudNote),
-              ),
-            ),
             if (_note != null) ...[
               const SizedBox(height: 8),
               Text(_note!, style: theme.textTheme.bodySmall),
@@ -779,6 +768,10 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
       });
       return;
     }
+    await ref
+        .read(prefsProvider.notifier)
+        .setWaveSoundCloud(option.soundCloud);
+    if (!mounted) return;
     ref.read(stationProvider.notifier).select(WaveStationIds.myVibe);
     ref.invalidate(waveSettingsProvider);
     ref.invalidate(waveTracksProvider);
@@ -799,12 +792,14 @@ class _WaveModeOption {
     required this.icon,
     required this.color,
     required this.settings,
+    this.soundCloud = false,
   });
 
   final String label;
   final IconData icon;
   final Color color;
   final WaveSettings settings;
+  final bool soundCloud;
 }
 
 class _ModeCard extends StatelessWidget {
@@ -831,23 +826,14 @@ class _ModeCard extends StatelessWidget {
             ? (controller.page ?? controller.initialPage.toDouble())
             : controller.initialPage.toDouble();
         final delta = (page - index).abs();
-        // Крайние карточки (1-я и 5-я) уходят в мягкое размытие: это намёк,
-        // что колесо продолжается в обе стороны.
-        final blur = (delta - 1).clamp(0.0, 1.0) * 2.6;
+        // Крайние карточки гаснут сильнее: намёк, что колесо продолжается.
+        // Живое размытие было здесь же, но на каждом кадре свайпа оно
+        // пересчитывалось для пяти карточек — 65% кадров не успевали.
         return Transform.scale(
           scale: 1 - 0.08 * delta.clamp(0.0, 2.0),
           child: Opacity(
-            opacity: (1 - 0.16 * delta).clamp(0.35, 1.0),
-            child: blur == 0
-                ? child
-                : ImageFiltered(
-                    imageFilter: ui.ImageFilter.blur(
-                      sigmaX: blur,
-                      sigmaY: blur,
-                      tileMode: TileMode.decal,
-                    ),
-                    child: child,
-                  ),
+            opacity: (1 - 0.22 * delta).clamp(0.25, 1.0),
+            child: child,
           ),
         );
       },
@@ -867,13 +853,6 @@ class _ModeCard extends StatelessWidget {
               ],
             ),
             border: Border.all(color: option.color.withValues(alpha: 0.45)),
-            boxShadow: [
-              BoxShadow(
-                color: option.color.withValues(alpha: 0.18),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

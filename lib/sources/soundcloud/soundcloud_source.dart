@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../../core/constants.dart';
+import '../../core/identity/normalizer.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/sources/music_source.dart';
 import '../../core/sources/source_dto.dart';
@@ -70,6 +71,81 @@ class SoundCloudSource implements MusicSource {
     } on Object catch (error) {
       AppLogger.instance.warn('soundcloud search "$needle": $error');
       return SearchResult(tracks: const [], page: page);
+    }
+  }
+
+  /// Волна целиком из SoundCloud: от каждого затравочного трека берём
+  /// похожие и раскладываем ветки по очереди, чтобы подряд не шёл один
+  /// исполнитель. Превью, блок, зашифрованный HLS и короткие отрывки отсеяны.
+  Future<List<SourceTrack>> radio({
+    required List<String> seedIds,
+    int target = 20,
+    Set<String> excludeSongs = const {},
+  }) async {
+    if (seedIds.isEmpty) return const [];
+    final branches = await Future.wait([
+      for (final seed in seedIds.take(4)) _related(seed),
+    ]);
+    final seen = <String>{...seedIds};
+    // На SoundCloud одну песню перезаливают разные аккаунты: другой id,
+    // свой список артистов и пара секунд разницы. Сравниваем по названию
+    // и любому из исполнителей — и с тем, что уже стоит в очереди.
+    final songs = <String>{...excludeSongs};
+    bool isNewSong(SourceTrack track) {
+      final keys = songKeys(track.title, track.artists);
+      if (keys.any(songs.contains)) return false;
+      songs.addAll(keys);
+      return true;
+    }
+
+    final result = <SourceTrack>[];
+    final longest = branches.fold(
+      0,
+      (max, b) => b.length > max ? b.length : max,
+    );
+    for (var i = 0; i < longest && result.length < target; i++) {
+      for (final branch in branches) {
+        if (i >= branch.length || result.length >= target) continue;
+        final track = branch[i];
+        if (!track.available || track.duration.inSeconds < 60) continue;
+        if (!seen.add(track.ref.remoteId)) continue;
+        if (!isNewSong(track)) continue;
+        result.add(track);
+      }
+    }
+    return result;
+  }
+
+  /// Ключи «название|исполнитель» для отсева перезаливов в [radio].
+  static List<String> songKeys(String title, List<String> artists) {
+    final normalized = normalizeTitle(title);
+    return [
+      for (final artist in artists) '$normalized|${normalizeArtist(artist)}',
+    ];
+  }
+
+  /// Затравка для [radio]: первый играбельный трек по запросу (обычно имя
+  /// исполнителя из волны Яндекса — так SoundCloud-волна сохраняет вкус).
+  Future<String?> seedFor(String query) async {
+    final found = await search(query, pageSize: 10);
+    for (final track in found.tracks) {
+      if (track.available && track.duration.inSeconds >= 60) {
+        return track.ref.remoteId;
+      }
+    }
+    return null;
+  }
+
+  Future<List<SourceTrack>> _related(String remoteId) async {
+    try {
+      final reply = await _api.related(remoteId);
+      if (reply.failure case final failure?) {
+        AppLogger.instance.warn('soundcloud related: ${failure.message}');
+      }
+      return SoundCloudDto.searchTracks(reply.asMap);
+    } on Object catch (error) {
+      AppLogger.instance.warn('soundcloud related $remoteId: $error');
+      return const [];
     }
   }
 

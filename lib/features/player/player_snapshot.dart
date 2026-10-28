@@ -93,6 +93,7 @@ final class PlayerSnapshot {
     PlayerIssue? issue,
     bool clearIssue = false,
     bool clearCurrent = false,
+    bool clearSource = false,
     bool? isRadio,
     bool? liked,
     bool? disliked,
@@ -108,8 +109,8 @@ final class PlayerSnapshot {
     duration: duration ?? this.duration,
     repeat: repeat ?? this.repeat,
     shuffle: shuffle ?? this.shuffle,
-    usedSource: usedSource ?? this.usedSource,
-    quality: quality ?? this.quality,
+    usedSource: clearSource ? null : (usedSource ?? this.usedSource),
+    quality: clearSource ? null : (quality ?? this.quality),
     uncensored: uncensored ?? this.uncensored,
     resolving: resolving ?? this.resolving,
     issue: clearIssue ? null : (issue ?? this.issue),
@@ -154,7 +155,7 @@ final class PlayerIssue {
   final bool needsUserAction;
 
   String get headline {
-    if (needsUserAction) {
+    if (needsUserAction && failures.isNotEmpty) {
       final auth = failures.firstWhere(
         (f) =>
             f.reason == SourceFailReason.authRequired ||

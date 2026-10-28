@@ -15,6 +15,7 @@ import '../../../widgets/chart_rank_cover.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/remote_track_actions.dart';
 import '../../../widgets/track_cover.dart';
+import '../../../widgets/two_line_title.dart';
 
 /// «Что послушать» — обзорный раздел как вторая вкладка Яндекса: волна,
 /// чарт, новинки, станции и артисты. Только реальные данные каталога.
@@ -163,10 +164,8 @@ class _NewReleasesSection extends ConsumerWidget {
                     children: [
                       TrackCover(url: album.coverUrl, size: 136),
                       const SizedBox(height: 6),
-                      Text(
+                      TwoLineTitle(
                         album.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       Text(
@@ -414,10 +413,8 @@ class _AlbumGridCard extends StatelessWidget {
             children: [
               TrackCover(url: album.coverUrl, size: size),
               const SizedBox(height: 6),
-              Text(
+              TwoLineTitle(
                 album.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleSmall,
               ),
               Text(
@@ -492,5 +489,5 @@ Future<void> _play(
         startIndex: index,
         sourceHint: {'kind': kind, 'title': ?title},
       );
-  if (context.mounted) openPlayer(context);
+  if (context.mounted) openPlayerAfterPlay(GoRouter.of(context));
 }

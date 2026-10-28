@@ -198,6 +198,9 @@ class PrefsController extends Notifier<Prefs> {
   Future<void> setShowDjInfo(bool value) =>
       _write(state.copyWith(showDjInfo: value));
 
+  Future<void> setOpenPlayerOnPlay(bool value) =>
+      _write(state.copyWith(openPlayerOnPlay: value));
+
   Future<void> setAutoDownloadLikes(bool value) =>
       _write(state.copyWith(autoDownloadLikes: value));
 

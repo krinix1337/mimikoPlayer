@@ -73,9 +73,14 @@ class YandexStation {
         body: settingsBody(settings),
       )).isOk;
 
-  Future<List<SourceTrack>> wave({String station = defaultStation}) async {
+  /// [queue] — id последнего трека в очереди: ротор отдаёт продолжение
+  /// после него, а не стартовую пачку заново.
+  Future<List<SourceTrack>> wave({
+    String station = defaultStation,
+    String? queue,
+  }) async {
     final result = await _api.get('/rotor/station/$station/tracks', {
-      'queue': '1',
+      'queue': queue ?? '1',
     });
     if (!result.isOk) return const [];
 
@@ -96,9 +101,10 @@ class YandexStation {
     String station = defaultStation,
     int batches = 4,
     int target = 20,
+    String? queue,
   }) async {
     final parts = await Future.wait([
-      for (var i = 0; i < batches; i++) wave(station: station),
+      for (var i = 0; i < batches; i++) wave(station: station, queue: queue),
     ]);
     final seen = <String>{};
     final tracks = <SourceTrack>[];
