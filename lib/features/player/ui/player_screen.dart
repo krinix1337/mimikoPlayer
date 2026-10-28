@@ -54,9 +54,51 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   String? _lastTrackId;
   int _lastIndex = -1;
 
+  /// Насколько плеер утащен вниз пальцем: свайп вниз сворачивает его, не
+  /// заставляя тянуться к стрелке в верхнем углу.
+  double _dismiss = 0;
+  late final AnimationController _dismissAnim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+  );
+  double _dismissFrom = 0;
+  double _dismissTo = 0;
+  bool _closing = false;
+
+  Future<void> _animateDismissTo(double target) {
+    _dismissFrom = _dismiss;
+    _dismissTo = target;
+    return _dismissAnim.forward(from: 0);
+  }
+
+  void _onDismissEnd(DragEndDetails details, double height) {
+    if (_closing) return;
+    final velocity = details.primaryVelocity ?? 0;
+    if (_dismiss > height * 0.22 || velocity > 900) {
+      _closing = true;
+      // Доезжаем до низа и только потом закрываем маршрут: иначе обратный
+      // переход стартовал бы с исходной позиции и страница прыгала вверх.
+      unawaited(
+        _animateDismissTo(height).then((_) {
+          if (mounted) Navigator.of(context).maybePop();
+        }),
+      );
+    } else {
+      unawaited(_animateDismissTo(0));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _dismissAnim.addListener(() {
+      final value = Curves.easeOutCubic.transform(_dismissAnim.value);
+      if (mounted) {
+        setState(
+          () => _dismiss = _dismissFrom + (_dismissTo - _dismissFrom) * value,
+        );
+      }
+    });
     _settle.addListener(() {
       final value = Curves.easeOutCubic.transform(_settle.value);
       if (mounted) {
@@ -67,6 +109,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   @override
   void dispose() {
+    _dismissAnim.dispose();
     _settle.dispose();
     super.dispose();
   }
@@ -109,6 +152,52 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       });
     }
 
+    final height = MediaQuery.sizeOf(context).height;
+    final pulled = (_dismiss / height).clamp(0.0, 1.0);
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onVerticalDragStart: (_) {
+        if (!_closing) _dismissAnim.stop();
+      },
+      onVerticalDragUpdate: (details) {
+        if (_closing) return;
+        setState(
+          () => _dismiss = (_dismiss + details.delta.dy).clamp(0, height),
+        );
+      },
+      onVerticalDragEnd: (details) => _onDismissEnd(details, height),
+      onVerticalDragCancel: () {
+        if (!_closing) unawaited(_animateDismissTo(0));
+      },
+      child: Transform.translate(
+        offset: Offset(0, _dismiss),
+        child: ClipRRect(
+          // Пока тянем, у страницы появляются скруглённые углы — видно, что
+          // это лист, который уезжает вниз.
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(32 * (pulled * 4).clamp(0, 1)),
+          ),
+          child: _scaffold(
+            context,
+            current,
+            snapshot,
+            place,
+            nextCover,
+            prevCover,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _scaffold(
+    BuildContext context,
+    NowPlaying? current,
+    (NowPlaying?, bool) snapshot,
+    (List<String>, int) place,
+    String? nextCover,
+    String? prevCover,
+  ) {
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
@@ -696,10 +785,8 @@ class _Controls extends ConsumerWidget {
     final services = ref.read(appServicesProvider);
     final downloader = ref.read(downloadControllerProvider.notifier);
     final controller = ref.read(playbackControllerProvider);
-    final synced = await LibraryActions(services).setFeedback(
-      current.localTrackId,
-      next,
-    );
+    final synced = await LibraryActions(services)
+        .setFeedback(current.localTrackId, next);
     if (next == 1) {
       await downloader.trackLiked(current.localTrackId);
     }
@@ -904,14 +991,13 @@ class _IssueBanner extends StatelessWidget {
   }
 }
 
-Future<void> showQueueSheet(BuildContext context) =>
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
-      builder: (context) => const _QueueSheet(),
-    );
+Future<void> showQueueSheet(BuildContext context) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+  builder: (context) => const _QueueSheet(),
+);
 
 class _QueueSheet extends ConsumerWidget {
   const _QueueSheet();
@@ -970,9 +1056,7 @@ class _QueueSheet extends ConsumerWidget {
               onTap: () {
                 // Позиция, а не id: у повтора в плейлисте одна и та же строка
                 // стоит несколько раз, и поиск по id прыгал всегда на первую.
-                ref
-                    .read(playbackControllerProvider)
-                    .skipToIndex(position);
+                ref.read(playbackControllerProvider).skipToIndex(position);
                 Navigator.of(context).pop();
               },
             );
@@ -1025,9 +1109,8 @@ class _QueueHeader extends StatelessWidget {
               if (count != null)
                 Text(
                   '$count',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: scheme.onSurfaceVariant),
                 ),
             ],
           ),
