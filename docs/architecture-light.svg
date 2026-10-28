@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="340" viewBox="0 0 1280 340" font-family="'Segoe UI', Inter, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#9AA0A6"/>
+    </marker>
+  </defs>
+
+  <rect width="1280" height="340" rx="28" fill="#F4F6EE"/>
+
+  <g fill="none" stroke="#9AA0A6" stroke-width="2" marker-end="url(#arrow)">
+    <path d="M224 82 C262 82 262 170 296 170"/>
+    <path d="M224 170 L296 170"/>
+    <path d="M224 258 C262 258 262 170 296 170"/>
+    <path d="M488 170 L548 170"/>
+    <path d="M760 170 L820 170"/>
+    <path d="M1032 170 C1062 170 1062 112 1088 112"/>
+    <path d="M1032 170 C1062 170 1062 228 1088 228"/>
+  </g>
+
+  <g font-size="17" font-weight="600" text-anchor="middle" fill="#16181C">
+    <!-- Источники -->
+    <rect x="40" y="56" width="184" height="52" rx="14" fill="#FFFFFF" stroke="#DDE1D3"/>
+    <text x="132" y="88">Яндекс Музыка</text>
+    <rect x="40" y="144" width="184" height="52" rx="14" fill="#FFFFFF" stroke="#DDE1D3"/>
+    <text x="132" y="176">SoundCloud</text>
+    <rect x="40" y="232" width="184" height="52" rx="14" fill="#FFFFFF" stroke="#DDE1D3"/>
+    <text x="132" y="264">Свои файлы</text>
+
+    <!-- Конвейер -->
+    <rect x="296" y="134" width="192" height="72" rx="16" fill="#FFFFFF" stroke="#DDE1D3"/>
+    <text x="392" y="166">MusicSource</text>
+    <rect x="548" y="134" width="212" height="72" rx="16" fill="#EEF6CF" stroke="#7FA000"/>
+    <text x="654" y="166" fill="#5E7A00">StreamResolver</text>
+    <rect x="820" y="134" width="212" height="72" rx="16" fill="#FFFFFF" stroke="#DDE1D3"/>
+    <text x="926" y="166">PlaybackController</text>
+
+    <!-- Выход -->
+    <rect x="1088" y="86" width="160" height="52" rx="14" fill="#FFFFFF" stroke="#DDE1D3"/>
+    <text x="1168" y="118">just_audio</text>
+    <rect x="1088" y="202" width="160" height="52" rx="14" fill="#FFFFFF" stroke="#DDE1D3"/>
+    <text x="1168" y="234">Экраны</text>
+  </g>
+
+  <g font-size="13" text-anchor="middle" fill="#646A72">
+    <text x="392" y="190">поиск · метаданные · поток</text>
+    <text x="654" y="190">кэш · запасной источник</text>
+    <text x="926" y="190">очередь · волна · история</text>
+  </g>
+
+  <g font-size="13" font-weight="700" letter-spacing="1.5" fill="#9AA0A6">
+    <text x="40" y="36">ИСТОЧНИКИ</text>
+    <text x="296" y="36">КАК ТРЕК ДОХОДИТ ДО ДИНАМИКА</text>
+  </g>
+</svg>

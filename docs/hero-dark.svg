@@ -1,53 +1,80 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-label="mimikoPlayer — музыкальный плеер для Android">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" font-family="'Segoe UI', Inter, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0B0C0F"/>
-      <stop offset="0.55" stop-color="#12151B"/>
-      <stop offset="1" stop-color="#1B1F2A"/>
+      <stop offset="0" stop-color="#16181C"/>
+      <stop offset="1" stop-color="#0D0E10"/>
     </linearGradient>
-    <radialGradient id="glow" cx="0.83" cy="0.42" r="0.55">
-      <stop offset="0" stop-color="#D8F544" stop-opacity="0.20"/>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#D8F544" stop-opacity="0.32"/>
       <stop offset="1" stop-color="#D8F544" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="play" x1="0" y1="0" x2="0.8" y2="1">
-      <stop offset="0" stop-color="#EAFF6A"/>
-      <stop offset="1" stop-color="#C4E036"/>
+    <radialGradient id="glow2" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8B7CF6" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#8B7CF6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cover" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8B7CF6"/>
+      <stop offset="0.55" stop-color="#E86A92"/>
+      <stop offset="1" stop-color="#F3B33D"/>
     </linearGradient>
+    <clipPath id="frame"><rect width="1280" height="420" rx="28"/></clipPath>
   </defs>
-  <rect width="1280" height="360" rx="32" fill="url(#bg)"/>
-  <rect width="1280" height="360" rx="32" fill="url(#glow)"/>
-  <g fill="none" stroke="#D8F544">
-    <circle cx="1094" cy="180" r="158" stroke-opacity="0.10"/>
-    <circle cx="1094" cy="180" r="124" stroke-opacity="0.16"/>
-    <circle cx="1094" cy="180" r="94" stroke-opacity="0.26"/>
-  </g>
-  <g transform="rotate(-9 1094 180)">
-    <rect x="1012" y="98" width="164" height="164" rx="56" fill="#D8F544" fill-opacity="0.08"/>
-  </g>
-  <circle cx="1094" cy="180" r="62" fill="url(#play)"/>
-  <path d="M1082 154l34 26-34 26z" fill="#10130A"/>
-  <g fill="#D8F544">
-    <circle cx="1236" cy="76" r="7" opacity="0.85"/>
-    <circle cx="968" cy="292" r="5" opacity="0.55"/>
-    <rect x="1212" y="268" width="14" height="14" rx="4" opacity="0.45"/>
-  </g>
-  <g font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif">
-    <rect x="72" y="56" width="318" height="38" rx="19" fill="#F2F3F5" fill-opacity="0.06" stroke="#F2F3F5" stroke-opacity="0.12"/>
-    <circle cx="94" cy="75" r="4" fill="#D8F544"/>
-    <text x="108" y="80" font-size="12.5" font-weight="600" letter-spacing="2.6" fill="#A9AFBB">ANDROID · MATERIAL 3 EXPRESSIVE</text>
-    <text x="70" y="198" font-size="78" font-weight="800" letter-spacing="-3">
-      <tspan fill="#F2F3F5">mimiko</tspan><tspan fill="#D8F544">Player</tspan>
-    </text>
-    <text x="74" y="242" font-size="22" fill="#A9AFBB">Яндекс Музыка, своя волна, коллекция и караоке — в одном плеере.</text>
-    <g fill="none" stroke="#F2F3F5" stroke-opacity="0.13">
-      <rect x="72" y="272" width="128" height="34" rx="17"/>
-      <rect x="212" y="272" width="146" height="34" rx="17"/>
-      <rect x="370" y="272" width="106" height="34" rx="17"/>
+
+  <g clip-path="url(#frame)">
+    <rect width="1280" height="420" fill="url(#bg)"/>
+    <circle cx="1010" cy="200" r="300" fill="url(#glow)"/>
+    <circle cx="760" cy="460" r="260" fill="url(#glow2)"/>
+    <rect x="0.5" y="0.5" width="1279" height="419" rx="28" fill="none" stroke="#262A30"/>
+
+    <!-- Текст -->
+    <rect x="64" y="64" width="306" height="34" rx="17" fill="#1E2126" stroke="#2C3036"/>
+    <circle cx="86" cy="81" r="5" fill="#D8F544"/>
+    <text x="102" y="86" font-size="13" font-weight="700" letter-spacing="2" fill="#9BA0A8">ANDROID · MATERIAL 3 · v1.3.2</text>
+
+    <text x="60" y="200" font-size="92" font-weight="800" letter-spacing="-3" fill="#F4F5F0">mimiko<tspan fill="#D8F544">Player</tspan></text>
+    <text x="64" y="248" font-size="24" fill="#C9CCC4">Яндекс Музыка, SoundCloud и свои файлы —</text>
+    <text x="64" y="282" font-size="24" fill="#C9CCC4">в одном плеере.</text>
+
+    <g font-size="15" font-weight="600" fill="#C9CCC4">
+      <rect x="64" y="318" width="132" height="38" rx="19" fill="#1E2126" stroke="#2C3036"/>
+      <text x="130" y="342" text-anchor="middle">Android 8.0+</text>
+      <rect x="208" y="318" width="100" height="38" rx="19" fill="#1E2126" stroke="#2C3036"/>
+      <text x="258" y="342" text-anchor="middle">RU / EN</text>
+      <rect x="320" y="318" width="112" height="38" rx="19" fill="#1E2126" stroke="#2C3036"/>
+      <text x="376" y="342" text-anchor="middle">Офлайн</text>
+      <rect x="444" y="318" width="120" height="38" rx="19" fill="#1E2126" stroke="#2C3036"/>
+      <text x="504" y="342" text-anchor="middle">191 тест</text>
     </g>
-    <g font-size="13" fill="#A9AFBB">
-      <text x="90" y="294">Android 8.0+</text>
-      <text x="230" y="294">RU / EN</text>
-      <text x="388" y="294">98 тестов</text>
+
+    <!-- Карточка «Сейчас играет» -->
+    <g transform="translate(830 52)">
+      <rect width="330" height="316" rx="26" fill="#17191D" stroke="#2C3036"/>
+      <rect x="24" y="24" width="282" height="150" rx="18" fill="url(#cover)"/>
+      <g fill="#FFFFFF" fill-opacity="0.9">
+        <rect x="130" y="80" width="8" height="38" rx="4"/>
+        <rect x="146" y="64" width="8" height="70" rx="4"/>
+        <rect x="162" y="74" width="8" height="50" rx="4"/>
+        <rect x="178" y="86" width="8" height="26" rx="4"/>
+        <rect x="114" y="90" width="8" height="18" rx="4"/>
+      </g>
+      <text x="24" y="210" font-size="20" font-weight="700" fill="#F4F5F0">Моя волна</text>
+      <text x="24" y="234" font-size="14" fill="#9BA0A8">Яндекс · SoundCloud</text>
+      <rect x="24" y="252" width="282" height="5" rx="2.5" fill="#2C3036"/>
+      <rect x="24" y="252" width="118" height="5" rx="2.5" fill="#D8F544"/>
+      <circle cx="142" cy="254.5" r="7" fill="#D8F544"/>
+      <g fill="#9BA0A8">
+        <path d="M96 282 l-12 8 l12 8 z"/>
+        <rect x="80" y="282" width="3" height="16" rx="1"/>
+        <path d="M234 282 l12 8 l-12 8 z"/>
+        <rect x="247" y="282" width="3" height="16" rx="1"/>
+      </g>
+      <circle cx="165" cy="290" r="22" fill="#D8F544"/>
+      <rect x="157" y="281" width="5" height="18" rx="1.5" fill="#14160A"/>
+      <rect x="168" y="281" width="5" height="18" rx="1.5" fill="#14160A"/>
     </g>
+
+    <circle cx="1214" cy="74" r="6" fill="#D8F544"/>
+    <circle cx="790" cy="350" r="4" fill="#8B7CF6"/>
+    <rect x="1200" y="342" width="10" height="10" rx="2" fill="#2C3036"/>
   </g>
 </svg>

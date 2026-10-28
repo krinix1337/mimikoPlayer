@@ -37,7 +37,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/features-dark.svg">
-  <img src="docs/features-light.svg" width="100%" alt="Волна, коллекция, плеер, караоке, источники и Material 3">
+  <img src="docs/features-light.svg" width="100%" alt="Моя волна, плеер, коллекция, караоке, источники и оформление">
 </picture>
 
 <table>
@@ -169,16 +169,10 @@
 
 Каждый источник — модуль за общим интерфейсом. Если источник не может отдать трек, резолвер идёт к следующему по приоритету, а экраны не знают, откуда пришла музыка.
 
-```mermaid
-flowchart LR
-    Y[Яндекс Музыка] --> S[MusicSource]
-    SC[SoundCloud] --> S
-    L[Локальные файлы] --> S
-    S --> R[StreamResolver<br/><sub>кэш и fallback</sub>]
-    R --> P[PlaybackController]
-    P --> J[just_audio · media3]
-    P --> UI[Экраны Flutter]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture-dark.svg">
+  <img src="docs/architecture-light.svg" width="100%" alt="Яндекс Музыка, SoundCloud и свои файлы → MusicSource → StreamResolver → PlaybackController → just_audio и экраны">
+</picture>
 
 <details>
 <summary><b>Структура проекта</b></summary>
@@ -198,11 +192,6 @@ lib/
 ```
 
 </details>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/tokens-dark.svg">
-  <img src="docs/tokens-light.svg" width="100%" alt="Токены Material 3: палитра, типографика, формы и движение">
-</picture>
 
 | Слой | Технологии |
 |---|---|
