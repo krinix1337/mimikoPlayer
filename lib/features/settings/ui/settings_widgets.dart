@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../app_providers.dart';
+import '../../../core/content/artist_blocklist.dart';
 import '../../../core/db/daos/downloads_dao.dart';
 import '../../../core/prefs/prefs.dart';
 import '../../../core/platform/mimiko_platform.dart';
@@ -843,16 +844,108 @@ class _ReorderListState extends State<_ReorderList> {
       });
       await widget.onReorder(List.of(_items));
     },
-    itemBuilder: (context, index) => ReorderableDragStartListener(
+    // Перетаскивание только за значок слева: когда слушатель стоял на всей
+    // строке, палец при прокрутке страницы легко цеплял источник и двигал его.
+    itemBuilder: (context, index) => ListTile(
       key: ValueKey(_items[index]),
-      index: index,
-      child: ListTile(
-        leading: const Icon(Icons.drag_handle_rounded),
-        title: Text(widget.labelFor(_items[index])),
-        subtitle: Text(widget.roleFor(_items[index])),
+      leading: ReorderableDragStartListener(
+        index: index,
+        child: const Padding(
+          padding: EdgeInsets.all(8),
+          child: Icon(Icons.drag_handle_rounded),
+        ),
       ),
+      title: Text(widget.labelFor(_items[index])),
+      subtitle: Text(widget.roleFor(_items[index])),
     ),
   );
+}
+
+/// Список исполнителей, которых попросили не рекомендовать: отсюда же их
+/// можно вернуть.
+class BlockedArtistsTile extends ConsumerWidget {
+  const BlockedArtistsTile({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    return ListenableBuilder(
+      listenable: ArtistBlocklist.instance,
+      builder: (context, _) => ListTile(
+        leading: const Icon(Icons.block_rounded),
+        title: Text(l.settingsBlockedArtists),
+        subtitle: Text(
+          l.settingsBlockedArtistsCount(ArtistBlocklist.instance.length),
+        ),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          showDragHandle: true,
+          isScrollControlled: true,
+          useSafeArea: true,
+          builder: (_) => const _BlockedArtistsSheet(),
+        ),
+      ),
+    );
+  }
+}
+
+class _BlockedArtistsSheet extends ConsumerWidget {
+  const _BlockedArtistsSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final db = ref.read(appServicesProvider).db;
+    return ListenableBuilder(
+      listenable: ArtistBlocklist.instance,
+      builder: (context, _) {
+        final names = ArtistBlocklist.instance.names;
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(
+                  l.settingsBlockedArtists,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              if (names.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  child: Text(
+                    l.settingsBlockedArtistsEmpty,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: names.length,
+                    itemBuilder: (context, index) => ListTile(
+                      title: Text(names[index]),
+                      trailing: IconButton(
+                        tooltip: l.artistUnblock,
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () =>
+                            ArtistBlocklist.instance.unblock(db, names[index]),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class DownloadsTile extends ConsumerWidget {
@@ -975,7 +1068,6 @@ class DeleteDownloadsTile extends ConsumerWidget {
   }
 }
 
-
 class CacheTile extends ConsumerStatefulWidget {
   const CacheTile({super.key});
 
@@ -1032,7 +1124,6 @@ class _CacheTileState extends ConsumerState<CacheTile> {
     );
   }
 }
-
 
 class DatabaseTile extends ConsumerWidget {
   const DatabaseTile({super.key});

@@ -43,6 +43,22 @@ class HistoryDao {
     return row?.playedAt;
   }
 
+  /// Треки, которые действительно слушали (не пролистали в первые секунды):
+  /// волна не предлагает их снова сразу после запуска.
+  Future<Set<String>> recentlyHeardIds({int limit = 150}) async {
+    final rows =
+        await (_db.select(_db.history)
+              ..where(
+                (t) =>
+                    t.completed.equals(true) |
+                    t.playedMs.isBiggerOrEqualValue(20000),
+              )
+              ..orderBy([(t) => OrderingTerm.desc(t.playedAt)])
+              ..limit(limit))
+            .get();
+    return {for (final row in rows) row.localTrackId};
+  }
+
   Future<List<HistoryData>> recent({int limit = 100}) =>
       (_db.select(_db.history)
             ..orderBy([(t) => OrderingTerm.desc(t.playedAt)])

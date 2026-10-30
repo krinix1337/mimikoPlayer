@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:phoneyandex/widgets/sliver_bottom_inset.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app_providers.dart';
+import '../playlist_cover.dart';
 import '../../../core/db/daos/library_dao.dart';
 import '../../../core/platform/mimiko_platform.dart';
 import '../../../core/sources/source_dto.dart';
@@ -115,6 +117,7 @@ class CollectionKindScreen extends ConsumerWidget {
                 ),
               ),
             ],
+            const SliverBottomInset(),
           ],
         ),
       ),
@@ -599,31 +602,30 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen> {
                 hasScrollBody: false,
                 child: _ErrorBox(text: l.dbError('$error')),
               ),
-              AsyncData(:final value) when value.isEmpty =>
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(28),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            l.collectionEmptyPlaylists,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                          ),
-                          const SizedBox(height: 16),
-                          FilledButton.tonalIcon(
-                            onPressed: _create,
-                            icon: const Icon(Icons.add_rounded),
-                            label: Text(l.playlistCreate),
-                          ),
-                        ],
-                      ),
+              AsyncData(:final value) when value.isEmpty => SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(28),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          l.collectionEmptyPlaylists,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.tonalIcon(
+                          onPressed: _create,
+                          icon: const Icon(Icons.add_rounded),
+                          label: Text(l.playlistCreate),
+                        ),
+                      ],
                     ),
                   ),
                 ),
+              ),
               AsyncData(:final value) => SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                 sliver: SliverGrid(
@@ -636,9 +638,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen> {
                   delegate: SliverChildBuilderDelegate(
                     childCount: value.length,
                     (context, index) => RiseIn(
-                      delay: Duration(
-                        milliseconds: (index * 24).clamp(0, 200),
-                      ),
+                      delay: Duration(milliseconds: (index * 24).clamp(0, 200)),
                       child: _PlaylistCard(playlist: value[index]),
                     ),
                   ),
@@ -651,6 +651,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen> {
                 ),
               ),
             },
+            const SliverBottomInset(),
           ],
         ),
       ),
@@ -839,6 +840,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
                       sourceTitle: value.overview.title,
                     ),
                   ),
+                  const SliverBottomInset(),
                 ],
               ),
               Positioned(
@@ -855,6 +857,19 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
                         tooltip: l.collectionShare,
                         icon: const Icon(Icons.share_rounded),
                         onPressed: () => _share(context, ref, value.overview),
+                      ),
+                    IconButton(
+                      tooltip: l.playlistCoverChange,
+                      icon: const Icon(Icons.image_outlined),
+                      onPressed: () =>
+                          changePlaylistCover(context, ref, widget.playlistId),
+                    ),
+                    if (value.overview.source == 'local')
+                      IconButton(
+                        tooltip: l.playlistDeleteLocal,
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        onPressed: () =>
+                            _deleteLocal(context, ref, value.overview),
                       ),
                     IconButton(
                       tooltip: l.collectionDownloadAllLikes,
@@ -888,6 +903,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
             ),
           ),
           SliverFillRemaining(hasScrollBody: false, child: child),
+          const SliverBottomInset(),
         ],
       );
 
@@ -936,6 +952,42 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
       kind = raw;
     }
     return 'https://music.yandex.ru/users/$owner/playlists/$kind';
+  }
+
+  Future<void> _deleteLocal(
+    BuildContext context,
+    WidgetRef ref,
+    PlaylistOverview overview,
+  ) async {
+    final l = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l.playlistDeleteLocal),
+        content: Text(l.playlistDeleteConfirm(overview.title)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l.commonDelete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    await ref
+        .read(appServicesProvider)
+        .db
+        .libraryDao
+        .deleteLocalPlaylist(overview.id);
+    ref.invalidate(playlistsProvider);
+    if (!context.mounted) return;
+    Navigator.of(context).maybePop();
+    messenger.showSnackBar(SnackBar(content: Text(l.playlistDeleted)));
   }
 
   Future<void> _share(

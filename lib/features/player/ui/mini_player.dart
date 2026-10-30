@@ -233,3 +233,43 @@ class _MiniProgress extends ConsumerWidget {
     );
   }
 }
+
+/// Обёртка для страниц поверх вкладок (поиск, «Любимое», плейлисты): у них
+/// нет нижней панели, поэтому мини-плеер стоит у нижнего края. Раскладка
+/// одна и та же всегда — иначе при появлении клавиатуры страница
+/// пересоздавалась бы и теряла фокус в поле.
+class MiniPlayerHost extends ConsumerWidget {
+  const MiniPlayerHost({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(prefsProvider.select((p) => p.showMiniPlayer));
+    final hasTrack = ref.watch(
+      playerSnapshotProviderValue.select((s) => s.current != null),
+    );
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final visible = enabled && hasTrack && !keyboard;
+    final bottom = MediaQuery.viewPaddingOf(context).bottom;
+    return ColoredBox(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: Column(
+        children: [
+          Expanded(
+            // Нижний отступ системы берёт на себя пилюля, а не страница.
+            child: MediaQuery.removePadding(
+              context: context,
+              removeBottom: visible,
+              child: child,
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.only(bottom: visible ? bottom + 4 : 0),
+            child: MiniPlayer(hidden: !visible),
+          ),
+        ],
+      ),
+    );
+  }
+}

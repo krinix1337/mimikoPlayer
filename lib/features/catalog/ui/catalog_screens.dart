@@ -1,8 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:phoneyandex/widgets/sliver_bottom_inset.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/content/artist_blocklist.dart';
+import '../artist_block_action.dart';
 import '../../../app_providers.dart';
 import '../../../core/sources/source_dto.dart';
 import '../../../features/player/player_snapshot.dart';
@@ -119,12 +122,37 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen> {
                                 if (artist.trackCount != null)
                                   l.commonTrackCount(artist.trackCount!),
                                 if (artist.listeners != null)
-                                  l.artistListeners(_compact(artist.listeners!.toInt())),
+                                  l.artistListeners(
+                                    _compact(artist.listeners!.toInt()),
+                                  ),
                               ].join(' · '),
                               style: Theme.of(context).textTheme.bodySmall,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                          ),
+                          ListenableBuilder(
+                            listenable: ArtistBlocklist.instance,
+                            builder: (context, _) {
+                              final blocked = ArtistBlocklist.instance
+                                  .isBlockedName(artist.name);
+                              return IconButton(
+                                tooltip: blocked
+                                    ? l.artistUnblock
+                                    : l.artistBlock,
+                                isSelected: blocked,
+                                icon: const Icon(Icons.block_rounded),
+                                selectedIcon: Icon(
+                                  Icons.block_rounded,
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                                onPressed: () => toggleArtistBlock(
+                                  context,
+                                  ref,
+                                  artist.name,
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -199,6 +227,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen> {
                         ),
                       ),
                     ),
+                  const SliverBottomInset(),
                 ],
               ),
               Positioned(
@@ -421,6 +450,7 @@ class ArtistTracksScreen extends ConsumerWidget {
                     ),
                   ),
           ),
+          const SliverBottomInset(),
         ],
       ),
     );
@@ -484,6 +514,7 @@ class ArtistAlbumsScreen extends ConsumerWidget {
                     ),
                   ),
           ),
+          const SliverBottomInset(),
         ],
       ),
     );
@@ -670,6 +701,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen> {
                       title: value.title,
                     ),
                   ),
+                  const SliverBottomInset(),
                 ],
               ),
               Positioned(
@@ -908,6 +940,7 @@ class _ChartScreenState extends ConsumerState<ChartScreen> {
                   ),
                 ),
               ),
+              const SliverBottomInset(),
             ],
           ),
           Positioned(

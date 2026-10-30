@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,6 +7,7 @@ import '../app_providers.dart';
 import '../core/db/daos/library_dao.dart';
 import '../core/links/yandex_playlist_link.dart';
 import '../core/logging/log_screen.dart';
+import '../core/prefs/prefs.dart';
 import '../features/catalog/ui/catalog_screens.dart';
 import '../features/discover/ui/discover_screen.dart';
 import '../features/home/ui/home_screen.dart';
@@ -26,6 +28,9 @@ import 'routes.dart';
 import 'slide_up_route.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
+
+/// Вложенный навигатор оболочки: на нём лежат страницы настроек.
+final _shellKey = GlobalKey<NavigatorState>();
 
 /// Вкладки: маршрут и иконка. Подписи локализуются в сборке навигации.
 const _tabs = <({String path, IconData icon})>[
@@ -65,6 +70,7 @@ final appRouterProvider = GoRouter(
   },
   routes: [
     ShellRoute(
+      navigatorKey: _shellKey,
       builder: (context, state, child) => AppShell(child: child),
       routes: [
         GoRoute(
@@ -189,13 +195,14 @@ final appRouterProvider = GoRouter(
     GoRoute(
       path: Routes.search,
       parentNavigatorKey: _rootKey,
-      pageBuilder: (context, state) => slideUpPage(state, const SearchScreen()),
+      pageBuilder: (context, state) =>
+          slideUpPage(state, const MiniPlayerHost(child: SearchScreen())),
     ),
     GoRoute(
       path: Routes.newReleases,
       parentNavigatorKey: _rootKey,
       pageBuilder: (context, state) =>
-          slideUpPage(state, const NewReleasesScreen()),
+          slideUpPage(state, const MiniPlayerHost(child: NewReleasesScreen())),
     ),
     // Плеер и караоке — корневые маршруты, открываются через push():
     // оболочка остаётся внизу стека, поэтому панель исчезает, а свайп
@@ -253,11 +260,52 @@ class AppShell extends ConsumerWidget {
     // мини-плеер там всегда лишний — независимо от того, откуда играет трек.
     final isHome = location == Routes.home;
 
+    // Жест «назад» всегда обрабатывает Flutter, а не система: без этого на
+    // Android 16 свайп на вложенной странице (импорт, обновления) мог закрыть
+    // всё приложение. Есть что закрыть внутри оболочки — закрываем, иначе выход.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        final nested = _shellKey.currentState;
+        if (nested != null && nested.canPop()) {
+          nested.pop();
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: _shell(
+        context,
+        ref,
+        l,
+        prefs,
+        compact,
+        withLabels,
+        barHeight,
+        isHome,
+        index,
+        labels,
+      ),
+    );
+  }
+
+  Widget _shell(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l,
+    Prefs prefs,
+    bool compact,
+    bool withLabels,
+    double barHeight,
+    bool isHome,
+    int index,
+    List<String> labels,
+  ) {
     return Scaffold(
       // На волне фон должен уходить под плавающую навигацию. На остальных
       // вкладках тело заканчивается ровно у мини-плеера (или панели, если
       // плеера нет) — без пустого хвоста под списком.
-      extendBody: isHome,
+      extendBody: true,
       backgroundColor: isHome
           ? Colors.transparent
           : Theme.of(context).scaffoldBackgroundColor,

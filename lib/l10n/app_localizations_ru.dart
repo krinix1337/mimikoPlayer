@@ -471,6 +471,90 @@ class AppLocalizationsRu extends AppLocalizations {
   String get playerTitle => 'Сейчас играет';
 
   @override
+  String get settingsCrossfade => 'Кроссфейд';
+
+  @override
+  String get settingsCrossfadeNote =>
+      'Следующий трек начинается ещё до конца текущего и плавно сводится с ним. Не действует при ручном переключении и повторе одного трека.';
+
+  @override
+  String get crossfadeOff => 'Выкл';
+
+  @override
+  String crossfadeSecondsValue(int seconds) {
+    return '$seconds с';
+  }
+
+  @override
+  String get playlistTarget => 'Где создать';
+
+  @override
+  String get playlistTargetYandex => 'Яндекс Музыка';
+
+  @override
+  String get playlistTargetDevice => 'На устройстве';
+
+  @override
+  String get playlistDeviceNote =>
+      'Плейлист останется на этом телефоне — в него можно добавлять и файлы из памяти.';
+
+  @override
+  String get playlistCoverRemove => 'Убрать обложку';
+
+  @override
+  String get playlistCoverChange => 'Изменить обложку';
+
+  @override
+  String get playlistDeleteLocal => 'Удалить плейлист';
+
+  @override
+  String playlistDeleteConfirm(String title) {
+    return 'Удалить «$title»? Сами треки в приложении останутся.';
+  }
+
+  @override
+  String get playlistDeleted => 'Плейлист удалён';
+
+  @override
+  String get commonDelete => 'Удалить';
+
+  @override
+  String get artistBlock => 'Не рекомендовать исполнителя';
+
+  @override
+  String get artistUnblock => 'Снова рекомендовать исполнителя';
+
+  @override
+  String artistBlockedDone(String name) {
+    return '«$name» больше не будет попадаться';
+  }
+
+  @override
+  String artistUnblockedDone(String name) {
+    return '«$name» снова в рекомендациях';
+  }
+
+  @override
+  String get settingsBlockedArtists => 'Заблокированные исполнители';
+
+  @override
+  String get settingsBlockedArtistsEmpty =>
+      'Список пуст. Заблокировать исполнителя можно на его странице или в меню трека.';
+
+  @override
+  String settingsBlockedArtistsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count исполнителя',
+      many: '$count исполнителей',
+      few: '$count исполнителя',
+      one: '$count исполнитель',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String artistListeners(String count) {
     return '$count слушателей';
   }
@@ -1369,12 +1453,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get homeCoverLighter => 'Светлее';
 
   @override
-  String get djInfo => 'DJ-сведения';
-
-  @override
-  String get djInfoNote => 'BPM и тональность в сведениях о треке';
-
-  @override
   String get settingsOpenPlayer => 'Открывать плеер при запуске';
 
   @override
@@ -1437,22 +1515,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get detailsLocalId => 'Локальный ID';
-
-  @override
-  String get djBpm => 'BPM';
-
-  @override
-  String get djGain => 'Громкость';
-
-  @override
-  String get djKey => 'Тональность';
-
-  @override
-  String get djNoKey => 'Не указана';
-
-  @override
-  String get djSourceNote =>
-      'BPM и громкость — Deezer. Тональность можно указать вручную по Camelot.';
 
   @override
   String get downloadsPaused => 'На паузе';

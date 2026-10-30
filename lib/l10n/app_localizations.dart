@@ -920,6 +920,132 @@ abstract class AppLocalizations {
   /// **'Сейчас играет'**
   String get playerTitle;
 
+  /// No description provided for @settingsCrossfade.
+  ///
+  /// In ru, this message translates to:
+  /// **'Кроссфейд'**
+  String get settingsCrossfade;
+
+  /// No description provided for @settingsCrossfadeNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Следующий трек начинается ещё до конца текущего и плавно сводится с ним. Не действует при ручном переключении и повторе одного трека.'**
+  String get settingsCrossfadeNote;
+
+  /// No description provided for @crossfadeOff.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выкл'**
+  String get crossfadeOff;
+
+  /// No description provided for @crossfadeSecondsValue.
+  ///
+  /// In ru, this message translates to:
+  /// **'{seconds} с'**
+  String crossfadeSecondsValue(int seconds);
+
+  /// No description provided for @playlistTarget.
+  ///
+  /// In ru, this message translates to:
+  /// **'Где создать'**
+  String get playlistTarget;
+
+  /// No description provided for @playlistTargetYandex.
+  ///
+  /// In ru, this message translates to:
+  /// **'Яндекс Музыка'**
+  String get playlistTargetYandex;
+
+  /// No description provided for @playlistTargetDevice.
+  ///
+  /// In ru, this message translates to:
+  /// **'На устройстве'**
+  String get playlistTargetDevice;
+
+  /// No description provided for @playlistDeviceNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Плейлист останется на этом телефоне — в него можно добавлять и файлы из памяти.'**
+  String get playlistDeviceNote;
+
+  /// No description provided for @playlistCoverRemove.
+  ///
+  /// In ru, this message translates to:
+  /// **'Убрать обложку'**
+  String get playlistCoverRemove;
+
+  /// No description provided for @playlistCoverChange.
+  ///
+  /// In ru, this message translates to:
+  /// **'Изменить обложку'**
+  String get playlistCoverChange;
+
+  /// No description provided for @playlistDeleteLocal.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить плейлист'**
+  String get playlistDeleteLocal;
+
+  /// No description provided for @playlistDeleteConfirm.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить «{title}»? Сами треки в приложении останутся.'**
+  String playlistDeleteConfirm(String title);
+
+  /// No description provided for @playlistDeleted.
+  ///
+  /// In ru, this message translates to:
+  /// **'Плейлист удалён'**
+  String get playlistDeleted;
+
+  /// No description provided for @commonDelete.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить'**
+  String get commonDelete;
+
+  /// No description provided for @artistBlock.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не рекомендовать исполнителя'**
+  String get artistBlock;
+
+  /// No description provided for @artistUnblock.
+  ///
+  /// In ru, this message translates to:
+  /// **'Снова рекомендовать исполнителя'**
+  String get artistUnblock;
+
+  /// No description provided for @artistBlockedDone.
+  ///
+  /// In ru, this message translates to:
+  /// **'«{name}» больше не будет попадаться'**
+  String artistBlockedDone(String name);
+
+  /// No description provided for @artistUnblockedDone.
+  ///
+  /// In ru, this message translates to:
+  /// **'«{name}» снова в рекомендациях'**
+  String artistUnblockedDone(String name);
+
+  /// No description provided for @settingsBlockedArtists.
+  ///
+  /// In ru, this message translates to:
+  /// **'Заблокированные исполнители'**
+  String get settingsBlockedArtists;
+
+  /// No description provided for @settingsBlockedArtistsEmpty.
+  ///
+  /// In ru, this message translates to:
+  /// **'Список пуст. Заблокировать исполнителя можно на его странице или в меню трека.'**
+  String get settingsBlockedArtistsEmpty;
+
+  /// No description provided for @settingsBlockedArtistsCount.
+  ///
+  /// In ru, this message translates to:
+  /// **'{count, plural, one{{count} исполнитель} few{{count} исполнителя} many{{count} исполнителей} other{{count} исполнителя}}'**
+  String settingsBlockedArtistsCount(int count);
+
   /// No description provided for @artistListeners.
   ///
   /// In ru, this message translates to:
@@ -2582,18 +2708,6 @@ abstract class AppLocalizations {
   /// **'Светлее'**
   String get homeCoverLighter;
 
-  /// No description provided for @djInfo.
-  ///
-  /// In ru, this message translates to:
-  /// **'DJ-сведения'**
-  String get djInfo;
-
-  /// No description provided for @djInfoNote.
-  ///
-  /// In ru, this message translates to:
-  /// **'BPM и тональность в сведениях о треке'**
-  String get djInfoNote;
-
   /// No description provided for @settingsOpenPlayer.
   ///
   /// In ru, this message translates to:
@@ -2719,36 +2833,6 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Локальный ID'**
   String get detailsLocalId;
-
-  /// No description provided for @djBpm.
-  ///
-  /// In ru, this message translates to:
-  /// **'BPM'**
-  String get djBpm;
-
-  /// No description provided for @djGain.
-  ///
-  /// In ru, this message translates to:
-  /// **'Громкость'**
-  String get djGain;
-
-  /// No description provided for @djKey.
-  ///
-  /// In ru, this message translates to:
-  /// **'Тональность'**
-  String get djKey;
-
-  /// No description provided for @djNoKey.
-  ///
-  /// In ru, this message translates to:
-  /// **'Не указана'**
-  String get djNoKey;
-
-  /// No description provided for @djSourceNote.
-  ///
-  /// In ru, this message translates to:
-  /// **'BPM и громкость — Deezer. Тональность можно указать вручную по Camelot.'**
-  String get djSourceNote;
 
   /// No description provided for @downloadsPaused.
   ///

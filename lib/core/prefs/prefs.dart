@@ -21,6 +21,7 @@ final class Prefs {
     this.launcherIcon = LauncherIcon.defaultIcon,
     this.quality = 'auto',
     this.fade = true,
+    this.crossfadeSeconds = 6,
     this.lyricsSize = LyricsSize.normal,
     this.lyricsDimOthers = true,
     this.compactUi = true,
@@ -37,7 +38,6 @@ final class Prefs {
     this.blurBottom = 16,
     this.blurTop = 24,
     this.blurCover = 24,
-    this.showDjInfo = true,
     this.openPlayerOnPlay = false,
     this.autoDownloadLikes = false,
     this.autoDownloadWifiOnly = true,
@@ -64,6 +64,9 @@ final class Prefs {
 
   /// Плавное поднятие/опускание громкости при старте, паузе и смене трека.
   final bool fade;
+
+  /// Перекрытие конца трека началом следующего, секунды; 0 — выключено.
+  final int crossfadeSeconds;
 
   final bool waveOnWifiOnly;
 
@@ -105,9 +108,6 @@ final class Prefs {
   final double blurBottom;
   final double blurTop;
   final double blurCover;
-
-  /// Показывать BPM и тональность в сведениях о треке.
-  final bool showDjInfo;
 
   /// Открывать полный плеер при запуске трека из списка. По умолчанию
   /// выключено: играет мини-плеер, полный открывается тапом по нему.
@@ -165,6 +165,7 @@ final class Prefs {
     LauncherIcon? launcherIcon,
     String? quality,
     bool? fade,
+    int? crossfadeSeconds,
     bool? waveOnWifiOnly,
     bool? waveSoundCloud,
     LyricsSize? lyricsSize,
@@ -181,7 +182,6 @@ final class Prefs {
     double? blurBottom,
     double? blurTop,
     double? blurCover,
-    bool? showDjInfo,
     bool? openPlayerOnPlay,
     bool? autoDownloadLikes,
     bool? autoDownloadWifiOnly,
@@ -206,6 +206,7 @@ final class Prefs {
     launcherIcon: launcherIcon ?? this.launcherIcon,
     quality: quality ?? this.quality,
     fade: fade ?? this.fade,
+    crossfadeSeconds: crossfadeSeconds ?? this.crossfadeSeconds,
     waveOnWifiOnly: waveOnWifiOnly ?? this.waveOnWifiOnly,
     waveSoundCloud: waveSoundCloud ?? this.waveSoundCloud,
     lyricsSize: lyricsSize ?? this.lyricsSize,
@@ -222,7 +223,6 @@ final class Prefs {
     blurBottom: blurBottom ?? this.blurBottom,
     blurTop: blurTop ?? this.blurTop,
     blurCover: blurCover ?? this.blurCover,
-    showDjInfo: showDjInfo ?? this.showDjInfo,
     openPlayerOnPlay: openPlayerOnPlay ?? this.openPlayerOnPlay,
     autoDownloadLikes: autoDownloadLikes ?? this.autoDownloadLikes,
     autoDownloadWifiOnly: autoDownloadWifiOnly ?? this.autoDownloadWifiOnly,
@@ -251,6 +251,7 @@ final class Prefs {
     'launcher_icon': launcherIcon.component,
     'quality': quality,
     'fade': fade,
+    'crossfade_seconds': crossfadeSeconds,
     'wave_on_wifi_only': waveOnWifiOnly,
     'wave_soundcloud': waveSoundCloud,
     'lyrics_size': lyricsSize.name,
@@ -267,7 +268,6 @@ final class Prefs {
     'blur_bottom': blurBottom,
     'blur_top': blurTop,
     'blur_cover': blurCover,
-    'show_dj_info': showDjInfo,
     'open_player_on_play': openPlayerOnPlay,
     'auto_download_likes': autoDownloadLikes,
     'auto_download_wifi_only': autoDownloadWifiOnly,
@@ -323,6 +323,10 @@ final class Prefs {
       ),
       quality: json['quality'] is String ? json['quality']! as String : 'auto',
       fade: json['fade'] != false,
+      crossfadeSeconds: switch (json['crossfade_seconds']) {
+        final int value when value >= 0 && value <= 12 => value,
+        _ => 6,
+      },
       waveOnWifiOnly: json['wave_on_wifi_only'] == true,
       waveSoundCloud: json['wave_soundcloud'] == true,
       lyricsSize: required('lyrics_size', LyricsSize.values, LyricsSize.normal),
@@ -354,7 +358,6 @@ final class Prefs {
         final num value => value.toDouble().clamp(0.0, 40.0).toDouble(),
         _ => 24,
       },
-      showDjInfo: json['show_dj_info'] != false,
       openPlayerOnPlay: json['open_player_on_play'] == true,
       autoDownloadLikes: json['auto_download_likes'] == true,
       autoDownloadWifiOnly: json['auto_download_wifi_only'] != false,
@@ -465,10 +468,7 @@ enum LyricsSize {
 /// Иконка в лаунчере: `activity-alias` с этим компонентом включается,
 /// остальные отключаются. `defaultIcon` — основной `<activity>`.
 enum LauncherIcon {
-  defaultIcon(
-    'MimikoLauncherDefault',
-    'assets/icon/variants/default.png',
-  ),
+  defaultIcon('MimikoLauncherDefault', 'assets/icon/variants/default.png'),
   acid('MimikoLauncherAcid', 'assets/icon/variants/acid.png'),
   mono('MimikoLauncherMono', 'assets/icon/variants/mono.png'),
   night('MimikoLauncherNight', 'assets/icon/variants/night.png'),

@@ -25,7 +25,6 @@ void main() {
       launcherIcon: LauncherIcon.forest,
       searchHistory: ['queen', 'joji'],
       homeCoverTone: HomeCoverTone.darker,
-      showDjInfo: false,
       openPlayerOnPlay: true,
       autoDownloadLikes: true,
       autoDownloadWifiOnly: false,
@@ -55,7 +54,6 @@ void main() {
     expect(restored.censorBypass, isFalse);
     expect(restored.searchHistory, ['queen', 'joji']);
     expect(restored.homeCoverTone, HomeCoverTone.darker);
-    expect(restored.showDjInfo, isFalse);
     expect(restored.openPlayerOnPlay, isTrue);
     expect(restored.autoDownloadLikes, isTrue);
     expect(restored.autoDownloadWifiOnly, isFalse);

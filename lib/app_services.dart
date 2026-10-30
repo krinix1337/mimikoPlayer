@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'core/db/database.dart';
 import 'core/content/ai_filter.dart';
+import 'core/content/artist_blocklist.dart';
 import 'core/content/censor_base.dart';
 import 'core/prefs/prefs_store.dart';
 import 'core/sources/registry.dart';
@@ -22,11 +23,7 @@ class AppServices {
     yandexApi = YandexApi();
     yandexAuth = YandexAuth(db.authDao, yandexApi!);
     yandex = YandexSource(api: yandexApi)..attachAuth(yandexAuth!);
-    registry = SourceRegistry([
-      yandex!,
-      SoundCloudSource(),
-      LocalSource(),
-    ]);
+    registry = SourceRegistry([yandex!, SoundCloudSource(), LocalSource()]);
     resolver = StreamResolver(registry: registry, store: db.streamsDao);
   }
 
@@ -44,6 +41,9 @@ class AppServices {
 
   /// Плавное затухание громкости; читается из настроек вместе с качеством.
   bool fadeEnabled = true;
+
+  /// Длина кроссфейда между треками, секунды. 0 — выключен.
+  int crossfadeSeconds = 6;
 
   /// Фильтр явно помеченных ИИ-треков; нужен и фоновой докачке волны.
   bool hideAiTracks = false;
@@ -66,6 +66,7 @@ class AppServices {
     final prefs = await loadPrefs(db);
     defaultQuality = Quality.fromWire(prefs.quality);
     fadeEnabled = prefs.fade;
+    crossfadeSeconds = prefs.crossfadeSeconds;
     hideAiTracks = prefs.hideAiTracks;
     eqEnabled = prefs.eqEnabled;
     eqPreset = prefs.eqPreset;
@@ -73,6 +74,7 @@ class AppServices {
     eqCustomLevel = prefs.eqCustomLevel;
     onEqualizerChanged?.call();
     CensorBase.instance.enabled = prefs.censorBypass;
+    await ArtistBlocklist.instance.load(db);
     if (hideAiTracks) {
       // Список большой и ходит в сеть; грузим после первого кадра.
       unawaited(AiFilter.instance.ensureLoaded());

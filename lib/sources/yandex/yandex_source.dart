@@ -147,10 +147,7 @@ class YandexSource implements MusicSource {
   int lastDislikesExpected = 0;
   int _lastLibraryExpected = 0;
 
-  Future<List<LikedTrack>> _libraryTracks(
-    String kind, {
-    int? limit,
-  }) async {
+  Future<List<LikedTrack>> _libraryTracks(String kind, {int? limit}) async {
     final uid = auth is AuthReady ? (auth as AuthReady).uid : null;
     if (uid == null) return const [];
 
@@ -309,9 +306,9 @@ class YandexSource implements MusicSource {
     final kind = parts.length == 2 ? parts.last : remotePlaylistId;
     final result = await _api.get('/users/$owner/playlists', {'kinds': kind});
     if (!result.isOk) return null;
-    final first = result.asList.where(
-      (item) => item['kind'].toString() == kind,
-    ).firstOrNull;
+    final first = result.asList
+        .where((item) => item['kind'].toString() == kind)
+        .firstOrNull;
     if (first == null) return null;
     return YandexDto.coverFrom(first['cover']) ??
         YandexDto.coverUrl(first['coverUri']);
@@ -736,7 +733,17 @@ class YandexSource implements MusicSource {
   /// Ставит отметку «нравится» (1), «не рекомендовать» (-1) или снимает её
   /// (0). Яндекс сам убирает противоположную отметку, но для предсказуемого
   /// состояния локальной базы сначала снимаем её явно.
-  Future<bool> setTrackFeedback(String trackId, int state) async {
+  ///
+  /// [previous] — какая отметка стояла до этого: при снятии успехом считается
+  /// именно снятие той отметки, что была. Раньше хватало любого из двух
+  /// запросов, и удачное снятие несуществующего дизлайка выдавало провалившееся
+  /// снятие лайка за успех — трек оставался в Яндексе и возвращался при
+  /// синхронизации.
+  Future<bool> setTrackFeedback(
+    String trackId,
+    int state, {
+    int previous = 0,
+  }) async {
     final uid = auth is AuthReady ? (auth as AuthReady).uid : null;
     if (uid == null) return false;
 
@@ -746,6 +753,12 @@ class YandexSource implements MusicSource {
         body: {'track-ids': trackId},
         form: true,
       );
+      if (!result.isOk) {
+        AppLogger.instance.warn(
+          'яндекс $kind/$action не принят: ${result.failure?.reason.name} '
+          'http=${result.failure?.httpStatus} ${result.failure?.message ?? ''}',
+        );
+      }
       return result.isOk;
     }
 
@@ -759,7 +772,11 @@ class YandexSource implements MusicSource {
       default:
         final like = await send('likes', 'remove');
         final dislike = await send('dislikes', 'remove');
-        return like || dislike;
+        return switch (previous) {
+          1 => like,
+          -1 => dislike,
+          _ => like && dislike,
+        };
     }
   }
 
@@ -887,10 +904,7 @@ final class SearchArtistHit {
 }
 
 final class SearchSections {
-  const SearchSections({
-    this.artists = const [],
-    this.albums = const [],
-  });
+  const SearchSections({this.artists = const [], this.albums = const []});
 
   final List<SearchArtistHit> artists;
   final List<AlbumBrief> albums;

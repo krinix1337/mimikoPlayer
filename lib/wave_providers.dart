@@ -5,6 +5,7 @@ import 'core/content/ai_filter.dart';
 import 'core/logging/app_logger.dart';
 import 'core/sources/source_dto.dart';
 import 'core/sources/source_id.dart';
+import 'features/player/wave_mix.dart';
 import 'sources/soundcloud/soundcloud_source.dart';
 import 'sources/yandex/yandex_station.dart';
 
@@ -111,13 +112,18 @@ final waveTracksProvider = FutureProvider<List<WaveTrack>>((ref) async {
       : fetched;
   final ids = await services.db.tracksDao.ingestAll(tracks);
   final disliked = await services.db.libraryDao.dislikedAmong(ids);
+  final recent = await services.db.historyDao.recentlyHeardIds();
   // Разные remote id (сингл/альбом, копия из SoundCloud) сводятся в один
-  // локальный трек: без отсева он стоял в волне дважды.
-  final seen = <String>{};
+  // локальный трек, недавно слушанное уходит в хвост, а один исполнитель не
+  // занимает всю выдачу.
+  final picked = pickWaveIndexes(
+    tracks: tracks,
+    ids: ids,
+    recent: recent,
+    disliked: disliked,
+  );
   return [
-    for (var i = 0; i < tracks.length; i++)
-      if (!disliked.contains(ids[i]) && seen.add(ids[i]))
-        WaveTrack(localTrackId: ids[i], source: tracks[i]),
+    for (final i in picked) WaveTrack(localTrackId: ids[i], source: tracks[i]),
   ];
 });
 

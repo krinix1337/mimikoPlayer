@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_services.dart';
 import 'core/content/ai_filter.dart';
+import 'core/content/artist_blocklist.dart';
 import 'core/content/censor_base.dart';
 import 'core/db/daos/downloads_dao.dart';
 import 'core/db/daos/library_dao.dart';
@@ -17,6 +18,7 @@ import 'core/sources/source_dto.dart';
 import 'core/sources/source_id.dart';
 import 'sources/lyrics/lrclib.dart';
 import 'sources/lyrics/lyrics_service.dart';
+import 'features/library/library_actions.dart';
 import 'features/player/playback_controller.dart';
 import 'features/player/player_snapshot.dart';
 import 'sources/yandex/yandex_source.dart';
@@ -142,6 +144,9 @@ class PrefsController extends Notifier<Prefs> {
 
   Future<void> setFade(bool value) => _write(state.copyWith(fade: value));
 
+  Future<void> setCrossfadeSeconds(int value) =>
+      _write(state.copyWith(crossfadeSeconds: value));
+
   Future<void> setEqEnabled(bool value) =>
       _write(state.copyWith(eqEnabled: value));
 
@@ -194,9 +199,6 @@ class PrefsController extends Notifier<Prefs> {
 
   Future<void> setBlurCover(double value) =>
       _write(state.copyWith(blurCover: value));
-
-  Future<void> setShowDjInfo(bool value) =>
-      _write(state.copyWith(showDjInfo: value));
 
   Future<void> setOpenPlayerOnPlay(bool value) =>
       _write(state.copyWith(openPlayerOnPlay: value));
@@ -340,7 +342,8 @@ final combinedSearchProvider = StreamProvider.autoDispose
                     .timeout(const Duration(seconds: 10));
                 bySource[source.id] = [
                   for (final track in result.tracks)
-                    if (!hideAi || !AiFilter.instance.isAiTrack(track))
+                    if ((!hideAi || !AiFilter.instance.isAiTrack(track)) &&
+                        !ArtistBlocklist.instance.isBlocked(track.artists))
                       SourceSearchHit(track.ref.source, track),
                 ];
                 if (!controller.isClosed) controller.add(snapshot());
@@ -700,6 +703,14 @@ final librarySyncProvider = FutureProvider<void>((ref) async {
   }
   if (!source.auth.isReady) return;
 
+  // Снятые здесь лайки, которые не дошли до Яндекса, повторяем при каждой
+  // синхронизации, а не раз в сутки.
+  try {
+    await PendingUnlikes.retry(services.db, source);
+  } on Object catch (error) {
+    AppLogger.instance.warn('снятие лайков не повторилось: $error');
+  }
+
   final lastRaw = await services.db.settingsDao.value(_likesSyncedKey);
   final last = lastRaw == null
       ? null
@@ -763,9 +774,7 @@ final librarySyncProvider = FutureProvider<void>((ref) async {
   // Плейлисты — отдельно: падение одного не должно отменять лайки.
   try {
     final lists = await importYandexPlaylists(source: source, db: services.db);
-    AppLogger.instance.info(
-      'коллекция: $likes лайков, $lists плейлистов',
-    );
+    AppLogger.instance.info('коллекция: $likes лайков, $lists плейлистов');
     ref.invalidate(playlistsProvider);
   } on Object catch (error) {
     AppLogger.instance.warn('плейлисты не синхронизировались: $error');
@@ -852,7 +861,14 @@ Future<int> importYandexLikes({
 }) async {
   if (source == null) return 0;
 
-  final entries = await source.likedTracks();
+  // Лайки, снятые здесь, но не снятые в Яндексе: сначала пробуем снять ещё
+  // раз, а оставшиеся не даём импорту вернуть обратно.
+  final pending = await PendingUnlikes.retry(db, source);
+  final all = await source.likedTracks();
+  final entries = [
+    for (final entry in all)
+      if (!pending.contains(entry.track.ref.remoteId)) entry,
+  ];
   // Одна транзакция на весь импорт, а дата лайка — из Яндекса, а не «сейчас»:
   // повторный импорт не должен переставлять коллекцию.
   await db.transaction(() async {
@@ -867,7 +883,7 @@ Future<int> importYandexLikes({
       );
     }
   });
-  return entries.length;
+  return all.length;
 }
 
 /// Импортирует «Нелюбимое» Яндекса. Отметка -1 перезаписывает локальный

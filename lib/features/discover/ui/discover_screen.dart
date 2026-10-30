@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phoneyandex/widgets/sliver_bottom_inset.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -60,6 +61,7 @@ class DiscoverScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            const SliverBottomInset(),
           ],
         ),
       ),
@@ -261,14 +263,15 @@ class _StationsSection extends ConsumerWidget {
                     : station.id == WaveStationIds.coolMusic
                     ? CircleAvatar(
                         radius: 12,
-                        backgroundColor:
-                            Theme.of(context).colorScheme.primaryContainer,
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .primaryContainer,
                         child: Icon(
                           Icons.local_fire_department_rounded,
                           size: 16,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onPrimaryContainer,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onPrimaryContainer,
                         ),
                       )
                     : null,
@@ -389,6 +392,7 @@ class NewReleasesScreen extends ConsumerWidget {
               ),
             ),
           ),
+          const SliverBottomInset(),
         ],
       ),
     );
@@ -413,10 +417,7 @@ class _AlbumGridCard extends StatelessWidget {
             children: [
               TrackCover(url: album.coverUrl, size: size),
               const SizedBox(height: 6),
-              TwoLineTitle(
-                album.title,
-                style: theme.textTheme.titleSmall,
-              ),
+              TwoLineTitle(album.title, style: theme.textTheme.titleSmall),
               Text(
                 album.artists.join(', '),
                 maxLines: 1,

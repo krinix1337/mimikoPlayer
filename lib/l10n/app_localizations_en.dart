@@ -468,6 +468,88 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playerTitle => 'Now playing';
 
   @override
+  String get settingsCrossfade => 'Crossfade';
+
+  @override
+  String get settingsCrossfadeNote =>
+      'The next track starts before the current one ends and blends with it. Does not apply to manual skips or repeating one track.';
+
+  @override
+  String get crossfadeOff => 'Off';
+
+  @override
+  String crossfadeSecondsValue(int seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String get playlistTarget => 'Where to create';
+
+  @override
+  String get playlistTargetYandex => 'Yandex Music';
+
+  @override
+  String get playlistTargetDevice => 'On this device';
+
+  @override
+  String get playlistDeviceNote =>
+      'The playlist stays on this phone — you can add files from storage too.';
+
+  @override
+  String get playlistCoverRemove => 'Remove cover';
+
+  @override
+  String get playlistCoverChange => 'Change cover';
+
+  @override
+  String get playlistDeleteLocal => 'Delete playlist';
+
+  @override
+  String playlistDeleteConfirm(String title) {
+    return 'Delete \"$title\"? The tracks themselves stay in the app.';
+  }
+
+  @override
+  String get playlistDeleted => 'Playlist deleted';
+
+  @override
+  String get commonDelete => 'Delete';
+
+  @override
+  String get artistBlock => 'Never recommend this artist';
+
+  @override
+  String get artistUnblock => 'Recommend this artist again';
+
+  @override
+  String artistBlockedDone(String name) {
+    return '\"$name\" will no longer show up';
+  }
+
+  @override
+  String artistUnblockedDone(String name) {
+    return '\"$name\" is back in recommendations';
+  }
+
+  @override
+  String get settingsBlockedArtists => 'Blocked artists';
+
+  @override
+  String get settingsBlockedArtistsEmpty =>
+      'The list is empty. Block an artist from their page or the track menu.';
+
+  @override
+  String settingsBlockedArtistsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count artists',
+      one: '$count artist',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String artistListeners(String count) {
     return '$count listeners';
   }
@@ -1368,12 +1450,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeCoverLighter => 'Lighter';
 
   @override
-  String get djInfo => 'DJ info';
-
-  @override
-  String get djInfoNote => 'BPM and key in track details';
-
-  @override
   String get settingsOpenPlayer => 'Open player on play';
 
   @override
@@ -1436,22 +1512,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get detailsLocalId => 'Local ID';
-
-  @override
-  String get djBpm => 'BPM';
-
-  @override
-  String get djGain => 'Gain';
-
-  @override
-  String get djKey => 'Key';
-
-  @override
-  String get djNoKey => 'Not set';
-
-  @override
-  String get djSourceNote =>
-      'BPM and gain from Deezer. Set the Camelot key manually.';
 
   @override
   String get downloadsPaused => 'Paused';

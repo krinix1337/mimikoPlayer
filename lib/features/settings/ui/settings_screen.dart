@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart' show CancelToken, DioException;
 import 'package:flutter/material.dart';
+import 'package:phoneyandex/widgets/sliver_bottom_inset.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -504,17 +505,20 @@ class _SoundPage extends ConsumerWidget {
               note: l.settingsFadeNote,
               onChanged: controller.setFade,
             ),
+            DiscreteSliderRow<int>(
+              label: l.settingsCrossfade,
+              note: l.settingsCrossfadeNote,
+              values: const [0, 3, 6, 9, 12],
+              current: prefs.crossfadeSeconds,
+              labelOf: (value) =>
+                  value == 0 ? l.crossfadeOff : l.crossfadeSecondsValue(value),
+              onPick: controller.setCrossfadeSeconds,
+            ),
             SwitchRow(
               label: l.censorBypass,
               value: prefs.censorBypass,
               note: l.censorBypassNote,
               onChanged: controller.setCensorBypass,
-            ),
-            SwitchRow(
-              label: l.djInfo,
-              value: prefs.showDjInfo,
-              note: l.djInfoNote,
-              onChanged: controller.setShowDjInfo,
             ),
             SwitchRow(
               label: l.settingsOpenPlayer,
@@ -523,6 +527,7 @@ class _SoundPage extends ConsumerWidget {
               onChanged: controller.setOpenPlayerOnPlay,
             ),
             const PriorityTile(),
+            const BlockedArtistsTile(),
           ],
         ),
         const _EqualizerSection(),
@@ -690,9 +695,11 @@ class _EqualizerSheetState extends ConsumerState<_EqualizerSheet> {
 
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.62,
+      // Фиксированная высота: потянуть лист на весь экран нельзя, лишнее
+      // содержимое просто прокручивается внутри.
+      initialChildSize: 0.78,
       minChildSize: 0.35,
-      maxChildSize: 1,
+      maxChildSize: 0.78,
       snap: true,
       shouldCloseOnMinExtent: true,
       builder: (context, scroll) => ListView(
@@ -723,7 +730,10 @@ class _EqualizerSheetState extends ConsumerState<_EqualizerSheet> {
                   style: theme.textTheme.titleLarge,
                 ),
               ),
-              Switch(value: prefs.eqEnabled, onChanged: controller.setEqEnabled),
+              Switch(
+                value: prefs.eqEnabled,
+                onChanged: controller.setEqEnabled,
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -1209,7 +1219,9 @@ class _AccountPage extends ConsumerWidget {
               title: const Text('Яндекс Музыка'),
               subtitle: Text(ready ? l.accountConnected : l.authNotSignedIn),
               trailing: Icon(
-                ready ? Icons.check_circle_rounded : Icons.error_outline_rounded,
+                ready
+                    ? Icons.check_circle_rounded
+                    : Icons.error_outline_rounded,
                 color: ready
                     ? Theme.of(context).colorScheme.primary
                     : Theme.of(context).colorScheme.error,
@@ -1261,11 +1273,7 @@ class _YandexAvatar extends StatelessWidget {
         color: scheme.primary.withValues(alpha: 0.22),
         shape: BoxShape.circle,
       ),
-      child: Icon(
-        Icons.person_rounded,
-        size: 34,
-        color: scheme.primary,
-      ),
+      child: Icon(Icons.person_rounded, size: 34, color: scheme.primary),
     );
     final source = url;
     if (source == null || source.isEmpty) return fallback;
@@ -1373,9 +1381,7 @@ class _ProfileHero extends StatelessWidget {
                     ? Icons.check_circle_rounded
                     : Icons.info_outline_rounded,
                 size: 17,
-                color: statusOk
-                    ? scheme.primary
-                    : scheme.onSurfaceVariant,
+                color: statusOk ? scheme.primary : scheme.onSurfaceVariant,
               ),
               const SizedBox(width: 7),
               Expanded(
@@ -1383,9 +1389,7 @@ class _ProfileHero extends StatelessWidget {
                   status,
                   style: text.labelLarge?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: statusOk
-                        ? scheme.primary
-                        : scheme.onSurfaceVariant,
+                    color: statusOk ? scheme.primary : scheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -2352,6 +2356,7 @@ class _Page extends StatelessWidget {
             const SizedBox(height: 24),
           ]),
         ),
+        const SliverBottomInset(),
       ],
     ),
   );

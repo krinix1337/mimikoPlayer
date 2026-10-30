@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
@@ -6,6 +7,8 @@ import 'package:just_audio/just_audio.dart';
 import '../../app_services.dart';
 import '../../core/constants.dart';
 import '../../core/content/ai_filter.dart';
+import '../../core/content/artist_blocklist.dart';
+import 'wave_mix.dart';
 import '../../core/content/censor_base.dart';
 import '../../core/db/daos/queue_dao.dart';
 import '../../core/logging/app_logger.dart';
@@ -65,10 +68,29 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   static MusicBackgroundAudioHandler? instance;
 
   final AppServices _services;
-  final AndroidEqualizer _equalizer = AndroidEqualizer();
-  late final AudioPlayer _player = AudioPlayer(
-    audioPipeline: AudioPipeline(androidAudioEffects: [_equalizer]),
-  );
+  late AndroidEqualizer _equalizer;
+  late AudioPlayer _player = _newPlayer();
+
+  /// Плеер, который доигрывает конец прошлого трека, пока звучит следующий
+  /// (кроссфейд). Живёт только на время перекрытия.
+  AudioPlayer? _outgoing;
+  final List<StreamSubscription<dynamic>> _playerSubs = [];
+
+  /// Поколение, для которого кроссфейд уже запускался или отклонён: второй
+  /// раз за один трек не пробуем.
+  int _crossfadeHandledFor = -1;
+  int _finishReportedFor = -1;
+  static const Duration _crossfadeLead = Duration(milliseconds: 1800);
+
+  /// У каждого плеера свой эквалайзер: эффект привязан к аудиосессии плеера.
+  AudioPlayer _newPlayer() {
+    final equalizer = AndroidEqualizer();
+    _equalizer = equalizer;
+    return AudioPlayer(
+      audioPipeline: AudioPipeline(androidAudioEffects: [equalizer]),
+    );
+  }
+
   final QueueManager _queue = QueueManager();
   final StreamController<PlayerSnapshot> _snapshots =
       StreamController<PlayerSnapshot>.broadcast();
@@ -275,7 +297,11 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         id = _queue.advance();
       }
       if (id == null) return null;
-      if (await _services.db.libraryDao.likeState(id) != -1) return id;
+      if (await _services.db.libraryDao.likeState(id) == -1) continue;
+      // Исполнитель в чёрном списке: трек пропускаем, как и дизлайкнутый.
+      final artists = await _services.db.tracksDao.artistNamesOf(id);
+      if (ArtistBlocklist.instance.isBlocked(artists)) continue;
+      return id;
     }
     return null;
   }
@@ -346,6 +372,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   Future<void> _stop({bool report = true}) async {
     _generation++;
     _wantPlaying = false;
+    _killOutgoing();
     _sleepTimer?.cancel();
     _sleepAtTrackEnd = false;
     _pauseWatchdog?.cancel();
@@ -404,6 +431,8 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   @override
   Future<void> pause() async {
     _wantPlaying = false;
+    // Пауза посреди кроссфейда останавливает и уходящий трек.
+    _killOutgoing();
     // Гасим до паузы и возвращаем громкость уже после неё: в обратном
     // порядке между вызовами проскакивал кусок на полной громкости.
     await _fadeOut();
@@ -519,48 +548,147 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
 
   // --- внутреннее ---------------------------------------------------------
 
+  void _unbindPlayer() {
+    for (final subscription in _playerSubs) {
+      unawaited(subscription.cancel());
+    }
+    _playerSubs.clear();
+  }
+
   void _bindPlayer() {
-    _player.playerStateStream.listen((state) {
-      final completed = state.processingState == ProcessingState.completed;
-      _publish(
-        _snapshot.copyWith(
-          playing: state.playing,
-          buffering:
-              state.processingState == ProcessingState.loading ||
-              state.processingState == ProcessingState.buffering,
-        ),
-      );
-      _emitServiceState();
-      if (!completed) {
-        _completionHandled = false;
-      } else if (!_completionHandled) {
-        _completionHandled = true;
-        unawaited(_onTrackFinished());
+    _unbindPlayer();
+    final player = _player;
+    _playerSubs.addAll([
+      player.playerStateStream.listen((state) {
+        final completed = state.processingState == ProcessingState.completed;
+        _publish(
+          _snapshot.copyWith(
+            playing: state.playing,
+            buffering:
+                state.processingState == ProcessingState.loading ||
+                state.processingState == ProcessingState.buffering,
+          ),
+        );
+        _emitServiceState();
+        if (!completed) {
+          _completionHandled = false;
+        } else if (!_completionHandled) {
+          _completionHandled = true;
+          unawaited(_onTrackFinished());
+        }
+      }),
+      player.positionStream.listen((position) {
+        _publish(_snapshot.copyWith(position: position));
+        _maybeCrossfade(position);
+      }),
+      player.durationStream.listen(
+        (duration) =>
+            _publish(_snapshot.copyWith(duration: duration ?? Duration.zero)),
+      ),
+      player.sequenceStateStream.listen((_) => _scheduleSnapshot()),
+      // just_audio сообщает об ошибке уже загруженного потока в errorStream
+      // (плюс дублирует её в errorCode события). Без этой подписки обрыв
+      // стриминга проходил молча: обработчик ниже ловил только ошибки загрузки.
+      player.errorStream.listen(
+        _onStreamError,
+        onError: (Object error, StackTrace _) => _onStreamError(error),
+      ),
+      player.playbackEventStream.listen(
+        null,
+        onError: (Object error, StackTrace _) => _onStreamError(error),
+      ),
+    ]);
+  }
+
+  // --- кроссфейд ----------------------------------------------------------
+  // Конец трека перекрывается началом следующего: за несколько секунд до
+  // конца следующий трек резолвится и стартует во втором плеере, громкости
+  // сводятся, и второй плеер становится основным.
+
+  void _maybeCrossfade(Duration position) {
+    final seconds = _services.crossfadeSeconds;
+    if (seconds <= 0 || !_wantPlaying || !_snapshot.playing) return;
+    if (_snapshot.resolving || _crossfadeHandledFor == _generation) return;
+    if (_queue.repeat == PlaybackRepeat.one || _sleepAtTrackEnd) return;
+    if (_queue.items.length < 2) return;
+    if (!_isRadio &&
+        _queue.repeat == PlaybackRepeat.none &&
+        _queue.remainingAfterCurrent == 0) {
+      return;
+    }
+    final duration = _player.duration;
+    // Короткие треки целиком не перекрываем.
+    if (duration == null || duration < Duration(seconds: seconds * 3)) return;
+    final remaining = duration - position;
+    if (remaining <= Duration.zero ||
+        remaining > Duration(seconds: seconds) + _crossfadeLead) {
+      return;
+    }
+    _crossfadeHandledFor = _generation;
+    unawaited(_startCrossfade());
+  }
+
+  Future<void> _startCrossfade() async {
+    // Отчёт о прослушанном делаем до перехода очереди: он берёт текущий трек.
+    _finishReportedFor = _generation;
+    await _reportCurrent(PlaybackEventType.trackFinished);
+    final next = await _nextTrack();
+    // Следующего нет — трек доиграет сам, обычным путём.
+    if (next == null) return;
+    _pendingSeek = Duration.zero;
+    _generation++;
+    await _playCurrent(crossfade: true);
+  }
+
+  /// Основной плеер уходит в [_outgoing], а вместо него встаёт новый.
+  AudioPlayer _swapToFreshPlayer() {
+    _killOutgoing();
+    final old = _player;
+    _unbindPlayer();
+    _player = _newPlayer();
+    _outgoing = old;
+    _completionHandled = false;
+    _bindPlayer();
+    return old;
+  }
+
+  void _killOutgoing() {
+    final old = _outgoing;
+    if (old == null) return;
+    _outgoing = null;
+    unawaited(() async {
+      try {
+        await old.stop();
+        await old.dispose();
+      } on Object {
+        // Уходящий плеер уже ничего не значит.
       }
-    });
+    }());
+  }
 
-    _player.positionStream.listen(
-      (position) => _publish(_snapshot.copyWith(position: position)),
-    );
-
-    _player.durationStream.listen(
-      (duration) =>
-          _publish(_snapshot.copyWith(duration: duration ?? Duration.zero)),
-    );
-
-    _player.sequenceStateStream.listen((_) => _scheduleSnapshot());
-
-    // just_audio сообщает об ошибке уже загруженного потока в errorStream
-    // (плюс дублирует её в errorCode события). Без этой подписки обрыв
-    // стриминга проходил молча: обработчик ниже ловил только ошибки загрузки.
-    _player.errorStream.listen(
-      _onStreamError,
-      onError: (Object error, StackTrace _) => _onStreamError(error),
-    );
-    _player.playbackEventStream.listen(
-      null,
-      onError: (Object error, StackTrace _) => _onStreamError(error),
-    );
+  /// Сведение громкостей по равной мощности: сумма не проваливается в середине.
+  Future<void> _crossRamp(AudioPlayer old, AudioPlayer incoming) async {
+    var length = Duration(seconds: _services.crossfadeSeconds);
+    final left = (old.duration ?? Duration.zero) - old.position;
+    // Прошлый трек кончается раньше — сводим за оставшееся время.
+    if (left > Duration.zero && left < length) length = left;
+    if (length < const Duration(milliseconds: 400)) {
+      length = const Duration(milliseconds: 400);
+    }
+    const stepMs = 50;
+    final steps = (length.inMilliseconds / stepMs).ceil().clamp(6, 400);
+    for (var step = 1; step <= steps; step++) {
+      // Паузу, стоп или другой трек нажали посреди сведения — прекращаем.
+      if (_outgoing != old || _player != incoming) return;
+      final t = step / steps;
+      await Future.wait([
+        old.setVolume(math.cos(t * math.pi / 2)),
+        incoming.setVolume(math.sin(t * math.pi / 2)),
+      ]);
+      await Future<void>.delayed(const Duration(milliseconds: stepMs));
+    }
+    if (_outgoing == old) _killOutgoing();
+    if (_player == incoming) await incoming.setVolume(1);
   }
 
   /// Перевалидировать протухшую ссылку и продолжить с той же позиции.
@@ -618,9 +746,11 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   /// чужое поколение и молча выходит, а не играет поверх паузы.
   int _generation = 0;
 
-  Future<void> _playCurrent() async {
+  Future<void> _playCurrent({bool crossfade = false}) async {
     final generation = _generation;
     _pauseWatchdog?.cancel();
+    // Обычный переход (тап, пропуск) обрывает перекрытие, а не ждёт его.
+    if (!crossfade) _killOutgoing();
     final localTrackId = _queue.currentId;
     if (localTrackId == null) return;
 
@@ -730,10 +860,12 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       '$localTrackId',
     );
     // Если что-то уже играет, старую песню гасим до подмены источника,
-    // иначе слышен щелчок на склейке.
-    if (_player.playing) await _fadeOut();
+    // иначе слышен щелчок на склейке. При кроссфейде старый трек не гасим:
+    // он доигрывает в отдельном плеере.
+    if (!crossfade && _player.playing) await _fadeOut();
     // Пока резолвили/грузили, могли нажать паузу, стоп или другой трек.
     if (generation != _generation) return;
+    final faded = crossfade ? _swapToFreshPlayer() : null;
     try {
       await _load(playback.target, initialPosition: _pendingSeek);
     } on Object catch (error) {
@@ -741,13 +873,23 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       // громкость оставалась на нуле, а плеер — на прошлом треке.
       AppLogger.instance.warn('playback: не загрузился $localTrackId: $error');
       _pendingSeek = Duration.zero;
+      if (faded != null) {
+        // Уходящий плеер уже отвязан и сам не продолжит очередь.
+        _killOutgoing();
+        if (generation == _generation) await _skipFailed();
+        return;
+      }
       await _player.setVolume(1);
       if (generation == _generation) {
         _publish(_snapshot.copyWith(resolving: false));
       }
       return;
     }
-    if (generation != _generation) return;
+    if (generation != _generation) {
+      _killOutgoing();
+      return;
+    }
+    if (faded != null) unawaited(_syncEqualizer());
     _pendingSeek = Duration.zero;
     _publish(
       _snapshot.copyWith(
@@ -759,6 +901,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     );
     if (!_wantPlaying) {
       // Паузу нажали, пока трек грузился: оставляем его готовым, но тихим.
+      _killOutgoing();
       await _player.setVolume(1);
       _startPauseWatchdog();
       _startStallProbe();
@@ -767,7 +910,11 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     }
     await _player.setVolume(0);
     _startPlayback();
-    unawaited(_fadeIn());
+    if (faded != null) {
+      unawaited(_crossRamp(faded, _player));
+    } else {
+      unawaited(_fadeIn());
+    }
 
     await _reportEvent(
       variants,
@@ -798,7 +945,10 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   }
 
   Future<void> _onTrackFinished() async {
-    unawaited(_reportCurrent(PlaybackEventType.trackFinished));
+    // Кроссфейд уже записал окончание этого трека, не дублируем.
+    if (_finishReportedFor != _generation) {
+      unawaited(_reportCurrent(PlaybackEventType.trackFinished));
+    }
     await _saveSnapshotNow();
     if (_sleepAtTrackEnd) {
       // Таймер сна: следующий трек ставим, но не запускаем.
@@ -940,10 +1090,17 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       if (tracks.isEmpty) return false;
       final ids = await _services.db.tracksDao.ingestAll(tracks);
       final disliked = await _services.db.libraryDao.dislikedAmong(ids);
-      final playableIds = [
-        for (final id in ids)
-          if (!disliked.contains(id)) id,
-      ];
+      final recent = await _services.db.historyDao.recentlyHeardIds();
+      // Уже стоящие в очереди треки считаем «недавними»: докачка не должна
+      // возвращать то, что сейчас играет или только что сыграло.
+      final picked = pickWaveIndexes(
+        tracks: tracks,
+        ids: ids,
+        recent: {...recent, ..._queue.items},
+        disliked: disliked,
+        minFresh: 4,
+      );
+      final playableIds = [for (final i in picked) ids[i]];
       if (!_queue.appendBatch(playableIds, moveToFirstNew: moveToFirstNew)) {
         // Ротор вернул то же самое — пробуем ещё раз на следующем треке.
         return false;
@@ -1299,6 +1456,8 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     _snapshotTimer?.cancel();
     _periodicSnapshot?.cancel();
     _services.onEqualizerChanged = null;
+    _killOutgoing();
+    _unbindPlayer();
     await _saveSnapshotNow();
     await _snapshots.close();
     await _player.dispose();
