@@ -25,3 +25,8 @@ android/key.properties
 .DS_Store
 Thumbs.db
 *.log
+
+# Локальные заметки и исходники картинок, в репо не нужны
+docs/API_PROBE.md
+docs/social-preview.png
+docs/releases/*.html
