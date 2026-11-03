@@ -1,0 +1,59 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,400;8..144,500;8..144,700;8..144,800&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,1,0&display=block" rel="stylesheet">
+<style>
+  /* M3 dark tonal palette, seed #D8F544 */
+  :root{
+    --surface:#12140C; --sc-low:#1A1C13; --sc:#1E2017; --sc-high:#282B21; --sc-highest:#33362B;
+    --on-surface:#E3E4D6; --on-variant:#C6C8B4; --outline:#45483A;
+    --primary:#C3DB2E; --on-primary:#2C3400; --pc:#D8F544; --on-pc:#191E00;
+    --sc2:#3C3E2C;
+    --tertiary-c:#1D5C4F; --on-tc:#A6F2DD;
+    --secondary-c:#43482A; --on-sc:#E0E6BF;
+    --error-c:#5B3E2B; --on-ec:#FFDCC3;
+    --purple-c:#45397A; --on-purc:#E6DEFF;
+    --pink-c:#653B4C; --on-pinc:#FFD9E3;
+    --blue-c:#284777; --on-bluc:#D6E3FF;
+  }
+  *{margin:0;box-sizing:border-box}
+  html,body{width:1280px;height:640px;background:transparent}
+  body{font-family:'Roboto Flex',sans-serif;color:var(--on-surface)}
+  .frame{width:1280px;height:640px;border-radius:48px;background:var(--surface);padding:40px;display:grid;grid-template-columns:420px 1fr;gap:16px;overflow:hidden}
+  .hero{background:var(--pc);color:var(--on-pc);border-radius:40px;padding:40px;display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .hero .app{font-size:22px;font-weight:500;letter-spacing:.1px;display:flex;align-items:center;gap:10px}
+  .hero .ver{font-size:120px;font-weight:800;line-height:1;letter-spacing:-3px;margin-top:28px;font-variation-settings:'opsz' 144}
+  .hero .lead{font-size:22px;line-height:30px;font-weight:500;margin-top:20px;max-width:300px}
+  .hero .chips{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap;position:relative;z-index:1}
+  .chip{height:40px;padding:0 16px 0 10px;border-radius:12px;background:var(--on-pc);color:var(--pc);font-size:16px;font-weight:500;display:flex;align-items:center;gap:6px}
+  .chip .material-symbols-rounded{font-size:20px}
+  .blob{position:absolute;right:-80px;bottom:-80px;width:280px;height:280px;color:var(--primary);opacity:.6}
+  .grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:16px}
+  .card{background:var(--sc);border-radius:28px;padding:0 28px;display:flex;align-items:center;gap:20px;min-width:0}
+  .icon{flex:none;width:64px;height:64px;border-radius:20px;display:grid;place-items:center}
+  .icon .material-symbols-rounded{font-size:32px}
+  .t{font-size:24px;line-height:30px;font-weight:500;white-space:nowrap}
+  .s{font-size:17px;line-height:24px;color:var(--on-variant);margin-top:2px;white-space:nowrap}
+  .material-symbols-rounded{font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1,'wght' 500;line-height:1}
+</style></head>
+<body>
+<div class="frame">
+  <div class="hero">
+    <div class="app"><span class="material-symbols-rounded" style="font-size:26px">graphic_eq</span>mimikoPlayer</div>
+    <div class="ver">1.3.6</div>
+    <div class="lead">Звук без потерь и без пауз между треками</div>
+    <svg class="blob" viewBox="0 0 200 200"><path fill="currentColor" d="M100 0c14 0 22 14 35 19s29 0 38 11 4 26 9 38 18 20 18 32-13 21-18 33-1 27-9 38-25 6-38 11-21 18-35 18-22-13-35-18-29 0-38-11-4-26-9-38S0 112 0 100s13-21 18-33 1-27 9-38 25-6 38-11S86 0 100 0z"/></svg>
+    <div class="chips">
+      <div class="chip"><span class="material-symbols-rounded">android</span>Android 8+</div>
+      <div class="chip"><span class="material-symbols-rounded">language</span>RU / EN</div>
+    </div>
+  </div>
+  <div class="grid">
+    <div class="card"><div class="icon" style="background:var(--secondary-c);color:var(--pc)"><span class="material-symbols-rounded">high_quality</span></div><div><div class="t">FLAC</div><div class="s">«Без потерь» работает</div></div></div>
+    <div class="card"><div class="icon" style="background:var(--tertiary-c);color:var(--on-tc)"><span class="material-symbols-rounded">fast_forward</span></div><div><div class="t">Без пауз</div><div class="s">Следующий трек заранее</div></div></div>
+    <div class="card"><div class="icon" style="background:var(--error-c);color:var(--on-ec)"><span class="material-symbols-rounded">cloud</span></div><div><div class="t">SoundCloud</div><div class="s">Чистая волна, загрузки</div></div></div>
+    <div class="card"><div class="icon" style="background:var(--purple-c);color:var(--on-purc)"><span class="material-symbols-rounded">link</span></div><div><div class="t">Импорт по ссылке</div><div class="s">Яндекс, Spotify, SoundCloud</div></div></div>
+    <div class="card"><div class="icon" style="background:var(--pink-c);color:var(--on-pinc)"><span class="material-symbols-rounded">lyrics</span></div><div><div class="t">Караоке</div><div class="s">Плавные строки</div></div></div>
+    <div class="card"><div class="icon" style="background:var(--blue-c);color:var(--on-bluc)"><span class="material-symbols-rounded">build</span></div><div><div class="t">8 исправлений</div><div class="s">Всё, что мешало в 1.3.5</div></div></div>
+  </div>
+</div>
+</body></html>
