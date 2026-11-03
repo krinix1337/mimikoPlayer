@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 /// Минимальный Markdown для описаний релизов: заголовки, списки, код,
 /// жирный/курсив и ссылки. Полный парсер ради changelog'а не нужен.
 class ReleaseNotes extends StatelessWidget {
-  const ReleaseNotes(this.source, {super.key});
+  const ReleaseNotes(this.source, {super.key, this.token = ''});
 
   final String source;
+
+  /// Токен GitHub: картинки закрытого репозитория грузятся через API.
+  final String token;
 
   @override
   Widget build(BuildContext context) {
@@ -113,6 +116,22 @@ class ReleaseNotes extends StatelessWidget {
           );
         case _BlockKind.rule:
           children.add(const Divider(height: 28));
+        case _BlockKind.image:
+          final source = releaseImageSource(block.text, token);
+          children.add(
+            Padding(
+              padding: EdgeInsets.only(top: children.isEmpty ? 0 : 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.network(
+                  source.url,
+                  headers: source.headers,
+                  fit: BoxFit.fitWidth,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              ),
+            ),
+          );
       }
     }
     return Column(
@@ -122,7 +141,32 @@ class ReleaseNotes extends StatelessWidget {
   }
 }
 
-enum _BlockKind { heading, paragraph, bullet, ordered, code, rule }
+enum _BlockKind { heading, paragraph, bullet, ordered, code, rule, image }
+
+/// Ссылку вида github.com/o/r/blob/ref/path переводит в API: обычная
+/// ссылка закрытого репозитория без входа в браузере не отдаёт файл.
+({String url, Map<String, String> headers}) releaseImageSource(
+  String url,
+  String token,
+) {
+  final blob = RegExp(
+    r'^https://github\.com/([^/]+)/([^/]+)/blob/([^/]+)/([^?#]+)',
+  ).firstMatch(url);
+  if (blob == null || token.isEmpty) return (url: url, headers: const {});
+  return (
+    url:
+        'https://api.github.com/repos/${blob.group(1)}/${blob.group(2)}'
+        '/contents/${blob.group(4)}?ref=${blob.group(3)}',
+    headers: {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/vnd.github.raw',
+    },
+  );
+}
+
+final _imagePattern = RegExp(
+  r'''^(?:<img\s[^>]*src=["']([^"']+)["'][^>]*>|!\[[^\]]*\]\(([^)\s]+)[^)]*\))$''',
+);
 
 class _Block {
   const _Block(this.kind, this.text, {this.level = 0, this.number});
@@ -166,6 +210,16 @@ List<_Block> _parse(String source) {
     }
     if (trimmed.isEmpty) {
       flushParagraph();
+      continue;
+    }
+    final image = _imagePattern.firstMatch(trimmed);
+    if (image != null) {
+      flushParagraph();
+      blocks.add(_Block(_BlockKind.image, image.group(1) ?? image.group(2)!));
+      continue;
+    }
+    if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
+      // Прочий HTML (обёртки <p>, <details>) в приложении не показываем.
       continue;
     }
     if (trimmed == '---' || trimmed == '***') {

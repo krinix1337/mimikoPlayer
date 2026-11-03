@@ -1836,7 +1836,9 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
       '',
     );
     await Navigator.of(context, rootNavigator: true).push(
-      slideUpRoute(_ReleaseNotesPage(version: release.version, body: body)),
+      slideUpRoute(
+        _ReleaseNotesPage(version: release.version, body: body, token: _token),
+      ),
     );
   }
 
@@ -2305,10 +2307,15 @@ class _UpdatesHero extends StatelessWidget {
 }
 
 class _ReleaseNotesPage extends StatelessWidget {
-  const _ReleaseNotesPage({required this.version, required this.body});
+  const _ReleaseNotesPage({
+    required this.version,
+    required this.body,
+    required this.token,
+  });
 
   final String version;
   final String body;
+  final String token;
 
   @override
   Widget build(BuildContext context) {
@@ -2330,7 +2337,7 @@ class _ReleaseNotesPage extends StatelessWidget {
         top: false,
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          child: ReleaseNotes(body),
+          child: ReleaseNotes(body, token: token),
         ),
       ),
     );
