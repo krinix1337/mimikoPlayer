@@ -7,10 +7,10 @@
 
 <br>
 
-<a href="https://github.com/krinix1337/mimikoPlayer/releases/latest"><img alt="Версия 1.3.5" src="https://img.shields.io/badge/версия-1.3.5-D8F544?style=for-the-badge&labelColor=1C1B1F"></a>
+<a href="https://github.com/krinix1337/mimikoPlayer/releases/latest"><img alt="Версия 1.3.6" src="https://img.shields.io/badge/версия-1.3.6-D8F544?style=for-the-badge&labelColor=1C1B1F"></a>
 <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white&labelColor=1C1B1F">
 <a href="https://flutter.dev"><img alt="Flutter 3.47" src="https://img.shields.io/badge/Flutter-3.47-02569B?style=for-the-badge&logo=flutter&logoColor=white&labelColor=1C1B1F"></a>
-<img alt="191 тест" src="https://img.shields.io/badge/тесты-191-22C7A9?style=for-the-badge&labelColor=1C1B1F">
+<img alt="203 теста" src="https://img.shields.io/badge/тесты-203-22C7A9?style=for-the-badge&labelColor=1C1B1F">
 <img alt="Лицензия MIT" src="https://img.shields.io/badge/лицензия-MIT-A78BFA?style=for-the-badge&labelColor=1C1B1F">
 
 <h3>Яндекс Музыка, SoundCloud и свои файлы — в одном плеере</h3>
@@ -119,7 +119,7 @@
 
 ## 📦 Установка
 
-1. Скачайте `mimikoPlayer-1.3.5.apk` со страницы **[Releases](https://github.com/krinix1337/mimikoPlayer/releases/latest)**.
+1. Скачайте `mimikoPlayer-1.3.6.apk` со страницы **[Releases](https://github.com/krinix1337/mimikoPlayer/releases/latest)**.
 2. Откройте файл и разрешите установку из этого источника.
 3. Войдите в Яндекс в разделе **Настройки → Аккаунт и сервисы**. SoundCloud и локальные файлы работают без входа.
 
@@ -199,8 +199,8 @@ adb logcat -s flutter | grep frames
 MIT — см. [LICENSE](LICENSE).
 
 - «Яндекс Музыка» и SoundCloud — товарные знаки своих правообладателей; проект с ними не связан.
-- Это неофициальный клиент: он работает через неофициальное API Яндекс Музыки, которое может измениться или перестать работать в любой момент.
-- Для прослушивания нужен свой аккаунт и подписка Яндекс Плюс. Приложение не обходит ограничения сервисов и не распространяет музыку; скачанные треки — только для личного офлайн-прослушивания.
+- Это неофициальный клиент: Яндекс Музыка и SoundCloud подключены через их неофициальные API, которые могут измениться или перестать работать в любой момент.
+- Для Яндекс Музыки нужен свой аккаунт и подписка Яндекс Плюс; SoundCloud и свои файлы работают без входа. Приложение не обходит ограничения сервисов и не распространяет музыку; скачанные треки — только для личного офлайн-прослушивания.
 - Тексты песен приходят из публичных источников по запросу пользователя.
 - Список ИИ-исполнителей — [Slopless](https://github.com/alexeyfv/slopless) (GPL-3.0), загружается по сети и не входит в APK.
 - Незацензуренные версии — открытая база [FckCensorData](https://github.com/Hazzz895/FckCensorData), загружается по сети.

@@ -159,16 +159,16 @@ class SoundCloudApi {
   Future<SoundCloudReply> track(String id, {bool retry = true}) =>
       _get('/tracks/$id', retry: retry);
 
+  /// Объект по публичной ссылке soundcloud.com: плейлист, трек, профиль.
+  Future<SoundCloudReply> resolveUrl(String url, {bool retry = true}) =>
+      _get('/resolve', query: {'url': url}, retry: retry);
+
   /// Похожие треки — рекомендации самого SoundCloud под конкретный трек.
   Future<SoundCloudReply> related(
     String id, {
     int limit = 30,
     bool retry = true,
-  }) => _get(
-    '/tracks/$id/related',
-    query: {'limit': '$limit'},
-    retry: retry,
-  );
+  }) => _get('/tracks/$id/related', query: {'limit': '$limit'}, retry: retry);
 
   /// Разворачивает выбранный транскодинг в подписанный медиа-URL.
   Future<SoundCloudReply> resolveMedia(

@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app_providers.dart';
 import '../../../core/db/daos/library_dao.dart';
+import '../../../core/sources/source_id.dart';
+import '../../../core/sources/stream_target.dart';
 import '../../../core/prefs/prefs.dart';
 import '../../../features/downloads/download_service.dart';
 import '../../../features/home/wave_mode_label.dart';
@@ -497,19 +499,28 @@ class _Artwork extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 28),
-            Text(
-              current.title,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineMedium,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              current.artist,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            // Тап по названию — альбом трека, как в Яндексе.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _openAlbum(context, ref),
+              child: Column(
+                children: [
+                  Text(
+                    current.title,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    current.artist,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ),
             if (ref.watch(
@@ -535,6 +546,25 @@ class _Artwork extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Плеер лежит поверх вкладок, а альбом — внутри них: сначала закрываем
+/// плеер, иначе альбом открылся бы под ним.
+Future<void> _openAlbum(BuildContext context, WidgetRef ref) async {
+  final router = GoRouter.of(context);
+  final localTrackId = ref
+      .read(playerSnapshotProviderValue)
+      .current
+      ?.localTrackId;
+  if (localTrackId == null) return;
+  final albumId = await ref
+      .read(appServicesProvider)
+      .db
+      .tracksDao
+      .albumRemoteIdOf(localTrackId);
+  if (albumId == null || albumId.isEmpty || !context.mounted) return;
+  if (router.canPop()) router.pop();
+  router.push(Routes.albumFor(albumId));
 }
 
 /// Скачивание прямо с экрана плеера: в меню списка оно есть, но текущий
@@ -913,28 +943,95 @@ class _TrackFlags extends ConsumerWidget {
   }
 }
 
+/// Откуда и в каком качестве играет трек: иконка источника, название
+/// сервиса и качество отдельными строками — вместо голого «yandex · lossless».
 class _SourceBadge extends ConsumerWidget {
   const _SourceBadge();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final state = ref.watch(
       playerSnapshotProviderValue.select(
-        (s) => (s.usedSource, s.quality?.wire, s.resolving),
+        (s) => (s.usedSource, s.quality, s.resolving),
       ),
     );
-    final label = state.$3
-        ? l.commonLoading
-        : state.$1 == null
-        ? l.issueUnknown
-        : l.playerSourceChip(state.$1!.wire, state.$2 ?? '');
-    return Chip(
-      label: Text(label),
-      visualDensity: VisualDensity.compact,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(
-          Motion.of(context).prefs.corner.radius * 0.5,
+    final source = state.$1;
+    final (icon, name) = switch (source) {
+      SourceId.yandex => (Icons.music_note_rounded, l.sourceYandex),
+      SourceId.soundcloud => (Icons.cloud_rounded, 'SoundCloud'),
+      SourceId.local => (Icons.offline_pin_rounded, l.collectionDownloaded),
+      _ => (Icons.help_outline_rounded, l.issueUnknown),
+    };
+    // Настоящее качество знает только Яндекс. Скачанному файлу и SoundCloud
+    // резолвер пишет запрошенное, поэтому для них качество не показываем.
+    final quality = source != SourceId.yandex
+        ? null
+        : switch (state.$2) {
+            Quality.lossless => l.qualityLossless,
+            Quality.high => l.qualityHigh,
+            Quality.normal => l.qualityNormal,
+            Quality.low => l.qualityLow,
+            _ => null,
+          };
+    final lossless = state.$2 == Quality.lossless;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      child: Container(
+        key: ValueKey('${state.$3}|$source|${state.$2}'),
+        padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHigh.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: scheme.onSurface.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: scheme.primary.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: state.$3
+                  ? Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: scheme.primary,
+                      ),
+                    )
+                  : Icon(icon, size: 17, color: scheme.primary),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  state.$3 ? l.commonLoading : name,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    height: 1.1,
+                  ),
+                ),
+                if (!state.$3 && quality != null)
+                  Text(
+                    quality,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: lossless
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant,
+                      height: 1.2,
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -992,6 +1089,7 @@ class _IssueBanner extends StatelessWidget {
 }
 
 Future<void> showQueueSheet(BuildContext context) => showModalBottomSheet<void>(
+  useRootNavigator: true,
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -1210,6 +1308,7 @@ class _QueueRow extends StatelessWidget {
 /// Таймер сна живёт в плеере, а не в экране: закрытие страницы его не сбрасывает.
 Future<void> showSleepSheet(BuildContext context, WidgetRef ref) =>
     showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       // Без этого лист обрезался по 9/16 высоты и нижние пункты таймера

@@ -188,21 +188,20 @@ final appRouterProvider = GoRouter(
             AlbumScreen(albumId: state.uri.queryParameters['id'] ?? ''),
           ),
         ),
+        // Поиск и новинки — внутри оболочки: исполнитель или альбом,
+        // открытые отсюда, ложатся в тот же стек, и «назад» возвращает
+        // к поиску. Поверх вкладок стрелка на карточке не срабатывала.
+        GoRoute(
+          path: Routes.search,
+          pageBuilder: (context, state) =>
+              slideUpPage(state, const SearchScreen()),
+        ),
+        GoRoute(
+          path: Routes.newReleases,
+          pageBuilder: (context, state) =>
+              slideUpPage(state, const NewReleasesScreen()),
+        ),
       ],
-    ),
-    // Поиск — поверх вкладок: в Яндексе он тоже открывается отдельным
-    // экраном со стрелкой назад, а не живёт пятой вкладкой.
-    GoRoute(
-      path: Routes.search,
-      parentNavigatorKey: _rootKey,
-      pageBuilder: (context, state) =>
-          slideUpPage(state, const MiniPlayerHost(child: SearchScreen())),
-    ),
-    GoRoute(
-      path: Routes.newReleases,
-      parentNavigatorKey: _rootKey,
-      pageBuilder: (context, state) =>
-          slideUpPage(state, const MiniPlayerHost(child: NewReleasesScreen())),
     ),
     // Плеер и караоке — корневые маршруты, открываются через push():
     // оболочка остаётся внизу стека, поэтому панель исчезает, а свайп
@@ -238,7 +237,12 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    final location = GoRouterState.of(context).matchedLocation;
+    // Состояние самой оболочки после push() остаётся первым экраном стека:
+    // открытый поверх волны альбом считался главной, и мини-плеер прятался.
+    // Берём верхний маршрут роутера.
+    // GoRouterState.of — только чтобы оболочка пересобиралась на переходах.
+    GoRouterState.of(context);
+    final location = GoRouter.of(context).state.matchedLocation;
     final matched = _tabs.indexWhere(
       (t) => t.path != Routes.home && location.startsWith(t.path),
     );

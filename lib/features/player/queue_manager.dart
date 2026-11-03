@@ -118,6 +118,12 @@ class QueueManager {
 
   /// Следующий трек. `manual` — переключение пользователем, тогда repeat=one
   /// тоже идёт вперёд; автопродолжение после окончания трека зовёт с false.
+  /// Следующие [count] треков без сдвига позиции — для предзагрузки.
+  List<String> peekAhead(int count) => [
+    for (var i = 1; i <= count && _position + i < _order.length; i++)
+      _items[_order[_position + i]],
+  ];
+
   String? advance({bool manual = true}) {
     if (_order.isEmpty) return null;
     if (_repeat == PlaybackRepeat.one && !manual) return currentId;

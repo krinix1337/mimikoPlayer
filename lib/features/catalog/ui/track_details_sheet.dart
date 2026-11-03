@@ -14,6 +14,7 @@ Future<void> showTrackDetails(
   WidgetRef ref,
   String localTrackId,
 ) => showModalBottomSheet<void>(
+  useRootNavigator: true,
   context: context,
   showDragHandle: true,
   isScrollControlled: true,

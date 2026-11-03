@@ -226,6 +226,22 @@ class AppLocalizationsRu extends AppLocalizations {
   String get importListHint => 'Исполнитель - Название\nИсполнитель - Название';
 
   @override
+  String get importLinkLabel => 'Ссылка на открытый плейлист';
+
+  @override
+  String get importLinkHint => 'Spotify, SoundCloud или Яндекс Музыка';
+
+  @override
+  String get importLinkFailed => 'Не удалось прочитать плейлист по ссылке';
+
+  @override
+  String get importLinkTitle => 'Импорт по ссылке';
+
+  @override
+  String get importLinkNote =>
+      'Треки найдутся в Яндексе и сложатся в новый плейлист. Плейлист Яндекса просто откроется.';
+
+  @override
   String get importListFormat =>
       'Одна строка — один трек, формат «Исполнитель - Название». Первые 300 строк.';
 

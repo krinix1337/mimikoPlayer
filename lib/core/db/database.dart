@@ -91,6 +91,10 @@ class AppDatabase extends _$AppDatabase {
       description: 'дубли треков в плейлисте: ключ по позиции',
       up: (m) => m.alterTable(TableMigration(playlistTracks)),
     ),
+    4: MigrationStep(
+      description: 'пометка «скачан без цензуры»',
+      up: (m) => m.addColumn(downloadedFiles, downloadedFiles.uncensored),
+    ),
   };
 
   @override

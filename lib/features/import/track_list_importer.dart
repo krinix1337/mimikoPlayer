@@ -44,7 +44,8 @@ final class TrackListImporter {
 
     var matched = 0;
     var skipped = 0;
-    final entries = <({String localTrackId, String sourceId, String remoteId})>[];
+    final entries =
+        <({String localTrackId, String sourceId, String remoteId})>[];
     final cache = <String, SourceTrack?>{};
     for (var i = 0; i < rows.length; i++) {
       onProgress?.call(i, rows.length);

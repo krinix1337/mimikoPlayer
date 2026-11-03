@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
@@ -891,12 +892,19 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     }
     if (faded != null) unawaited(_syncEqualizer());
     _pendingSeek = Duration.zero;
+    // Скачанный файл мог лечь до того, как трек появился в базе без цензуры:
+    // тогда в нём цензура, и метку берём из пометки загрузки.
+    final uncensored = playback.usedSource == SourceId.local
+        ? _playsUncensored(variants) &&
+              await db.streamsDao.downloadIsUncensored(localTrackId)
+        : _playsUncensored(variants);
+    if (generation != _generation) return;
     _publish(
       _snapshot.copyWith(
         resolving: false,
         usedSource: playback.usedSource,
         quality: playback.quality,
-        uncensored: _playsUncensored(variants),
+        uncensored: uncensored,
       ),
     );
     if (!_wantPlaying) {
@@ -924,7 +932,56 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     );
     _startStallProbe();
     _scheduleSnapshot();
-    unawaited(_prefetchRadio());
+    unawaited(_prefetchRadio().whenComplete(() => _prefetchNext(generation)));
+  }
+
+  /// Пока играет текущий трек, заранее резолвим следующий и прогреваем
+  /// начало файла: на переходе ссылка берётся из кэша резолвера, и трек
+  /// не молчит пару секунд, пока идут download-info и первый буфер.
+  Future<void> _prefetchNext(int generation) async {
+    // Даём текущему треку спокойно набрать буфер.
+    await Future<void>.delayed(const Duration(seconds: 4));
+    if (generation != _generation) return;
+    for (final id in _queue.peekAhead(3)) {
+      if (await _services.db.libraryDao.likeState(id) == -1) continue;
+      final artists = await _services.db.tracksDao.artistNamesOf(id);
+      if (ArtistBlocklist.instance.isBlocked(artists)) continue;
+      try {
+        final variants = await _services.db.tracksDao.variantsOf(id);
+        final result = await _services.resolver.resolve(
+          localTrackId: id,
+          variants: variants,
+          quality: _services.defaultQuality,
+        );
+        if (generation != _generation) return;
+        if (result.playback?.target case StreamUrl(
+          :final url,
+          :final headers,
+        )) {
+          await _warmStream(url, headers);
+        }
+      } on Object catch (error) {
+        AppLogger.instance.warn('предзагрузка $id: $error');
+      }
+      return;
+    }
+  }
+
+  /// Первые ~512 КБ следующего трека: соединение с CDN и его кэш уже
+  /// прогреты, когда плеер попросит файл.
+  Future<void> _warmStream(Uri url, Map<String, String> headers) async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+    try {
+      final request = await client.getUrl(url);
+      headers.forEach(request.headers.set);
+      request.headers.set(HttpHeaders.rangeHeader, 'bytes=0-524287');
+      final response = await request.close();
+      await response.drain<void>();
+    } on Object {
+      // Прогрев — подсказка, не обязанность.
+    } finally {
+      client.close(force: true);
+    }
   }
 
   Future<void> _load(

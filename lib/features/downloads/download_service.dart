@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -13,6 +14,7 @@ import '../../core/db/daos/downloads_dao.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/platform/mimiko_platform.dart';
 import '../../core/sources/source_errors.dart';
+import '../../core/content/censor_base.dart';
 import '../../core/sources/source_id.dart';
 import '../../core/sources/stream_resolver.dart';
 import '../../core/sources/stream_target.dart';
@@ -81,12 +83,10 @@ class DownloadService {
       if (target is! StreamUrl) {
         throw const DownloadSkipException('Трек уже лежит в телефоне');
       }
-      if (_isHls(null, target.url)) {
-        throw const DownloadSkipException(hlsSkipReason);
-      }
-
       try {
-        final audio = await fetchResumable(
+        // SoundCloud чаще всего отдаёт HLS: сегменты склеиваются в один файл.
+        final fetch = _isHls(null, target.url) ? fetchHls : fetchResumable;
+        final audio = await fetch(
           url: target.url,
           headers: target.headers,
           dir: dir,
@@ -123,6 +123,15 @@ class DownloadService {
           codec: audio.codec,
           origin: origin,
           coverPath: coverPath,
+          // Яндекс-трек с заменой в базе резолвится в незацензуренный файл.
+          uncensored:
+              playback.usedSource == SourceId.yandex &&
+              CensorBase.instance.enabled &&
+              variants.any(
+                (v) =>
+                    v.ref.source == SourceId.yandex &&
+                    CensorBase.instance.hasReplacement(v.ref.remoteId),
+              ),
         );
         AppLogger.instance.info(
           'download done $localTrackId ${audio.bytes} bytes ${audio.path}',
@@ -169,6 +178,106 @@ class DownloadService {
       if (reason != null) return DownloadSkipException(reason);
     }
     return const DownloadException('Ни один источник не отдал поток');
+  }
+
+  /// Закачка HLS-потока: плейлист → init-сегмент (если есть) и сегменты по
+  /// порядку в один файл. MP3-сегменты склеиваются в обычный mp3, fMP4 — в
+  /// m4a. Зашифрованные потоки (EXT-X-KEY) не трогаем. Докачки с обрыва нет:
+  /// треки короткие, и после паузы файл просто качается заново.
+  static Future<DownloadedAudio> fetchHls({
+    required Uri url,
+    Map<String, String> headers = const {},
+    required Directory dir,
+    required String localTrackId,
+    CancelToken? cancelToken,
+    void Function(int received, int? total)? onBytes,
+    Future<bool> Function(int extraBytes)? fitsInLimit,
+    Future<bool> Function()? stillAllowed,
+    Future<void> Function(String codec, int? total, int offset)? onStarted,
+    void Function(String codec, int? total, int offset)? onLog,
+    Dio? dio,
+  }) async {
+    final client = dio ?? _dio;
+    Future<Response<T>> get<T>(Uri target, ResponseType type) async {
+      try {
+        return await client.get<T>(
+          '$target',
+          cancelToken: cancelToken,
+          options: Options(headers: headers, responseType: type),
+        );
+      } on DioException catch (error) {
+        if (_isCancelled(error)) throw const DownloadPausedException();
+        rethrow;
+      }
+    }
+
+    final playlist = (await get<String>(url, ResponseType.plain)).data ?? '';
+    final lines = const LineSplitter().convert(playlist);
+    if (lines.any(
+      (line) => line.startsWith('#EXT-X-KEY') && !line.contains('METHOD=NONE'),
+    )) {
+      throw const DownloadSkipException(hlsSkipReason);
+    }
+    Uri? init;
+    final segments = <Uri>[];
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.startsWith('#EXT-X-MAP')) {
+        final uri = RegExp(r'URI="([^"]+)"').firstMatch(trimmed)?.group(1);
+        if (uri != null) init = url.resolve(uri);
+      } else if (trimmed.isNotEmpty && !trimmed.startsWith('#')) {
+        segments.add(url.resolve(trimmed));
+      }
+    }
+    if (segments.isEmpty) {
+      throw const DownloadException('Источник вернул пустой плейлист');
+    }
+
+    final first = segments.first.path.toLowerCase();
+    final codec =
+        init != null || first.endsWith('.m4s') || first.endsWith('.mp4')
+        ? 'm4a'
+        : first.endsWith('.aac')
+        ? 'aac'
+        : 'mp3';
+    await onStarted?.call(codec, null, 0);
+    onLog?.call(codec, null, 0);
+
+    final temp = File(p.join(dir.path, '$localTrackId.part'));
+    await _delete(temp);
+    final sink = temp.openWrite();
+    var received = 0;
+    final parts = [?init, ...segments];
+    try {
+      for (final part in parts) {
+        if (stillAllowed != null && !await stillAllowed()) {
+          throw const DownloadPausedException();
+        }
+        final response = await get<List<int>>(part, ResponseType.bytes);
+        final bytes = response.data ?? const <int>[];
+        if (fitsInLimit != null && !await fitsInLimit(bytes.length)) {
+          throw const DownloadLimitException();
+        }
+        sink.add(bytes);
+        received += bytes.length;
+        onBytes?.call(received, null);
+      }
+      await sink.flush();
+      await sink.close();
+    } on Object {
+      await sink.close();
+      await _delete(temp);
+      rethrow;
+    }
+
+    if (received < 64 * 1024) {
+      await _delete(temp);
+      throw const DownloadException('Источник вернул не аудио');
+    }
+    final file = File(p.join(dir.path, '$localTrackId.$codec'));
+    if (await file.exists()) await file.delete();
+    await temp.rename(file.path);
+    return DownloadedAudio(path: file.path, bytes: received, codec: codec);
   }
 
   /// HTTP-механика одной закачки: `.part`, Range, 206/200/416 и обрыв по

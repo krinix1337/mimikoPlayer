@@ -7053,6 +7053,21 @@ class $DownloadedFilesTable extends DownloadedFiles
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _uncensoredMeta = const VerificationMeta(
+    'uncensored',
+  );
+  @override
+  late final GeneratedColumn<bool> uncensored = GeneratedColumn<bool>(
+    'uncensored',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("uncensored" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _stateMeta = const VerificationMeta('state');
   @override
   late final GeneratedColumn<String> state = GeneratedColumn<String>(
@@ -7114,6 +7129,7 @@ class $DownloadedFilesTable extends DownloadedFiles
     codec,
     origin,
     coverPath,
+    uncensored,
     state,
     source,
     errorText,
@@ -7182,6 +7198,12 @@ class $DownloadedFilesTable extends DownloadedFiles
       context.handle(
         _coverPathMeta,
         coverPath.isAcceptableOrUnknown(data['cover_path']!, _coverPathMeta),
+      );
+    }
+    if (data.containsKey('uncensored')) {
+      context.handle(
+        _uncensoredMeta,
+        uncensored.isAcceptableOrUnknown(data['uncensored']!, _uncensoredMeta),
       );
     }
     if (data.containsKey('state')) {
@@ -7264,6 +7286,10 @@ class $DownloadedFilesTable extends DownloadedFiles
         DriftSqlType.string,
         data['${effectivePrefix}cover_path'],
       ),
+      uncensored: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}uncensored'],
+      )!,
       state: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}state'],
@@ -7307,6 +7333,10 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
   /// Локальная копия обложки; без неё «Скачанное» пустеет офлайн.
   final String? coverPath;
 
+  /// Скачан незацензуренный файл из базы FckCensorData. У старых загрузок
+  /// false: они могли скачаться до того, как трек попал в базу.
+  final bool uncensored;
+
   /// pending | downloading | complete | failed
   final String state;
   final String source;
@@ -7324,6 +7354,7 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
     this.codec,
     required this.origin,
     this.coverPath,
+    required this.uncensored,
     required this.state,
     required this.source,
     this.errorText,
@@ -7345,6 +7376,7 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
     if (!nullToAbsent || coverPath != null) {
       map['cover_path'] = Variable<String>(coverPath);
     }
+    map['uncensored'] = Variable<bool>(uncensored);
     map['state'] = Variable<String>(state);
     map['source'] = Variable<String>(source);
     if (!nullToAbsent || errorText != null) {
@@ -7371,6 +7403,7 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
       coverPath: coverPath == null && nullToAbsent
           ? const Value.absent()
           : Value(coverPath),
+      uncensored: Value(uncensored),
       state: Value(state),
       source: Value(source),
       errorText: errorText == null && nullToAbsent
@@ -7395,6 +7428,7 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
       codec: serializer.fromJson<String?>(json['codec']),
       origin: serializer.fromJson<String>(json['origin']),
       coverPath: serializer.fromJson<String?>(json['coverPath']),
+      uncensored: serializer.fromJson<bool>(json['uncensored']),
       state: serializer.fromJson<String>(json['state']),
       source: serializer.fromJson<String>(json['source']),
       errorText: serializer.fromJson<String?>(json['errorText']),
@@ -7414,6 +7448,7 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
       'codec': serializer.toJson<String?>(codec),
       'origin': serializer.toJson<String>(origin),
       'coverPath': serializer.toJson<String?>(coverPath),
+      'uncensored': serializer.toJson<bool>(uncensored),
       'state': serializer.toJson<String>(state),
       'source': serializer.toJson<String>(source),
       'errorText': serializer.toJson<String?>(errorText),
@@ -7431,6 +7466,7 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
     Value<String?> codec = const Value.absent(),
     String? origin,
     Value<String?> coverPath = const Value.absent(),
+    bool? uncensored,
     String? state,
     String? source,
     Value<String?> errorText = const Value.absent(),
@@ -7445,6 +7481,7 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
     codec: codec.present ? codec.value : this.codec,
     origin: origin ?? this.origin,
     coverPath: coverPath.present ? coverPath.value : this.coverPath,
+    uncensored: uncensored ?? this.uncensored,
     state: state ?? this.state,
     source: source ?? this.source,
     errorText: errorText.present ? errorText.value : this.errorText,
@@ -7463,6 +7500,9 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
       codec: data.codec.present ? data.codec.value : this.codec,
       origin: data.origin.present ? data.origin.value : this.origin,
       coverPath: data.coverPath.present ? data.coverPath.value : this.coverPath,
+      uncensored: data.uncensored.present
+          ? data.uncensored.value
+          : this.uncensored,
       state: data.state.present ? data.state.value : this.state,
       source: data.source.present ? data.source.value : this.source,
       errorText: data.errorText.present ? data.errorText.value : this.errorText,
@@ -7484,6 +7524,7 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
           ..write('codec: $codec, ')
           ..write('origin: $origin, ')
           ..write('coverPath: $coverPath, ')
+          ..write('uncensored: $uncensored, ')
           ..write('state: $state, ')
           ..write('source: $source, ')
           ..write('errorText: $errorText, ')
@@ -7503,6 +7544,7 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
     codec,
     origin,
     coverPath,
+    uncensored,
     state,
     source,
     errorText,
@@ -7521,6 +7563,7 @@ class DownloadedFile extends DataClass implements Insertable<DownloadedFile> {
           other.codec == this.codec &&
           other.origin == this.origin &&
           other.coverPath == this.coverPath &&
+          other.uncensored == this.uncensored &&
           other.state == this.state &&
           other.source == this.source &&
           other.errorText == this.errorText &&
@@ -7537,6 +7580,7 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
   final Value<String?> codec;
   final Value<String> origin;
   final Value<String?> coverPath;
+  final Value<bool> uncensored;
   final Value<String> state;
   final Value<String> source;
   final Value<String?> errorText;
@@ -7551,6 +7595,7 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
     this.codec = const Value.absent(),
     this.origin = const Value.absent(),
     this.coverPath = const Value.absent(),
+    this.uncensored = const Value.absent(),
     this.state = const Value.absent(),
     this.source = const Value.absent(),
     this.errorText = const Value.absent(),
@@ -7566,6 +7611,7 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
     this.codec = const Value.absent(),
     this.origin = const Value.absent(),
     this.coverPath = const Value.absent(),
+    this.uncensored = const Value.absent(),
     this.state = const Value.absent(),
     required String source,
     this.errorText = const Value.absent(),
@@ -7583,6 +7629,7 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
     Expression<String>? codec,
     Expression<String>? origin,
     Expression<String>? coverPath,
+    Expression<bool>? uncensored,
     Expression<String>? state,
     Expression<String>? source,
     Expression<String>? errorText,
@@ -7598,6 +7645,7 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
       if (codec != null) 'codec': codec,
       if (origin != null) 'origin': origin,
       if (coverPath != null) 'cover_path': coverPath,
+      if (uncensored != null) 'uncensored': uncensored,
       if (state != null) 'state': state,
       if (source != null) 'source': source,
       if (errorText != null) 'error_text': errorText,
@@ -7615,6 +7663,7 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
     Value<String?>? codec,
     Value<String>? origin,
     Value<String?>? coverPath,
+    Value<bool>? uncensored,
     Value<String>? state,
     Value<String>? source,
     Value<String?>? errorText,
@@ -7630,6 +7679,7 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
       codec: codec ?? this.codec,
       origin: origin ?? this.origin,
       coverPath: coverPath ?? this.coverPath,
+      uncensored: uncensored ?? this.uncensored,
       state: state ?? this.state,
       source: source ?? this.source,
       errorText: errorText ?? this.errorText,
@@ -7665,6 +7715,9 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
     if (coverPath.present) {
       map['cover_path'] = Variable<String>(coverPath.value);
     }
+    if (uncensored.present) {
+      map['uncensored'] = Variable<bool>(uncensored.value);
+    }
     if (state.present) {
       map['state'] = Variable<String>(state.value);
     }
@@ -7694,6 +7747,7 @@ class DownloadedFilesCompanion extends UpdateCompanion<DownloadedFile> {
           ..write('codec: $codec, ')
           ..write('origin: $origin, ')
           ..write('coverPath: $coverPath, ')
+          ..write('uncensored: $uncensored, ')
           ..write('state: $state, ')
           ..write('source: $source, ')
           ..write('errorText: $errorText, ')
@@ -15483,6 +15537,7 @@ typedef $$DownloadedFilesTableCreateCompanionBuilder =
       Value<String?> codec,
       Value<String> origin,
       Value<String?> coverPath,
+      Value<bool> uncensored,
       Value<String> state,
       required String source,
       Value<String?> errorText,
@@ -15499,6 +15554,7 @@ typedef $$DownloadedFilesTableUpdateCompanionBuilder =
       Value<String?> codec,
       Value<String> origin,
       Value<String?> coverPath,
+      Value<bool> uncensored,
       Value<String> state,
       Value<String> source,
       Value<String?> errorText,
@@ -15574,6 +15630,11 @@ class $$DownloadedFilesTableFilterComposer
 
   ColumnFilters<String> get coverPath => $composableBuilder(
     column: $table.coverPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get uncensored => $composableBuilder(
+    column: $table.uncensored,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -15670,6 +15731,11 @@ class $$DownloadedFilesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get uncensored => $composableBuilder(
+    column: $table.uncensored,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get state => $composableBuilder(
     column: $table.state,
     builder: (column) => ColumnOrderings(column),
@@ -15748,6 +15814,11 @@ class $$DownloadedFilesTableAnnotationComposer
 
   GeneratedColumn<String> get coverPath =>
       $composableBuilder(column: $table.coverPath, builder: (column) => column);
+
+  GeneratedColumn<bool> get uncensored => $composableBuilder(
+    column: $table.uncensored,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get state =>
       $composableBuilder(column: $table.state, builder: (column) => column);
@@ -15828,6 +15899,7 @@ class $$DownloadedFilesTableTableManager
                 Value<String?> codec = const Value.absent(),
                 Value<String> origin = const Value.absent(),
                 Value<String?> coverPath = const Value.absent(),
+                Value<bool> uncensored = const Value.absent(),
                 Value<String> state = const Value.absent(),
                 Value<String> source = const Value.absent(),
                 Value<String?> errorText = const Value.absent(),
@@ -15842,6 +15914,7 @@ class $$DownloadedFilesTableTableManager
                 codec: codec,
                 origin: origin,
                 coverPath: coverPath,
+                uncensored: uncensored,
                 state: state,
                 source: source,
                 errorText: errorText,
@@ -15858,6 +15931,7 @@ class $$DownloadedFilesTableTableManager
                 Value<String?> codec = const Value.absent(),
                 Value<String> origin = const Value.absent(),
                 Value<String?> coverPath = const Value.absent(),
+                Value<bool> uncensored = const Value.absent(),
                 Value<String> state = const Value.absent(),
                 required String source,
                 Value<String?> errorText = const Value.absent(),
@@ -15872,6 +15946,7 @@ class $$DownloadedFilesTableTableManager
                 codec: codec,
                 origin: origin,
                 coverPath: coverPath,
+                uncensored: uncensored,
                 state: state,
                 source: source,
                 errorText: errorText,

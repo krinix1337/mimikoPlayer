@@ -49,87 +49,94 @@ class SettingsScreen extends ConsumerWidget {
       return '$theme · $accent · $language';
     }
 
+    // Список режется по низ статус-бара: при прокрутке крупный заголовок
+    // заезжал на часы и значки.
     return Scaffold(
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 56, 20, 12),
-            child: Text(
-              l.settingsTitle,
-              style: Theme.of(context).textTheme.displaySmall,
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: EdgeInsets.only(
+            bottom: 24 + MediaQuery.paddingOf(context).bottom,
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+              child: Text(
+                l.settingsTitle,
+                style: Theme.of(context).textTheme.displaySmall,
+              ),
             ),
-          ),
-          SettingsSection(
-            title: kKeyboardTestTheme ? '' : l.settingsTitle,
-            children: [
-              _CategoryTile(
-                index: 0,
-                icon: Icons.palette_outlined,
-                title: l.settingsSectionAppearance,
-                subtitle: appearanceSummary(),
-                page: const _AppearancePage(),
-              ),
-              _CategoryTile(
-                index: 1,
-                icon: Icons.graphic_eq_rounded,
-                title: l.settingsSectionSound,
-                subtitle: '${l.settingsQuality}: ${prefs.qualityLabel(l)}',
-                page: const _SoundPage(),
-              ),
-              _CategoryTile(
-                index: 2,
-                icon: Icons.lyrics_rounded,
-                title: l.settingsSectionKaraoke,
-                subtitle: l.settingsLyricsSource,
-                page: const _KaraokeSettingsPage(),
-              ),
-              _CategoryTile(
-                index: 3,
-                icon: Icons.sd_storage_rounded,
-                title: l.settingsSectionStorage,
-                subtitle: l.settingsData,
-                page: const _StoragePage(),
-              ),
-              _CategoryTile(
-                index: 4,
-                icon: Icons.account_circle_outlined,
-                title: l.settingsSectionAccount,
-                subtitle: l.settingsAccount,
-                page: const _AccountPage(),
-              ),
-              _CategoryTile(
-                index: 5,
-                icon: Icons.move_to_inbox_rounded,
-                title: l.importTitle,
-                subtitle: l.importTileSubtitle,
-                page: const _ImportPage(),
-              ),
-              FutureBuilder<String>(
-                future: MimikoPlatform.appVersion(),
-                builder: (context, snapshot) {
-                  final version = snapshot.data;
-                  return _CategoryTile(
-                    index: 6,
-                    icon: Icons.system_update_rounded,
-                    title: l.updatesTitle,
-                    subtitle: version == null || version.isEmpty
-                        ? l.updatesTileSubtitle
-                        : l.settingsVersion(version),
-                    page: const _UpdatesPage(),
-                  );
-                },
-              ),
-              _CategoryTile(
-                index: 7,
-                icon: Icons.info_outline_rounded,
-                title: l.settingsSectionAbout,
-                subtitle: l.appTitle,
-                page: const _AboutPage(),
-              ),
-            ],
-          ),
-        ],
+            SettingsSection(
+              title: kKeyboardTestTheme ? '' : l.settingsTitle,
+              children: [
+                _CategoryTile(
+                  index: 0,
+                  icon: Icons.palette_outlined,
+                  title: l.settingsSectionAppearance,
+                  subtitle: appearanceSummary(),
+                  page: const _AppearancePage(),
+                ),
+                _CategoryTile(
+                  index: 1,
+                  icon: Icons.graphic_eq_rounded,
+                  title: l.settingsSectionSound,
+                  subtitle: '${l.settingsQuality}: ${prefs.qualityLabel(l)}',
+                  page: const _SoundPage(),
+                ),
+                _CategoryTile(
+                  index: 2,
+                  icon: Icons.lyrics_rounded,
+                  title: l.settingsSectionKaraoke,
+                  subtitle: l.settingsLyricsSource,
+                  page: const _KaraokeSettingsPage(),
+                ),
+                _CategoryTile(
+                  index: 3,
+                  icon: Icons.sd_storage_rounded,
+                  title: l.settingsSectionStorage,
+                  subtitle: l.settingsData,
+                  page: const _StoragePage(),
+                ),
+                _CategoryTile(
+                  index: 4,
+                  icon: Icons.account_circle_outlined,
+                  title: l.settingsSectionAccount,
+                  subtitle: l.settingsAccount,
+                  page: const _AccountPage(),
+                ),
+                _CategoryTile(
+                  index: 5,
+                  icon: Icons.move_to_inbox_rounded,
+                  title: l.importTitle,
+                  subtitle: l.importTileSubtitle,
+                  page: const _ImportPage(),
+                ),
+                FutureBuilder<String>(
+                  future: MimikoPlatform.appVersion(),
+                  builder: (context, snapshot) {
+                    final version = snapshot.data;
+                    return _CategoryTile(
+                      index: 6,
+                      icon: Icons.system_update_rounded,
+                      title: l.updatesTitle,
+                      subtitle: version == null || version.isEmpty
+                          ? l.updatesTileSubtitle
+                          : l.settingsVersion(version),
+                      page: const _UpdatesPage(),
+                    );
+                  },
+                ),
+                _CategoryTile(
+                  index: 7,
+                  icon: Icons.info_outline_rounded,
+                  title: l.settingsSectionAbout,
+                  subtitle: l.appTitle,
+                  page: const _AboutPage(),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -693,23 +700,17 @@ class _EqualizerSheetState extends ConsumerState<_EqualizerSheet> {
     final prefs = ref.watch(prefsProvider);
     final controller = ref.read(prefsProvider.notifier);
 
-    return DraggableScrollableSheet(
-      expand: false,
-      // Фиксированная высота: потянуть лист на весь экран нельзя, лишнее
-      // содержимое просто прокручивается внутри.
-      initialChildSize: 0.78,
-      minChildSize: 0.35,
-      maxChildSize: 0.78,
-      snap: true,
-      shouldCloseOnMinExtent: true,
-      builder: (context, scroll) => ListView(
-        controller: scroll,
-        padding: EdgeInsets.fromLTRB(
-          16,
-          8,
-          16,
-          24 + MediaQuery.viewPaddingOf(context).bottom,
-        ),
+    // Лист по высоте содержимого: раньше он тянулся на 78% экрана, и под
+    // кнопкой пресета оставалась пустота.
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        24 + MediaQuery.viewPaddingOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Center(
             child: Container(
@@ -738,7 +739,7 @@ class _EqualizerSheetState extends ConsumerState<_EqualizerSheet> {
           ),
           const SizedBox(height: 10),
           SizedBox(
-            height: 300,
+            height: 240,
             child: _EqualizerSliders(
               gains: _gains,
               level: _level,
@@ -1136,6 +1137,21 @@ class _ImportPage extends StatelessWidget {
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () async {
                 final result = await showTrackListImportSheet(context);
+                if (result?.playlistId != null && context.mounted) {
+                  context.push(Routes.playlist(result!.playlistId!));
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.link_rounded),
+              title: Text(l.importLinkTitle),
+              subtitle: Text(l.importLinkHint),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () async {
+                final result = await showTrackListImportSheet(
+                  context,
+                  byLink: true,
+                );
                 if (result?.playlistId != null && context.mounted) {
                   context.push(Routes.playlist(result!.playlistId!));
                 }

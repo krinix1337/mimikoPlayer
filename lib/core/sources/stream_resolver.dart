@@ -167,6 +167,11 @@ final class StreamResolver {
     return ResolveResult.failed(failures);
   }
 
+  /// Запрос «без потерь» не берёт из сохранённого кэша mp3 прошлых запусков:
+  /// он мог лечь до того, как появился FLAC-путь.
+  static bool _fits(ResolvedPlayback cached, Quality wanted) =>
+      wanted != Quality.lossless || cached.quality == Quality.lossless;
+
   Future<ResolvedPlayback?> _fromCache(
     String localTrackId,
     SourceId source,
@@ -178,7 +183,9 @@ final class StreamResolver {
       _lru.remove(_key(localTrackId, source, quality));
     }
     if (await store.cached(localTrackId, source, quality) case final stored?) {
-      if (stored.canReuseAt(now)) return stored.asCached();
+      if (stored.canReuseAt(now) && _fits(stored, quality)) {
+        return stored.asCached();
+      }
       await store.invalidate(localTrackId, source);
     }
     return null;

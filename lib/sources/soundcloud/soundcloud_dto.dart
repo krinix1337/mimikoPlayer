@@ -88,6 +88,8 @@ final class SoundCloudDto {
         'permalink_url': json['permalink_url'],
         'policy': policy,
         'genre': json['genre'],
+        'plays': json['playback_count'],
+        'likes': json['likes_count'] ?? json['favoritings_count'],
       },
     );
   }

@@ -12,6 +12,7 @@ import '../../../sources/yandex/yandex_auth.dart';
 /// странице Яндекса, приложение только опрашивает выдачу токена.
 Future<void> showYandexLogin(BuildContext context, WidgetRef ref) =>
     showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       builder: (context) => const _YandexLoginSheet(),

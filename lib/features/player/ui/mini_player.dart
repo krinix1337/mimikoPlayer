@@ -222,13 +222,17 @@ class _MiniProgress extends ConsumerWidget {
     final value = total == 0
         ? 0.0
         : (data.$1.inMilliseconds / total).clamp(0.0, 1.0);
-    return SizedBox(
-      height: 2,
+    // Полоса внутри пилюли, с отступами от краёв: прижатая к низу, она
+    // вылезала розовым хвостом из-под скруглённого угла.
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
       child: LinearProgressIndicator(
         value: value,
-        minHeight: 2,
-        backgroundColor: Colors.transparent,
-        color: Theme.of(context).colorScheme.primary,
+        minHeight: 3,
+        borderRadius: BorderRadius.circular(2),
+        backgroundColor: scheme.onSurface.withValues(alpha: 0.10),
+        color: scheme.primary,
       ),
     );
   }
@@ -243,6 +247,9 @@ class MiniPlayerHost extends ConsumerWidget {
 
   final Widget child;
 
+  /// Пилюля 64 + полоса прогресса 9 + поля 6/4 и запас.
+  static const double _pillHeight = 90;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final enabled = ref.watch(prefsProvider.select((p) => p.showMiniPlayer));
@@ -251,25 +258,31 @@ class MiniPlayerHost extends ConsumerWidget {
     );
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     final visible = enabled && hasTrack && !keyboard;
-    final bottom = MediaQuery.viewPaddingOf(context).bottom;
-    return ColoredBox(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: Column(
-        children: [
-          Expanded(
-            // Нижний отступ системы берёт на себя пилюля, а не страница.
-            child: MediaQuery.removePadding(
-              context: context,
-              removeBottom: visible,
-              child: child,
+    final media = MediaQuery.of(context);
+    // Пилюля плавает поверх страницы, как во вкладках: список уходит под
+    // неё, а не обрывается сплошной полосой. Её высоту страница получает
+    // нижним отступом — SliverBottomInset добавляет хвост под последний ряд.
+    return Stack(
+      children: [
+        MediaQuery(
+          data: media.copyWith(
+            padding: media.padding.copyWith(
+              bottom: media.padding.bottom + (visible ? _pillHeight : 0),
             ),
           ),
-          Padding(
-            padding: EdgeInsets.only(bottom: visible ? bottom + 4 : 0),
+          child: child,
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: SafeArea(
+            top: false,
+            minimum: const EdgeInsets.only(bottom: 4),
             child: MiniPlayer(hidden: !visible),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

@@ -45,12 +45,12 @@ class GlassTopBar extends StatelessWidget {
             // резкий тёмный прямоугольник. Стекло проявляется при прокрутке.
             final exposure = ((offset - 12) / 80).clamp(0.0, 1.0);
             final sigma = currentBlur.top;
-            // Пока список движется, фильтр не пересчитывается: плотная
-            // подложка вместо blur. Стекло возвращается после остановки.
-            final useBlur = sigma > 0.3 && !scrolling;
+            // Стекло не выключается на время прокрутки: подмена на плотную
+            // подложку и обратно читалась как моргание панели.
+            final useBlur = sigma > 0.3;
             final baseAlpha = kKeyboardTestTheme
                 ? 0.95
-                : (sigma > 0 ? (scrolling ? 0.9 : 0.5) : 0.78);
+                : (sigma > 0 ? 0.5 : 0.78);
             final tintTop = scheme.surface.withValues(
               alpha: baseAlpha * exposure,
             );

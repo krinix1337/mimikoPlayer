@@ -106,6 +106,10 @@ class DownloadedFiles extends Table {
   /// Локальная копия обложки; без неё «Скачанное» пустеет офлайн.
   TextColumn get coverPath => text().nullable()();
 
+  /// Скачан незацензуренный файл из базы FckCensorData. У старых загрузок
+  /// false: они могли скачаться до того, как трек попал в базу.
+  BoolColumn get uncensored => boolean().withDefault(const Constant(false))();
+
   /// pending | downloading | complete | failed
   TextColumn get state => text().withDefault(const Constant('pending'))();
   TextColumn get source => text()();

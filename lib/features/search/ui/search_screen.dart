@@ -200,7 +200,9 @@ class _SearchResults extends StatelessWidget {
     final artists = sections?.artists ?? const <SearchArtistHit>[];
     final albums = sections?.albums ?? const <AlbumBrief>[];
     return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: EdgeInsets.only(
+        bottom: 24 + MediaQuery.paddingOf(context).bottom,
+      ),
       children: [
         if (artists.isNotEmpty) ...[
           _SectionTitle(title: l.searchArtists),
@@ -236,8 +238,7 @@ class _SearchResults extends StatelessWidget {
                   width: 128,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(14),
-                    onTap: () =>
-                        context.push(Routes.albumFor(album.remoteId)),
+                    onTap: () => context.push(Routes.albumFor(album.remoteId)),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -379,7 +380,12 @@ class _SearchHistory extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        24 + MediaQuery.paddingOf(context).bottom,
+      ),
       children: [
         Row(
           children: [

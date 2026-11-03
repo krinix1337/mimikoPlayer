@@ -198,35 +198,50 @@ class _LyricsBodyState extends State<_LyricsBody> {
       });
     }
 
-    return Stack(
-      children: [
-        ListView.builder(
-          controller: widget.scroll,
-          padding: const EdgeInsets.fromLTRB(24, 40, 24, 120),
-          itemCount: widget.lyrics.lines.length,
-          itemBuilder: (context, index) {
-            final line = widget.lyrics.lines[index];
-            final isActive = index == active;
-            return _LyricLineView(
-              key: isActive
-                  ? widget.keys.putIfAbsent(index, () => GlobalKey())
-                  : null,
-              line: line,
-              active: isActive && widget.lyrics.synced,
-              dimmed: widget.lyrics.synced && !isActive,
-              progress: isActive && widget.lyrics.synced
-                  ? line.progressAt(widget.at)
-                  : 0,
-              onTap: widget.onSeek == null
-                  ? null
-                  : () => widget.onSeek!(line),
-            );
-          },
-        ),
-        // Мягкие края: строки не обрезаются резкой границей экрана.
-        const _EdgeFade(alignment: Alignment.topCenter, height: 56),
-        const _EdgeFade(alignment: Alignment.bottomCenter, height: 104),
-      ],
+    // Края списка растворяют сам текст, а не кладут чёрные полосы поверх фона:
+    // у полос была видна граница, и строки под шапкой словно обрезались.
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (bounds) => LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: const [
+          Colors.transparent,
+          Colors.transparent,
+          Colors.white,
+          Colors.white,
+          Colors.transparent,
+        ],
+        stops: [
+          0,
+          // Первые 20 px полностью прозрачны: срез строки у шапки не виден.
+          (20 / bounds.height).clamp(0.0, 0.2),
+          (96 / bounds.height).clamp(0.0, 0.5),
+          (1 - 104 / bounds.height).clamp(0.5, 1.0),
+          1,
+        ],
+      ).createShader(bounds),
+      child: ListView.builder(
+        controller: widget.scroll,
+        padding: const EdgeInsets.fromLTRB(24, 40, 24, 120),
+        itemCount: widget.lyrics.lines.length,
+        itemBuilder: (context, index) {
+          final line = widget.lyrics.lines[index];
+          final isActive = index == active;
+          return _LyricLineView(
+            // Ключ у каждой строки постоянный: когда он появлялся только у
+            // активной, строка пересоздавалась и анимация обрывалась рывком.
+            key: widget.keys.putIfAbsent(index, () => GlobalKey()),
+            line: line,
+            active: isActive && widget.lyrics.synced,
+            dimmed: widget.lyrics.synced && !isActive,
+            progress: isActive && widget.lyrics.synced
+                ? line.progressAt(widget.at)
+                : 0,
+            onTap: widget.onSeek == null ? null : () => widget.onSeek!(line),
+          );
+        },
+      ),
     );
   }
 }
@@ -253,10 +268,8 @@ class _LyricLineView extends StatelessWidget {
     final prefs = motion.prefs;
     final scheme = Theme.of(context).colorScheme;
     final scale = prefs.lyricsSize.scale;
-    final base = Theme.of(context).textTheme.headlineSmall!.copyWith(
-      height: 1.35,
-      letterSpacing: -0.1,
-    );
+    final base = Theme.of(context).textTheme.headlineSmall!
+        .copyWith(height: 1.35, letterSpacing: -0.1);
     final dimAlpha = prefs.lyricsDimOthers ? 0.5 : 0.74;
     final inactive = base.copyWith(
       fontSize: 23 * scale,
@@ -276,7 +289,13 @@ class _LyricLineView extends StatelessWidget {
       duration: motion.micro(300),
       curve: Curves.easeOutCubic,
       builder: (context, t, _) {
-        final style = TextStyle.lerp(inactive, activeStyle, t)!;
+        // Размер шрифта не анимируем: каждый кадр текст переносился заново,
+        // высота строки скакала, и соседние строки дёргались. Шрифт сразу
+        // конечный, рост показывает масштаб, а высоту плавно ведёт AnimatedSize.
+        final style = (active ? activeStyle : inactive).copyWith(
+          color: Color.lerp(inactive.color, activeStyle.color, t),
+        );
+        final grow = (23 + 6 * t) / (active ? 29 : 23);
         final dimColor = Color.lerp(
           inactive.color!,
           scheme.primary.withValues(alpha: 0.42),
@@ -301,9 +320,18 @@ class _LyricLineView extends StatelessWidget {
         return GestureDetector(
           onTap: onTap,
           behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 7 + 4 * t),
-            child: content,
+          child: AnimatedSize(
+            duration: motion.micro(300),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topLeft,
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: active ? 11 : 7),
+              child: Transform.scale(
+                scale: grow,
+                alignment: Alignment.centerLeft,
+                child: content,
+              ),
+            ),
           ),
         );
       },
@@ -475,33 +503,6 @@ class _ProgressTextState extends State<_ProgressText> {
   }
 }
 
-class _EdgeFade extends StatelessWidget {
-  const _EdgeFade({required this.alignment, required this.height});
-
-  final Alignment alignment;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) => IgnorePointer(
-    child: Align(
-      alignment: alignment,
-      child: Container(
-        height: height,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: alignment,
-            end: Alignment(alignment.x, -alignment.y),
-            colors: [
-              Colors.black.withValues(alpha: 0.52),
-              Colors.black.withValues(alpha: 0),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
 class _Notice extends StatelessWidget {
   const _Notice({required this.text});
 
@@ -515,9 +516,8 @@ class _Notice extends StatelessWidget {
         child: Text(
           text,
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+          style: Theme.of(context).textTheme.bodyLarge
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       ),
     );

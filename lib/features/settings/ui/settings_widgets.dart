@@ -879,6 +879,7 @@ class BlockedArtistsTile extends ConsumerWidget {
         ),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: () => showModalBottomSheet<void>(
+          useRootNavigator: true,
           context: context,
           showDragHandle: true,
           isScrollControlled: true,
@@ -905,42 +906,47 @@ class _BlockedArtistsSheet extends ConsumerWidget {
           constraints: BoxConstraints(
             maxHeight: MediaQuery.sizeOf(context).height * 0.7,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Text(
-                  l.settingsBlockedArtists,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-              if (names.isEmpty)
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                   child: Text(
-                    l.settingsBlockedArtistsEmpty,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    l.settingsBlockedArtists,
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
-                )
-              else
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: names.length,
-                    itemBuilder: (context, index) => ListTile(
-                      title: Text(names[index]),
-                      trailing: IconButton(
-                        tooltip: l.artistUnblock,
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () =>
-                            ArtistBlocklist.instance.unblock(db, names[index]),
+                ),
+                if (names.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                    child: Text(
+                      l.settingsBlockedArtistsEmpty,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: names.length,
+                      itemBuilder: (context, index) => ListTile(
+                        title: Text(names[index]),
+                        trailing: IconButton(
+                          tooltip: l.artistUnblock,
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => ArtistBlocklist.instance.unblock(
+                            db,
+                            names[index],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         );
       },

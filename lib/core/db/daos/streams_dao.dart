@@ -23,6 +23,16 @@ class StreamsDao implements ResolutionStore {
             ..limit(1))
           .getSingleOrNull();
 
+  /// Скачанный файл — незацензуренная версия (см. [DownloadedFiles.uncensored]).
+  Future<bool> downloadIsUncensored(String localTrackId) async {
+    final row =
+        await (_db.select(_db.downloadedFiles)
+              ..where((t) => t.localTrackId.equals(localTrackId))
+              ..limit(1))
+            .getSingleOrNull();
+    return row?.uncensored ?? false;
+  }
+
   @override
   Future<String?> downloadedFilePath(String localTrackId) async {
     final row =
@@ -73,8 +83,10 @@ class StreamsDao implements ResolutionStore {
     String? codec,
     String origin = 'manual',
     String? coverPath,
+    bool uncensored = false,
   }) => _replaceDownload(
     DownloadedFilesCompanion.insert(
+      uncensored: Value(uncensored),
       localTrackId: localTrackId,
       filePath: filePath,
       source: source.wire,

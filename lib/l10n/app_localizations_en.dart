@@ -224,6 +224,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importListHint => 'Artist - Title\nArtist - Title';
 
   @override
+  String get importLinkLabel => 'Link to a public playlist';
+
+  @override
+  String get importLinkHint => 'Spotify, SoundCloud or Yandex Music';
+
+  @override
+  String get importLinkFailed => 'Could not read the playlist from this link';
+
+  @override
+  String get importLinkTitle => 'Import by link';
+
+  @override
+  String get importLinkNote =>
+      'Tracks are matched on Yandex and saved to a new playlist. A Yandex playlist simply opens.';
+
+  @override
   String get importListFormat =>
       'One line per track, “Artist - Title”. First 300 lines.';
 

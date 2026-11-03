@@ -488,6 +488,36 @@ abstract class AppLocalizations {
   /// **'Исполнитель - Название\nИсполнитель - Название'**
   String get importListHint;
 
+  /// No description provided for @importLinkLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Ссылка на открытый плейлист'**
+  String get importLinkLabel;
+
+  /// No description provided for @importLinkHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Spotify, SoundCloud или Яндекс Музыка'**
+  String get importLinkHint;
+
+  /// No description provided for @importLinkFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось прочитать плейлист по ссылке'**
+  String get importLinkFailed;
+
+  /// No description provided for @importLinkTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Импорт по ссылке'**
+  String get importLinkTitle;
+
+  /// No description provided for @importLinkNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Треки найдутся в Яндексе и сложатся в новый плейлист. Плейлист Яндекса просто откроется.'**
+  String get importLinkNote;
+
   /// No description provided for @importListFormat.
   ///
   /// In ru, this message translates to:

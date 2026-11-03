@@ -39,6 +39,50 @@ class SoundCloudSource implements MusicSource {
     await _api.ensureClientId();
   }
 
+  /// Открытый плейлист по ссылке: название и строки «Исполнитель — Название».
+  /// В ответе /resolve полные данные только у первых треков, остальные
+  /// приходят одним id и дочитываются пачками.
+  Future<({String title, List<String> rows})?> playlistRows(String url) async {
+    final reply = await _api.resolveUrl(url);
+    final data = reply.asMap;
+    if (data == null || data['tracks'] is! List) return null;
+    final raw = [
+      for (final item in data['tracks'] as List)
+        if (item is Map) Map<String, dynamic>.from(item),
+    ];
+    final missing = [
+      for (final item in raw)
+        if (item['title'] == null) '${item['id']}',
+    ];
+    final full = <String, Map<String, dynamic>>{};
+    for (var i = 0; i < missing.length; i += 50) {
+      final batch = await _api.tracks(missing.skip(i).take(50).toList());
+      if (batch.data is List) {
+        for (final item in batch.data! as List) {
+          if (item is Map) full['${item['id']}'] = Map.from(item);
+        }
+      }
+    }
+    final rows = <String>[];
+    for (final item in raw) {
+      final track = item['title'] == null ? full['${item['id']}'] : item;
+      if (track == null) continue;
+      final title = '${track['title'] ?? ''}'.trim();
+      final meta = track['publisher_metadata'];
+      final artist = meta is Map && '${meta['artist'] ?? ''}'.trim().isNotEmpty
+          ? '${meta['artist']}'.trim()
+          : '${(track['user'] as Map?)?['username'] ?? ''}'.trim();
+      if (title.isEmpty) continue;
+      // Заголовок на SoundCloud часто уже «Исполнитель - Трек».
+      rows.add(
+        RegExp(r'\s[-–—]\s').hasMatch(title) || artist.isEmpty
+            ? title
+            : '$artist - $title',
+      );
+    }
+    return (title: '${data['title'] ?? ''}'.trim(), rows: rows);
+  }
+
   @override
   Future<SearchResult> search(
     String query, {
@@ -103,17 +147,52 @@ class SoundCloudSource implements MusicSource {
       0,
       (max, b) => b.length > max ? b.length : max,
     );
-    for (var i = 0; i < longest && result.length < target; i++) {
-      for (final branch in branches) {
-        if (i >= branch.length || result.length >= target) continue;
-        final track = branch[i];
-        if (!track.available || track.duration.inSeconds < 60) continue;
-        if (!seen.add(track.ref.remoteId)) continue;
-        if (!isNewSong(track)) continue;
-        result.add(track);
+    // Два прохода: сначала только «слушабельные» треки, и лишь если их
+    // слишком мало — добираем с мягким порогом прослушиваний.
+    for (final minPlays in const [_radioMinPlays, _radioFallbackPlays]) {
+      for (var i = 0; i < longest && result.length < target; i++) {
+        for (final branch in branches) {
+          if (i >= branch.length || result.length >= target) continue;
+          final track = branch[i];
+          if (!isRadioWorthy(track, minPlays: minPlays)) continue;
+          if (seen.contains(track.ref.remoteId)) continue;
+          if (!isNewSong(track)) continue;
+          seen.add(track.ref.remoteId);
+          result.add(track);
+        }
       }
+      if (result.length >= target ~/ 2) break;
     }
     return result;
+  }
+
+  static const _radioMinPlays = 20000;
+  static const _radioFallbackPlays = 2000;
+
+  /// Перезаливы с изменённой скоростью, нарезки, миксы и «биты» — то, что в
+  /// волне звучит как мусор. Обычные ремиксы оставляем.
+  static final _junkTitle = RegExp(
+    r'slowed|sped[\s-]?up|speed[\s-]?up|nightcore|reverb|\b8d\b|'
+    r'bass\s?boost|type\s?beat|mashup|snippet|preview|\bleak|'
+    r'\bdj\s?set\b|\bmix(tape)?\b\s*\d|podcast|episode|'
+    r'замедл|ускор|\bремикс\s+by\b',
+    caseSensitive: false,
+  );
+
+  /// Годится ли трек для волны: играется целиком, длина обычной песни,
+  /// заметное число прослушиваний и без признаков мусорного перезалива.
+  static bool isRadioWorthy(
+    SourceTrack track, {
+    int minPlays = _radioMinPlays,
+  }) {
+    if (!track.available) return false;
+    final seconds = track.duration.inSeconds;
+    if (seconds < 90 || seconds > 8 * 60) return false;
+    if (_junkTitle.hasMatch(track.title)) return false;
+    final plays = track.raw?['plays'];
+    // Нет счётчика (старый кэш) — не режем, иначе волна пустеет.
+    if (plays is num && plays < minPlays) return false;
+    return true;
   }
 
   /// Ключи «название|исполнитель» для отсева перезаливов в [radio].
@@ -128,9 +207,21 @@ class SoundCloudSource implements MusicSource {
   /// исполнителя из волны Яндекса — так SoundCloud-волна сохраняет вкус).
   Future<String?> seedFor(String query) async {
     final found = await search(query, pageSize: 10);
-    for (final track in found.tracks) {
-      if (track.available && track.duration.inSeconds >= 60) {
-        return track.ref.remoteId;
+    // Затравка задаёт всю ветку рекомендаций: берём популярный трек, а не
+    // первый попавшийся перезалив.
+    final wanted = normalizeArtist(query);
+    bool byArtist(SourceTrack track) =>
+        track.artists.any((artist) => normalizeArtist(artist) == wanted);
+    for (final pass in const [
+      (plays: _radioMinPlays, sameArtist: true),
+      (plays: _radioMinPlays, sameArtist: false),
+      (plays: 0, sameArtist: false),
+    ]) {
+      for (final track in found.tracks) {
+        if (pass.sameArtist && !byArtist(track)) continue;
+        if (isRadioWorthy(track, minPlays: pass.plays)) {
+          return track.ref.remoteId;
+        }
       }
     }
     return null;

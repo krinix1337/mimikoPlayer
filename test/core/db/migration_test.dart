@@ -77,19 +77,20 @@ void _createV1(File file) {
 }
 
 void main() {
-  test('апгрейд v1 → v3 сохраняет лайки и старые загрузки', () async {
+  test('апгрейд v1 → v4 сохраняет лайки и старые загрузки', () async {
     final dir = await Directory.systemTemp.createTemp('mimiko_migration_');
     final file = File(p.join(dir.path, 'app.sqlite'));
     _createV1(file);
 
     final db = AppDatabase.forTesting(NativeDatabase(file));
     try {
-      expect(await db.schemaVersionInDb(), 3);
+      expect(await db.schemaVersionInDb(), 4);
       expect(await db.libraryDao.likedTrackIds(), ['t_1']);
 
       final downloads = await db.select(db.downloadedFiles).get();
       expect(downloads, hasLength(1));
       expect(downloads.single.filePath, '/data/downloads/t_1.mp3');
+      expect(downloads.single.uncensored, isFalse);
       expect(downloads.single.origin, 'manual');
       expect(downloads.single.coverPath, isNull);
       expect(await db.select(db.downloadTasks).get(), isEmpty);
@@ -99,10 +100,10 @@ void main() {
     }
   });
 
-  test('чистая установка создаёт всю схему v3', () async {
+  test('чистая установка создаёт всю схему v4', () async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     try {
-      expect(await db.schemaVersionInDb(), 3);
+      expect(await db.schemaVersionInDb(), 4);
       final counts = await db.rowCountSnapshot();
       expect(
         counts.keys,

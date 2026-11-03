@@ -39,13 +39,10 @@ class AppSurface extends StatelessWidget {
     return ValueListenableBuilder<bool>(
       valueListenable: appScrollActive,
       builder: (context, scrolling, _) {
-        // Пока идёт прокрутка, не пересчитываем BackdropFilter каждый кадр:
-        // панель становится плотной, а стекло возвращается после остановки.
-        final dense = scrolling && baseSigma > 0;
-        final sigma = dense ? 0.0 : baseSigma;
-        final surfaceColor = dense
-            ? Color.alphaBlend(baseColor, scheme.surfaceContainerHigh)
-            : baseColor;
+        // Стекло держим и во время прокрутки: переключение на плотную
+        // подложку и обратно было видно как моргание панели и мини-плеера.
+        final sigma = baseSigma;
+        final surfaceColor = baseColor;
         Widget surface = Material(
           color: surfaceColor,
           borderRadius: shape,

@@ -38,6 +38,7 @@ Future<void> showTrackMenu(
   final hostContext = context;
 
   return showModalBottomSheet<void>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
@@ -419,6 +420,7 @@ Future<void> _showAddToPlaylist(
 
   final choice =
       await showModalBottomSheet<({PlaylistOverview? playlist, bool create})>(
+        useRootNavigator: true,
         context: context,
         showDragHandle: true,
         isScrollControlled: true,

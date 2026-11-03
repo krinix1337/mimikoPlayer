@@ -134,24 +134,41 @@ class HomeScreen extends ConsumerWidget {
                         tooltip: l.waveTune,
                       ),
                       Expanded(
-                        child: modeLabel == null && contextTitle == null
-                            ? Text(
-                                stationTitle,
-                                style: theme.textTheme.displaySmall,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                              )
-                            : Center(
-                                child: _WaveModePill(
-                                  label: modeLabel ?? contextTitle!,
-                                  onClear: modeLabel != null
-                                      ? () => _resetWaveMode(context, ref)
-                                      : () => ref
-                                            .read(playbackControllerProvider)
-                                            .stop(),
-                                ),
-                              ),
+                        // Крупным текстом — только «Моя волна» без режима.
+                        // Любая другая станция, режим или источник — пилюля
+                        // с крестиком, который возвращает к «Моей волне».
+                        child: switch ((
+                          modeLabel,
+                          contextTitle,
+                          station == WaveStationIds.myVibe,
+                        )) {
+                          (null, null, true) => Text(
+                            stationTitle,
+                            style: theme.textTheme.displaySmall,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                          (final mode?, _, _) => Center(
+                            child: _WaveModePill(
+                              label: mode,
+                              onClear: () => _resetWaveMode(context, ref),
+                            ),
+                          ),
+                          (null, final playing?, _) => Center(
+                            child: _WaveModePill(
+                              label: playing,
+                              onClear: () =>
+                                  ref.read(playbackControllerProvider).stop(),
+                            ),
+                          ),
+                          _ => Center(
+                            child: _WaveModePill(
+                              label: stationTitle,
+                              onClear: () => _backToMyVibe(ref),
+                            ),
+                          ),
+                        },
                       ),
                       IconButton(
                         tooltip: l.navSearch,
@@ -180,6 +197,14 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  static Future<void> _backToMyVibe(WidgetRef ref) async {
+    ref.read(stationProvider.notifier).select(WaveStationIds.myVibe);
+    ref.invalidate(waveTracksProvider);
+    if (ref.read(playerSnapshotProviderValue).isRadio) {
+      await startWave(ref);
+    }
   }
 
   static Future<void> _resetWaveMode(
@@ -397,51 +422,56 @@ class _WaveControls extends ConsumerWidget {
             const SizedBox(width: 8),
           ],
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(20, 11, 20, 11),
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: scheme.onSurface.withValues(alpha: 0.08),
-                ),
-              ),
-              child: AnimatedSwitcher(
-                duration: motion.micro(240),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                transitionBuilder: (child, animation) => FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween(
-                      begin: const Offset(0, 0.12),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
+            // Тап по плашке трека открывает полный плеер, как мини-плеер.
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: current == null ? null : () => openPlayer(context),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 11, 20, 11),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.72),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: scheme.onSurface.withValues(alpha: 0.08),
                   ),
                 ),
-                child: Column(
-                  key: ValueKey('${current?.localTrackId}:$text'),
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      text,
-                      maxLines: 1,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                child: AnimatedSwitcher(
+                  duration: motion.micro(240),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween(
+                        begin: const Offset(0, 0.12),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
                     ),
-                    if (subtitle != null && subtitle.isNotEmpty)
+                  ),
+                  child: Column(
+                    key: ValueKey('${current?.localTrackId}:$text'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       Text(
-                        subtitle,
+                        text,
                         maxLines: 1,
                         textAlign: TextAlign.center,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                  ],
+                      if (subtitle != null && subtitle.isNotEmpty)
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -536,6 +566,7 @@ class _RoundAction extends StatelessWidget {
 /// новое, язык. Пишется прямо в станцию — рекомендации меняются на аккаунте.
 Future<void> showWaveSettingsSheet(BuildContext context, WidgetRef ref) =>
     showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -768,9 +799,7 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
       });
       return;
     }
-    await ref
-        .read(prefsProvider.notifier)
-        .setWaveSoundCloud(option.soundCloud);
+    await ref.read(prefsProvider.notifier).setWaveSoundCloud(option.soundCloud);
     if (!mounted) return;
     ref.read(stationProvider.notifier).select(WaveStationIds.myVibe);
     ref.invalidate(waveSettingsProvider);

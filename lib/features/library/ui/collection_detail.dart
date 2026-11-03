@@ -44,81 +44,74 @@ class CollectionKindScreen extends ConsumerWidget {
       CollectionKind.downloaded => l.collectionDownloaded,
     };
 
-    return Scaffold(
-      // Список заканчивается у мини-плеера, без пустого хвоста под ним.
-      extendBody: false,
-      // Пилюля уважает настройку и не заезжает под системную навигацию.
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Consumer(
-          builder: (context, ref, _) => ref.watch(prefsProvider).showMiniPlayer
-              ? const MiniPlayer()
-              : const SizedBox.shrink(),
-        ),
-      ),
-      body: rows.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _ErrorBox(text: l.dbError('$error')),
-        data: (data) => CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              pinned: true,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              title: Text(title),
-              actions: [
-                if (kind == CollectionKind.liked)
+    // Мини-плеер плавает поверх страницы, как во вкладках.
+    return MiniPlayerHost(
+      child: Scaffold(
+        body: rows.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => _ErrorBox(text: l.dbError('$error')),
+          data: (data) => CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                pinned: true,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                title: Text(title),
+                actions: [
+                  if (kind == CollectionKind.liked)
+                    IconButton(
+                      tooltip: l.collectionDownloadAllLikes,
+                      icon: const Icon(Icons.download_rounded),
+                      onPressed: () => _downloadAll(context, ref),
+                    ),
                   IconButton(
-                    tooltip: l.collectionDownloadAllLikes,
-                    icon: const Icon(Icons.download_rounded),
-                    onPressed: () => _downloadAll(context, ref),
+                    tooltip: l.collectionSort,
+                    icon: const Icon(Icons.swap_vert_rounded),
+                    onPressed: () => showSortSheet(context, ref),
                   ),
-                IconButton(
-                  tooltip: l.collectionSort,
-                  icon: const Icon(Icons.swap_vert_rounded),
-                  onPressed: () => showSortSheet(context, ref),
+                ],
+              ),
+              if (data.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(28),
+                      child: Text(
+                        _emptyFor(l),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                    ),
+                  ),
+                )
+              else ...[
+                SliverToBoxAdapter(
+                  child: _CollectionHero(
+                    kind: kind,
+                    rows: data,
+                    onPlay: () => _play(context, ref, data, 0),
+                    onShuffle: () =>
+                        _play(context, ref, data, 0, shuffle: true),
+                  ),
                 ),
-              ],
-            ),
-            if (data.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(28),
-                    child: Text(
-                      _emptyFor(l),
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyLarge,
+                SliverList.builder(
+                  itemCount: data.length,
+                  itemBuilder: (context, index) => RiseIn(
+                    delay: Duration(milliseconds: (index * 18).clamp(0, 180)),
+                    offset: 12,
+                    child: TrackTile(
+                      row: data[index],
+                      queue: data,
+                      index: index,
+                      kind: kind.name,
+                      sourceTitle: title,
                     ),
                   ),
                 ),
-              )
-            else ...[
-              SliverToBoxAdapter(
-                child: _CollectionHero(
-                  kind: kind,
-                  rows: data,
-                  onPlay: () => _play(context, ref, data, 0),
-                  onShuffle: () => _play(context, ref, data, 0, shuffle: true),
-                ),
-              ),
-              SliverList.builder(
-                itemCount: data.length,
-                itemBuilder: (context, index) => RiseIn(
-                  delay: Duration(milliseconds: (index * 18).clamp(0, 180)),
-                  offset: 12,
-                  child: TrackTile(
-                    row: data[index],
-                    queue: data,
-                    index: index,
-                    kind: kind.name,
-                    sourceTitle: title,
-                  ),
-                ),
-              ),
+              ],
+              const SliverBottomInset(),
             ],
-            const SliverBottomInset(),
-          ],
+          ),
         ),
       ),
     );
@@ -566,93 +559,88 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen> {
     final l = AppLocalizations.of(context);
     final playlists = ref.watch(playlistsProvider);
 
-    return Scaffold(
-      // Сетка заканчивается у мини-плеера, а не уезжает под него.
-      extendBody: false,
-      // Пилюля уважает настройку и не заезжает под системную навигацию.
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Consumer(
-          builder: (context, ref, _) => ref.watch(prefsProvider).showMiniPlayer
-              ? const MiniPlayer()
-              : const SizedBox.shrink(),
-        ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () =>
-            ref.read(playlistSyncProvider.notifier).refresh(force: true),
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverAppBar(
-              pinned: true,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              title: Text(l.collectionPlaylists),
-              titleTextStyle: Theme.of(context).textTheme.headlineSmall,
-              actions: [
-                IconButton(
-                  tooltip: l.playlistCreate,
-                  icon: const Icon(Icons.add_rounded),
-                  onPressed: _create,
-                ),
-              ],
-            ),
-            switch (playlists) {
-              AsyncError(:final error) => SliverFillRemaining(
-                hasScrollBody: false,
-                child: _ErrorBox(text: l.dbError('$error')),
+    // Мини-плеер плавает поверх страницы, как во вкладках.
+    return MiniPlayerHost(
+      child: Scaffold(
+        body: RefreshIndicator(
+          onRefresh: () =>
+              ref.read(playlistSyncProvider.notifier).refresh(force: true),
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverAppBar(
+                pinned: true,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                title: Text(l.collectionPlaylists),
+                titleTextStyle: Theme.of(context).textTheme.headlineSmall,
+                actions: [
+                  IconButton(
+                    tooltip: l.playlistCreate,
+                    icon: const Icon(Icons.add_rounded),
+                    onPressed: _create,
+                  ),
+                ],
               ),
-              AsyncData(:final value) when value.isEmpty => SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
+              switch (playlists) {
+                AsyncError(:final error) => SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _ErrorBox(text: l.dbError('$error')),
+                ),
+                AsyncData(:final value) when value.isEmpty =>
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(28),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              l.collectionEmptyPlaylists,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                            const SizedBox(height: 16),
+                            FilledButton.tonalIcon(
+                              onPressed: _create,
+                              icon: const Icon(Icons.add_rounded),
+                              label: Text(l.playlistCreate),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                AsyncData(:final value) => SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  sliver: SliverGrid(
+                    gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 220,
+                      mainAxisSpacing: 14,
+                      crossAxisSpacing: 14,
+                      childAspectRatio: 0.78,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      childCount: value.length,
+                      (context, index) => RiseIn(
+                        delay: Duration(
+                          milliseconds: (index * 24).clamp(0, 200),
+                        ),
+                        child: _PlaylistCard(playlist: value[index]),
+                      ),
+                    ),
+                  ),
+                ),
+                _ => const SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(28),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          l.collectionEmptyPlaylists,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        const SizedBox(height: 16),
-                        FilledButton.tonalIcon(
-                          onPressed: _create,
-                          icon: const Icon(Icons.add_rounded),
-                          label: Text(l.playlistCreate),
-                        ),
-                      ],
-                    ),
+                    padding: EdgeInsets.all(48),
+                    child: Center(child: CircularProgressIndicator()),
                   ),
                 ),
-              ),
-              AsyncData(:final value) => SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                sliver: SliverGrid(
-                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 220,
-                    mainAxisSpacing: 14,
-                    crossAxisSpacing: 14,
-                    childAspectRatio: 0.78,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    childCount: value.length,
-                    (context, index) => RiseIn(
-                      delay: Duration(milliseconds: (index * 24).clamp(0, 200)),
-                      child: _PlaylistCard(playlist: value[index]),
-                    ),
-                  ),
-                ),
-              ),
-              _ => const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.all(48),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              ),
-            },
-            const SliverBottomInset(),
-          ],
+              },
+              const SliverBottomInset(),
+            ],
+          ),
         ),
       ),
     );
@@ -717,173 +705,170 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
     final l = AppLocalizations.of(context);
     final detail = ref.watch(playlistProvider(widget.playlistId));
 
-    return Scaffold(
-      // Список заканчивается у мини-плеера, без пустой полосы под ним.
-      extendBody: false,
-      // Пилюля уважает настройку и не заезжает под системную навигацию.
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Consumer(
-          builder: (context, ref, _) => ref.watch(prefsProvider).showMiniPlayer
-              ? const MiniPlayer()
-              : const SizedBox.shrink(),
-        ),
-      ),
-      body: detail.when(
-        loading: () => _statusView(
-          context,
-          l,
-          const Center(child: CircularProgressIndicator()),
-        ),
-        error: (error, _) =>
-            _statusView(context, l, Center(child: Text(l.dbError('$error')))),
-        data: (value) {
-          if (value == null) {
-            return _statusView(
-              context,
-              l,
-              Center(child: Text(l.playlistNotFound)),
-            );
-          }
-          final rows = value.rows;
-          final scheme = Theme.of(context).colorScheme;
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              // Лёгкий оттенок обложки на всей странице: низ больше не
-              // выглядит чёрной дырой вокруг мини-плеера и панели.
-              BlurredCover(url: value.overview.coverUrl, opacity: 0.16),
-              // Hero заканчивается плотной поверхностью, а страница под ним
-              // подсвечена обложкой: без моста на стыке видна тёмная полоса.
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 470,
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          scheme.surface,
-                          scheme.surface,
-                          scheme.surface.withValues(alpha: 0),
-                        ],
-                        stops: const [0, 380 / 470, 1],
+    // Мини-плеер плавает поверх страницы, как во вкладках.
+    return MiniPlayerHost(
+      child: Scaffold(
+        body: detail.when(
+          loading: () => _statusView(
+            context,
+            l,
+            const Center(child: CircularProgressIndicator()),
+          ),
+          error: (error, _) =>
+              _statusView(context, l, Center(child: Text(l.dbError('$error')))),
+          data: (value) {
+            if (value == null) {
+              return _statusView(
+                context,
+                l,
+                Center(child: Text(l.playlistNotFound)),
+              );
+            }
+            final rows = value.rows;
+            final scheme = Theme.of(context).colorScheme;
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // Лёгкий оттенок обложки на всей странице: низ больше не
+                // выглядит чёрной дырой вокруг мини-плеера и панели.
+                BlurredCover(url: value.overview.coverUrl, opacity: 0.16),
+                // Hero заканчивается плотной поверхностью, а страница под ним
+                // подсвечена обложкой: без моста на стыке видна тёмная полоса.
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 470,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            scheme.surface,
+                            scheme.surface,
+                            scheme.surface.withValues(alpha: 0),
+                          ],
+                          stops: const [0, 380 / 470, 1],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              CustomScrollView(
-                controller: _scroll,
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: _PlaylistHero(
-                      title: value.overview.title,
-                      coverUrl: value.overview.coverUrl,
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SectionHeader(title: l.collectionCount(rows.length)),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              FilledButton.icon(
-                                onPressed: rows.isEmpty
-                                    ? null
-                                    : () => _play(
-                                        context,
-                                        ref,
-                                        rows,
-                                        0,
-                                        title: value.overview.title,
-                                      ),
-                                icon: const Icon(Icons.play_arrow_rounded),
-                                label: Text(l.collectionPlayAll),
-                              ),
-                              const SizedBox(width: 10),
-                              OutlinedButton.icon(
-                                onPressed: rows.isEmpty
-                                    ? null
-                                    : () => _play(
-                                        context,
-                                        ref,
-                                        rows,
-                                        0,
-                                        title: value.overview.title,
-                                        shuffle: true,
-                                      ),
-                                icon: const Icon(Icons.shuffle_rounded),
-                                label: Text(l.collectionShuffleAll),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SliverList.builder(
-                    itemCount: rows.length,
-                    itemBuilder: (context, index) => TrackTile(
-                      row: rows[index],
-                      queue: rows,
-                      index: index,
-                      kind: 'playlist',
-                      sourceTitle: value.overview.title,
-                    ),
-                  ),
-                  const SliverBottomInset(),
-                ],
-              ),
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: GlassTopBar(
-                  title: value.overview.title,
+                CustomScrollView(
                   controller: _scroll,
-                  revealAt: 300,
-                  actions: [
-                    if (value.overview.source == 'yandex')
-                      IconButton(
-                        tooltip: l.collectionShare,
-                        icon: const Icon(Icons.share_rounded),
-                        onPressed: () => _share(context, ref, value.overview),
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _PlaylistHero(
+                        title: value.overview.title,
+                        coverUrl: value.overview.coverUrl,
                       ),
-                    IconButton(
-                      tooltip: l.playlistCoverChange,
-                      icon: const Icon(Icons.image_outlined),
-                      onPressed: () =>
-                          changePlaylistCover(context, ref, widget.playlistId),
                     ),
-                    if (value.overview.source == 'local')
-                      IconButton(
-                        tooltip: l.playlistDeleteLocal,
-                        icon: const Icon(Icons.delete_outline_rounded),
-                        onPressed: () =>
-                            _deleteLocal(context, ref, value.overview),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SectionHeader(
+                              title: l.collectionCount(rows.length),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                FilledButton.icon(
+                                  onPressed: rows.isEmpty
+                                      ? null
+                                      : () => _play(
+                                          context,
+                                          ref,
+                                          rows,
+                                          0,
+                                          title: value.overview.title,
+                                        ),
+                                  icon: const Icon(Icons.play_arrow_rounded),
+                                  label: Text(l.collectionPlayAll),
+                                ),
+                                const SizedBox(width: 10),
+                                OutlinedButton.icon(
+                                  onPressed: rows.isEmpty
+                                      ? null
+                                      : () => _play(
+                                          context,
+                                          ref,
+                                          rows,
+                                          0,
+                                          title: value.overview.title,
+                                          shuffle: true,
+                                        ),
+                                  icon: const Icon(Icons.shuffle_rounded),
+                                  label: Text(l.collectionShuffleAll),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    IconButton(
-                      tooltip: l.collectionDownloadAllLikes,
-                      icon: const Icon(Icons.download_rounded),
-                      onPressed: rows.isEmpty
-                          ? null
-                          : () => _downloadAll(context, ref, rows),
                     ),
+                    SliverList.builder(
+                      itemCount: rows.length,
+                      itemBuilder: (context, index) => TrackTile(
+                        row: rows[index],
+                        queue: rows,
+                        index: index,
+                        kind: 'playlist',
+                        sourceTitle: value.overview.title,
+                      ),
+                    ),
+                    const SliverBottomInset(),
                   ],
                 ),
-              ),
-            ],
-          );
-        },
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: GlassTopBar(
+                    title: value.overview.title,
+                    controller: _scroll,
+                    revealAt: 300,
+                    actions: [
+                      if (value.overview.source == 'yandex')
+                        IconButton(
+                          tooltip: l.collectionShare,
+                          icon: const Icon(Icons.share_rounded),
+                          onPressed: () => _share(context, ref, value.overview),
+                        ),
+                      IconButton(
+                        tooltip: l.playlistCoverChange,
+                        icon: const Icon(Icons.image_outlined),
+                        onPressed: () => changePlaylistCover(
+                          context,
+                          ref,
+                          widget.playlistId,
+                        ),
+                      ),
+                      if (value.overview.source == 'local')
+                        IconButton(
+                          tooltip: l.playlistDeleteLocal,
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          onPressed: () =>
+                              _deleteLocal(context, ref, value.overview),
+                        ),
+                      IconButton(
+                        tooltip: l.collectionDownloadAllLikes,
+                        icon: const Icon(Icons.download_rounded),
+                        onPressed: rows.isEmpty
+                            ? null
+                            : () => _downloadAll(context, ref, rows),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

@@ -660,8 +660,12 @@ Future<void> showSortSheet(BuildContext context, WidgetRef ref) {
   };
 
   return showModalBottomSheet<void>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
+    // В AMOLED-теме лист по умолчанию почти чёрный и сливался с затемнённым
+    // фоном — выглядел выключенным. Берём поднятую поверхность.
+    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
     builder: (context) => SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
