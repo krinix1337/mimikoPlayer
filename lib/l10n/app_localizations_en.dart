@@ -1693,4 +1693,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutRepository => 'Repository';
+
+  @override
+  String get updatesReinstall => 'Reinstall';
+
+  @override
+  String updatesReinstallTitle(String version) {
+    return 'Reinstall $version';
+  }
+
+  @override
+  String get updatesReinstallNote => 'Download this version’s APK again';
+
+  @override
+  String get updatesReinstallConfirm =>
+      'The app will download the latest release and open the installer. Your account, collection, statistics and settings stay.';
 }

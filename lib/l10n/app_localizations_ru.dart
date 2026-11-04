@@ -1697,4 +1697,19 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get aboutRepository => 'Репозиторий';
+
+  @override
+  String get updatesReinstall => 'Переустановить';
+
+  @override
+  String updatesReinstallTitle(String version) {
+    return 'Переустановить $version';
+  }
+
+  @override
+  String get updatesReinstallNote => 'Скачать APK этой версии заново';
+
+  @override
+  String get updatesReinstallConfirm =>
+      'Приложение скачает последний релиз и откроет установщик. Аккаунт, коллекция, статистика и настройки сохранятся.';
 }

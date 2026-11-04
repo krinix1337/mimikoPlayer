@@ -3121,6 +3121,30 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Репозиторий'**
   String get aboutRepository;
+
+  /// No description provided for @updatesReinstall.
+  ///
+  /// In ru, this message translates to:
+  /// **'Переустановить'**
+  String get updatesReinstall;
+
+  /// No description provided for @updatesReinstallTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Переустановить {version}'**
+  String updatesReinstallTitle(String version);
+
+  /// No description provided for @updatesReinstallNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скачать APK этой версии заново'**
+  String get updatesReinstallNote;
+
+  /// No description provided for @updatesReinstallConfirm.
+  ///
+  /// In ru, this message translates to:
+  /// **'Приложение скачает последний релиз и откроет установщик. Аккаунт, коллекция, статистика и настройки сохранятся.'**
+  String get updatesReinstallConfirm;
 }
 
 class _AppLocalizationsDelegate

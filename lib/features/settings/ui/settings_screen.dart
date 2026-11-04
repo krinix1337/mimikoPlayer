@@ -1839,8 +1839,34 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
     }
   }
 
-  Future<void> _downloadAndInstall() async {
-    final release = _release;
+  /// Переустановка текущей версии: тот же APK из последнего релиза
+  /// скачивается заново после подтверждения. Данные приложения остаются.
+  Future<void> _reinstall(UpdateRelease latest) async {
+    final l = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.restart_alt_rounded),
+        title: Text(l.updatesReinstallTitle(latest.version)),
+        content: Text(l.updatesReinstallConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l.updatesReinstall),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await _downloadAndInstall(latest);
+  }
+
+  Future<void> _downloadAndInstall([UpdateRelease? target]) async {
+    final release = target ?? _release;
     if (release == null) return;
     final l = AppLocalizations.of(context);
     setState(() {
@@ -1938,7 +1964,9 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
     final theme = Theme.of(context);
     final failure = _failureText(l);
     final release = _release;
-    final action = _downloadedPath != null ? _install : _downloadAndInstall;
+    final action = _downloadedPath != null
+        ? _install
+        : () => _downloadAndInstall();
     final actionLabel = _downloading
         ? l.updatesDownloading((_progress * 100).round())
         : _downloadedPath != null
@@ -2079,6 +2107,41 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
                   '${l.updatesSize(GithubUpdater.formatMb(latest.size))}',
                 ),
               ),
+              if (_upToDate)
+                ListTile(
+                  leading: Icon(
+                    Icons.restart_alt_rounded,
+                    color: theme.colorScheme.primary,
+                  ),
+                  title: Text(
+                    _downloading
+                        ? l.updatesDownloading((_progress * 100).round())
+                        : l.updatesReinstallTitle(latest.version),
+                  ),
+                  subtitle: Text(l.updatesReinstallNote),
+                  trailing: _downloading
+                      ? TextButton(
+                          onPressed: _cancelDownload,
+                          child: Text(l.updatesCancel),
+                        )
+                      : const Icon(Icons.chevron_right_rounded, size: 18),
+                  onTap: _downloading || _checking
+                      ? null
+                      : _downloadedPath != null
+                      ? _install
+                      : () => _reinstall(latest),
+                ),
+              if (_upToDate && _downloading)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: WavyProgress(
+                    value: _progress,
+                    playing: true,
+                    height: 12,
+                    stroke: 4,
+                    amplitude: 2.5,
+                  ),
+                ),
               if (latest.notes != null && latest.notes!.isNotEmpty)
                 ListTile(
                   leading: const Icon(Icons.article_outlined),
@@ -2201,8 +2264,17 @@ class _UpdatesHero extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
+                    // Компактная кнопка M3 (40 dp): тема делает кнопки
+                    // крупными, и рядом с названием эта казалась огромной.
                     FilledButton.tonalIcon(
                       onPressed: onCheck,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        textStyle: Theme.of(context).textTheme.labelLarge
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
                       icon: checking
                           ? const SizedBox(
                               width: 16,

@@ -613,5 +613,10 @@
   "statsPlaysCount": "{count, plural, one{{count} play} other{{count} plays}}",
   "@statsPlaysCount": {"placeholders": {"count": {"type": "int"}}},
   "statsCleared": "Statistics cleared",
-  "aboutRepository": "Repository"
+  "aboutRepository": "Repository",
+  "updatesReinstall": "Reinstall",
+  "updatesReinstallTitle": "Reinstall {version}",
+  "@updatesReinstallTitle": {"placeholders": {"version": {"type": "String"}}},
+  "updatesReinstallNote": "Download this version’s APK again",
+  "updatesReinstallConfirm": "The app will download the latest release and open the installer. Your account, collection, statistics and settings stay."
 }

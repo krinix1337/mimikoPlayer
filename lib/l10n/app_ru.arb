@@ -826,5 +826,10 @@
   "statsPlaysCount": "{count, plural, one{{count} прослушивание} few{{count} прослушивания} many{{count} прослушиваний} other{{count} прослушивания}}",
   "@statsPlaysCount": {"placeholders": {"count": {"type": "int"}}},
   "statsCleared": "Статистика очищена",
-  "aboutRepository": "Репозиторий"
+  "aboutRepository": "Репозиторий",
+  "updatesReinstall": "Переустановить",
+  "updatesReinstallTitle": "Переустановить {version}",
+  "@updatesReinstallTitle": {"placeholders": {"version": {"type": "String"}}},
+  "updatesReinstallNote": "Скачать APK этой версии заново",
+  "updatesReinstallConfirm": "Приложение скачает последний релиз и откроет установщик. Аккаунт, коллекция, статистика и настройки сохранятся."
 }
