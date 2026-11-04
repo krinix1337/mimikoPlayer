@@ -28,6 +28,13 @@ void main() {
   }
 
   final api = YandexApi()..token = token;
+
+  // uid берём из аккаунта токена, а не храним в репозитории.
+  Future<String> accountUid() async {
+    final status = await api.get('/account/status');
+    final account = status.asMap?['account'] as Map?;
+    return '${account?['uid']}';
+  }
   final source = YandexSource(api: api);
 
   test('поиск отдаёт треки с артистами и обложкой', () async {
@@ -91,7 +98,7 @@ void main() {
   });
 
   test('список плейлистов аккаунта и один плейлист с треками', () async {
-    final uid = '1874380055';
+    final uid = await accountUid();
     final list = await api.get('/users/$uid/playlists/list');
     expect(list.isOk, isTrue);
     expect(list.asList, isNotEmpty);
@@ -119,7 +126,8 @@ void main() {
   });
 
   test('лайки резолвятся в полные треки', () async {
-    final result = await api.get('/users/1874380055/likes/tracks');
+    final uid = await accountUid();
+    final result = await api.get('/users/$uid/likes/tracks');
     final library = result.asMap?['library'] as Map?;
     final pairs = (library?['tracks'] as List? ?? const []).take(20).toList();
     expect(pairs, isNotEmpty);
