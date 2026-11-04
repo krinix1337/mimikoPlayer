@@ -19,6 +19,7 @@ import 'theme/app_motion.dart';
 import 'theme/blur_settings.dart';
 import 'theme/app_theme.dart';
 import 'theme/keyboard_theme.dart';
+import 'widgets/theme_reveal.dart';
 
 class MimikoApp extends ConsumerStatefulWidget {
   const MimikoApp({super.key});
@@ -161,7 +162,7 @@ class _MimikoAppState extends ConsumerState<MimikoApp>
           child: Stack(
             fit: StackFit.expand,
             children: [
-              _AppReveal(child: child ?? const SizedBox()),
+              ThemeReveal(child: _AppReveal(child: child ?? const SizedBox())),
               _LaunchSplash(
                 enabled: prefs.animations != AnimationsSpeed.off,
                 iconAsset: prefs.launcherIcon.asset,

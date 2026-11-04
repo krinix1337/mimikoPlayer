@@ -890,7 +890,6 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       _killOutgoing();
       return;
     }
-    if (faded != null) unawaited(_syncEqualizer());
     _pendingSeek = Duration.zero;
     // Скачанный файл мог лечь до того, как трек появился в базе без цензуры:
     // тогда в нём цензура, и метку берём из пометки загрузки.
@@ -915,6 +914,16 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       _startStallProbe();
       _scheduleSnapshot();
       return;
+    }
+    // Новый плеер (кроссфейд, первый запуск) — новая аудиосессия: пока
+    // эквалайзер на неё не встал, первая секунда звучала без него и
+    // громкость прыгала. Ждём применения, но не дольше 800 мс.
+    if (!identical(_equalizerSyncedFor, _player)) {
+      await _syncEqualizer().timeout(
+        const Duration(milliseconds: 800),
+        onTimeout: () {},
+      );
+      if (generation != _generation) return;
     }
     await _player.setVolume(0);
     _startPlayback();
@@ -1524,10 +1533,17 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
   /// Пресет пересчитывается под реальные полосы устройства. `parameters`
   /// разрешается после активации аудиосессии, поэтому вызов можно делать
   /// до старта воспроизведения: гейны применятся, как только появится плеер.
+  /// Плеер, к сессии которого эквалайзер уже применён.
+  AudioPlayer? _equalizerSyncedFor;
+
   Future<void> _syncEqualizer() async {
+    final player = _player;
     final enabled = _services.eqEnabled;
     await _equalizer.setEnabled(enabled);
-    if (!enabled) return;
+    if (!enabled) {
+      _equalizerSyncedFor = player;
+      return;
+    }
     final custom = _services.eqPreset == equalizerCustomId;
     try {
       final params = await _equalizer.parameters;
@@ -1549,6 +1565,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       for (var i = 0; i < params.bands.length && i < gains.length; i++) {
         await params.bands[i].setGain(gains[i]);
       }
+      _equalizerSyncedFor = player;
     } on Object catch (error) {
       AppLogger.instance.warn('эквалайзер не применился: $error');
     }

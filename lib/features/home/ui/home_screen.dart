@@ -14,9 +14,11 @@ import '../../../sources/yandex/yandex_station.dart';
 import '../../../theme/app_motion.dart';
 import '../../../theme/blur_settings.dart';
 import '../../../wave_providers.dart';
+import '../../../widgets/expressive_shapes.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/track_cover.dart';
 import '../wave_mode_label.dart';
+import '../../../widgets/expressive_loader.dart';
 
 /// Главная: живой цвет волны во весь экран, крупное название, круглая кнопка
 /// запуска и пилюля «что играет».
@@ -358,21 +360,21 @@ class _WaveStage extends ConsumerWidget {
     return GestureDetector(
       onTap: () => openPlayer(context),
       child: SizedBox(
-        width: 116,
-        height: 116,
+        width: 232,
+        height: 232,
         child: cover == null
             ? Container(
                 decoration: BoxDecoration(
                   color: scheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(26),
+                  borderRadius: BorderRadius.circular(32),
                 ),
                 child: Icon(
                   Icons.music_note_rounded,
-                  size: 44,
+                  size: 64,
                   color: scheme.onSurfaceVariant,
                 ),
               )
-            : TrackCover(url: cover, size: 116, radius: 26),
+            : TrackCover(url: cover, size: 232, radius: 32),
       ),
     );
   }
@@ -418,6 +420,8 @@ class _WaveControls extends ConsumerWidget {
               icon: playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
               tooltip: playing ? l.commonPause : l.commonPlay,
               onTap: controller.togglePlay,
+              primary: true,
+              round: playing,
             ),
             const SizedBox(width: 8),
           ],
@@ -427,51 +431,60 @@ class _WaveControls extends ConsumerWidget {
               behavior: HitTestBehavior.opaque,
               onTap: current == null ? null : () => openPlayer(context),
               child: Container(
-                padding: const EdgeInsets.fromLTRB(20, 11, 20, 11),
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: scheme.surfaceContainerHighest.withValues(alpha: 0.72),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: scheme.onSurface.withValues(alpha: 0.08),
-                  ),
+                  borderRadius: BorderRadius.circular(28),
                 ),
-                child: AnimatedSwitcher(
-                  duration: motion.micro(240),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  transitionBuilder: (child, animation) => FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: Tween(
-                        begin: const Offset(0, 0.12),
-                        end: Offset.zero,
-                      ).animate(animation),
-                      child: child,
-                    ),
-                  ),
-                  child: Column(
-                    key: ValueKey('${current?.localTrackId}:$text'),
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        text,
-                        maxLines: 1,
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
+                // Как в Яндекс Музыке на ПК: сама плашка заливается по мере
+                // проигрывания — пройденная часть светлее.
+                child: Stack(
+                  children: [
+                    if (current != null)
+                      const Positioned.fill(child: _PillProgressFill()),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                      child: AnimatedSwitcher(
+                        duration: motion.micro(240),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween(
+                              begin: const Offset(0, 0.12),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: child,
+                          ),
+                        ),
+                        child: Column(
+                          key: ValueKey('${current?.localTrackId}:$text'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              text,
+                              maxLines: 1,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (subtitle != null && subtitle.isNotEmpty)
+                              Text(
+                                subtitle,
+                                maxLines: 1,
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall,
+                              ),
+                          ],
                         ),
                       ),
-                      if (subtitle != null && subtitle.isNotEmpty)
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall,
-                        ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -521,6 +534,31 @@ class _WaveControls extends ConsumerWidget {
   }
 }
 
+/// Заливка плашки трека по прогрессу; перестраивается только она.
+class _PillProgressFill extends ConsumerWidget {
+  const _PillProgressFill();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final data = ref.watch(
+      playerSnapshotProviderValue.select((s) => (s.position, s.duration)),
+    );
+    final total = data.$2.inMilliseconds;
+    final value = total == 0
+        ? 0.0
+        : (data.$1.inMilliseconds / total).clamp(0.0, 1.0);
+    final scheme = Theme.of(context).colorScheme;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: FractionallySizedBox(
+        widthFactor: value,
+        heightFactor: 1,
+        child: ColoredBox(color: scheme.onSurface.withValues(alpha: 0.10)),
+      ),
+    );
+  }
+}
+
 /// Круглая стеклянная кнопка пульта волны: play/pause и «любимое» стоят
 /// по бокам плашки трека.
 class _RoundAction extends StatelessWidget {
@@ -529,6 +567,8 @@ class _RoundAction extends StatelessWidget {
     required this.tooltip,
     required this.onTap,
     this.active = false,
+    this.primary = false,
+    this.round = true,
   });
 
   final IconData icon;
@@ -536,25 +576,42 @@ class _RoundAction extends StatelessWidget {
   final VoidCallback onTap;
   final bool active;
 
+  /// Залита акцентом (play/pause).
+  final bool primary;
+
+  /// Круг; иначе скруглённый квадрат — play на паузе, как в плеере M3.
+  final bool round;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final motion = Motion.of(context);
     return Tooltip(
       message: tooltip,
-      child: SizedBox(
-        width: 52,
-        height: 52,
-        child: Material(
-          color: scheme.surfaceContainerHighest.withValues(alpha: 0.72),
-          shape: const CircleBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            child: Icon(
-              icon,
-              size: 26,
-              color: active ? scheme.primary : scheme.onSurface,
-            ),
+      child: PressableScale(
+        minScale: 0.88,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: motion.morph,
+          curve: Curves.elasticOut,
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: primary
+                ? scheme.primary
+                : active
+                ? scheme.primary.withValues(alpha: 0.22)
+                : scheme.surfaceContainerHighest.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(round ? 28 : 16),
+          ),
+          child: Icon(
+            icon,
+            size: 28,
+            color: primary
+                ? scheme.onPrimary
+                : active
+                ? scheme.primary
+                : scheme.onSurface,
           ),
         ),
       ),
@@ -715,7 +772,7 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
             if (!_loaded)
               const SizedBox(
                 height: 160,
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(child: ExpressiveLoader()),
               )
             else
               SizedBox(
@@ -751,7 +808,13 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
             Row(
               children: [
                 Expanded(
+                  // Крупная кнопка-пилюля M3 Expressive.
                   child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(56),
+                      shape: const StadiumBorder(),
+                      textStyle: Theme.of(context).textTheme.titleMedium,
+                    ),
                     onPressed: _loaded && !_saving
                         ? () => _start(selected)
                         : null,
@@ -761,7 +824,7 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.play_arrow_rounded),
+                        : const Icon(Icons.play_arrow_rounded, size: 26),
                     label: Text(l.waveListen),
                   ),
                 ),
@@ -831,6 +894,8 @@ class _WaveModeOption {
   final bool soundCloud;
 }
 
+/// Карточка режима: тональная плашка с иконкой в цвете режима. Выбранная
+/// становится акцентной, скругляется сильнее, а иконка — «печеньем».
 class _ModeCard extends StatelessWidget {
   const _ModeCard({
     required this.controller,
@@ -858,78 +923,81 @@ class _ModeCard extends StatelessWidget {
         // Крайние карточки гаснут сильнее: намёк, что колесо продолжается.
         // Живое размытие было здесь же, но на каждом кадре свайпа оно
         // пересчитывалось для пяти карточек — 65% кадров не успевали.
+        // M3 Expressive: центральная карточка скругляется сильнее, а
+        // иконка в ней превращается в «печенье» — форма показывает выбор.
+        final focus = (1 - delta).clamp(0.0, 1.0);
         return Transform.scale(
           scale: 1 - 0.08 * delta.clamp(0.0, 2.0),
           child: Opacity(
             opacity: (1 - 0.22 * delta).clamp(0.25, 1.0),
-            child: child,
+            child: GestureDetector(
+              onTap: onTap,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                decoration: BoxDecoration(
+                  // Тональная заливка цветом режима поверх поверхности M3.
+                  color: Color.alphaBlend(
+                    option.color.withValues(alpha: 0.14 + 0.16 * focus),
+                    scheme.surfaceContainerHigh,
+                  ),
+                  borderRadius: BorderRadius.circular(16 + 12 * focus),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ClipPath(
+                      clipper: CookieClipper(lobes: 8, depth: 0.08 * focus),
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        color: option.color,
+                        child: Icon(option.icon, size: 22, color: Colors.white),
+                      ),
+                    ),
+                    child!,
+                  ],
+                ),
+              ),
+            ),
           ),
         );
       },
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                option.color.withValues(alpha: 0.55),
-                option.color.withValues(alpha: 0.16),
-                scheme.surfaceContainerHigh,
-              ],
-            ),
-            border: Border.all(color: option.color.withValues(alpha: 0.45)),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(option.icon, size: 20, color: Colors.white),
-              ),
-              const SizedBox(height: 7),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 5),
-                // Одиночное слово ужимаем целиком, фразу переносим по словам:
-                // пять карточек оставляют мало ширины.
-                child: option.label.contains(' ')
-                    ? Text(
-                        option.label,
-                        maxLines: 2,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontSize: 11,
-                          height: 1.1,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      )
-                    : FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          option.label,
-                          maxLines: 1,
-                          softWrap: false,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 7),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 5),
+            // Одиночное слово ужимаем целиком, фразу переносим по словам:
+            // пять карточек оставляют мало ширины.
+            child: option.label.contains(' ')
+                ? Text(
+                    option.label,
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontSize: 11,
+                      height: 1.1,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                    ),
+                  )
+                : FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      option.label,
+                      maxLines: 1,
+                      softWrap: false,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
                       ),
-              ),
-            ],
+                    ),
+                  ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -20,9 +20,15 @@ void main() {
       ),
     );
 
-    expect(find.text('Что нового', findRichText: true), findsOneWidget);
+    // «Что нового» уже в шапке страницы — дубль из тела не рисуется.
+    expect(find.text('Что нового', findRichText: true), findsNothing);
     expect(find.text('Источники', findRichText: true), findsOneWidget);
-    expect(find.text('•'), findsNWidgets(2));
+    // Пункты списка — по строке на каждый, маркер рисуется точкой, не «•».
+    expect(find.text('•'), findsNothing);
+    expect(
+      find.textContaining('Второй пункт', findRichText: true),
+      findsOneWidget,
+    );
     expect(
       find.textContaining('SoundCloud', findRichText: true),
       findsOneWidget,

@@ -10,6 +10,7 @@ import '../../../theme/blur_settings.dart';
 import '../../../theme/keyboard_theme.dart';
 import '../../../theme/surface.dart';
 import '../../../widgets/track_cover.dart';
+import '../../../widgets/wavy_slider.dart';
 
 /// Полоска «сейчас играет» над навигацией — пилюля фиксированной высоты.
 /// Нет трека — нет полоски.
@@ -224,16 +225,12 @@ class _MiniProgress extends ConsumerWidget {
         : (data.$1.inMilliseconds / total).clamp(0.0, 1.0);
     // Полоса внутри пилюли, с отступами от краёв: прижатая к низу, она
     // вылезала розовым хвостом из-под скруглённого угла.
-    final scheme = Theme.of(context).colorScheme;
+    final playing = ref.watch(
+      playerSnapshotProviderValue.select((s) => s.playing),
+    );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-      child: LinearProgressIndicator(
-        value: value,
-        minHeight: 3,
-        borderRadius: BorderRadius.circular(2),
-        backgroundColor: scheme.onSurface.withValues(alpha: 0.10),
-        color: scheme.primary,
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 3),
+      child: WavyProgress(value: value, playing: playing),
     );
   }
 }

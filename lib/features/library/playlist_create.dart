@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app_providers.dart';
 import '../../core/sources/source_id.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/connected_button_group.dart';
 import '../../widgets/track_cover.dart';
 import 'playlist_cover.dart';
 
@@ -206,23 +207,21 @@ class _CreatePlaylistSheetState extends ConsumerState<_CreatePlaylistSheet> {
             ),
           const SizedBox(height: 10),
           if (_yandexReady) ...[
-            SegmentedButton<bool>(
-              segments: [
-                ButtonSegment(
+            ConnectedButtonGroup<bool>(
+              options: [
+                ConnectedOption(
                   value: false,
-                  icon: const Icon(Icons.music_note_rounded, size: 18),
-                  label: Text(l.playlistTargetYandex),
+                  icon: Icons.music_note_rounded,
+                  label: l.playlistTargetYandex,
                 ),
-                ButtonSegment(
+                ConnectedOption(
                   value: true,
-                  icon: const Icon(Icons.smartphone_rounded, size: 18),
-                  label: Text(l.playlistTargetDevice),
+                  icon: Icons.smartphone_rounded,
+                  label: l.playlistTargetDevice,
                 ),
               ],
-              selected: {_local},
-              showSelectedIcon: false,
-              onSelectionChanged: (value) =>
-                  setState(() => _local = value.first),
+              selected: _local,
+              onPick: (value) => setState(() => _local = value),
             ),
             const SizedBox(height: 12),
           ],
@@ -235,23 +234,22 @@ class _CreatePlaylistSheetState extends ConsumerState<_CreatePlaylistSheet> {
                     style: theme.textTheme.titleSmall,
                   ),
                 ),
-                SegmentedButton<bool>(
-                  segments: [
-                    ButtonSegment(
+                ConnectedButtonGroup<bool>(
+                  expand: false,
+                  options: [
+                    ConnectedOption(
                       value: true,
-                      icon: const Icon(Icons.public_rounded, size: 18),
-                      label: Text(l.playlistPublic),
+                      icon: Icons.public_rounded,
+                      label: l.playlistPublic,
                     ),
-                    ButtonSegment(
+                    ConnectedOption(
                       value: false,
-                      icon: const Icon(Icons.lock_outline_rounded, size: 18),
-                      label: Text(l.playlistPrivate),
+                      icon: Icons.lock_outline_rounded,
+                      label: l.playlistPrivate,
                     ),
                   ],
-                  selected: {_public},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (value) =>
-                      setState(() => _public = value.first),
+                  selected: _public,
+                  onPick: (value) => setState(() => _public = value),
                 ),
               ],
             )

@@ -407,18 +407,31 @@ class _PillNavBar extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final itemWidth = constraints.maxWidth / destinations.length;
-          final left = itemWidth * selected + (itemWidth - indicatorWidth) / 2;
           final top = (height - contentHeight) / 2;
 
           return Stack(
             children: [
-              AnimatedPositioned(
-                duration: motion.micro(420),
-                curve: Curves.easeOutBack,
-                left: left,
-                top: top,
-                width: indicatorWidth,
-                height: indicatorHeight,
+              // Индикатор едет пружиной и по дороге вытягивается каплей —
+              // движение M3 Expressive вместо простого сдвига.
+              TweenAnimationBuilder<double>(
+                tween: Tween(end: selected.toDouble()),
+                duration: motion.micro(520),
+                curve: Curves.elasticOut,
+                builder: (context, pos, child) {
+                  final travel = (pos - pos.roundToDouble()).abs();
+                  final stretch = (travel * itemWidth * 0.9).clamp(
+                    0.0,
+                    itemWidth * 0.6,
+                  );
+                  final width = indicatorWidth + stretch;
+                  return Positioned(
+                    left: itemWidth * pos + (itemWidth - width) / 2,
+                    top: top,
+                    width: width,
+                    height: indicatorHeight,
+                    child: child!,
+                  );
+                },
                 child: const _GlassIndicator(),
               ),
               Positioned.fill(

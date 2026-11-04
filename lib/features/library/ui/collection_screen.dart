@@ -55,11 +55,13 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
+          // Крупный заголовок сразу наверху, в одной строке с кнопками.
           SliverAppBar(
             pinned: true,
+            toolbarHeight: 72,
             backgroundColor: Theme.of(context).colorScheme.surface,
             title: Text(l.collectionTitle),
-            titleTextStyle: Theme.of(context).textTheme.headlineSmall,
+            titleTextStyle: Theme.of(context).textTheme.headlineMedium,
             actions: [
               IconButton(
                 tooltip: l.navSearch,

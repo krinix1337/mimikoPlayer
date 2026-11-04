@@ -114,27 +114,45 @@ class GlassTopBar extends StatelessWidget {
                   left: 4,
                   right: 4,
                   height: kToolbarHeight,
-                  child: Row(
-                    children: [
-                      IconButton(
-                        tooltip: l.playerBack,
-                        icon: const Icon(Icons.arrow_back_rounded),
-                        onPressed:
-                            onBack ?? () => Navigator.of(context).maybePop(),
+                  // Над обложкой у кнопок тональная круглая подложка (M3):
+                  // иконки читаются на любом фоне и не липнут друг к другу.
+                  // Когда проявляется стекло, подложка растворяется.
+                  child: IconButtonTheme(
+                    data: IconButtonThemeData(
+                      style: IconButton.styleFrom(
+                        backgroundColor: scheme.surface.withValues(
+                          alpha: 0.5 * (1 - exposure),
+                        ),
+                        fixedSize: const Size.square(40),
+                        minimumSize: const Size.square(40),
+                        padding: EdgeInsets.zero,
                       ),
-                      Expanded(
-                        child: Opacity(
-                          opacity: shown,
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    child: Row(
+                      spacing: 8,
+                      children: [
+                        const SizedBox(width: 4),
+                        IconButton(
+                          tooltip: l.playerBack,
+                          icon: const Icon(Icons.arrow_back_rounded),
+                          onPressed:
+                              onBack ?? () => Navigator.of(context).maybePop(),
+                        ),
+                        Expanded(
+                          child: Opacity(
+                            opacity: shown,
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
                           ),
                         ),
-                      ),
-                      ...actions,
-                    ],
+                        ...actions,
+                        const SizedBox(width: 4),
+                      ],
+                    ),
                   ),
                 ),
               ],

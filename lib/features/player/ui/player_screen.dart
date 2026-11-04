@@ -16,9 +16,11 @@ import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../theme/app_motion.dart';
 import '../../../wave_providers.dart';
+import '../../../widgets/expressive_loader.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/track_badges.dart';
 import '../../../widgets/track_cover.dart';
+import '../../../widgets/wavy_slider.dart';
 import '../../../widgets/track_tile.dart';
 import '../player_snapshot.dart';
 
@@ -659,6 +661,9 @@ class _ProgressState extends ConsumerState<_Progress> {
     final state = ref.watch(
       playerSnapshotProviderValue.select((s) => (s.position, s.duration)),
     );
+    final playing = ref.watch(
+      playerSnapshotProviderValue.select((s) => s.playing),
+    );
     final total = state.$2.inMilliseconds;
     final value =
         _drag ??
@@ -668,8 +673,9 @@ class _ProgressState extends ConsumerState<_Progress> {
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
       child: Column(
         children: [
-          Slider(
+          WavySlider(
             value: value.clamp(0.0, 1.0),
+            playing: playing,
             onChanged: total == 0 ? null : (v) => setState(() => _drag = v),
             onChangeEnd: total == 0
                 ? null
@@ -770,7 +776,8 @@ class _Controls extends ConsumerWidget {
           ),
           _ControlButton(
             icon: Icons.skip_previous_rounded,
-            size: 34,
+            size: 30,
+            tonal: true,
             tooltip: l.commonPrevious,
             onPressed: controller.skipPrevious,
           ),
@@ -781,7 +788,8 @@ class _Controls extends ConsumerWidget {
           ),
           _ControlButton(
             icon: Icons.skip_next_rounded,
-            size: 34,
+            size: 30,
+            tonal: true,
             tooltip: l.commonNext,
             onPressed: controller.skipNext,
           ),
@@ -851,6 +859,7 @@ class _ControlButton extends StatelessWidget {
     this.tooltip,
     this.size = 26,
     this.active = false,
+    this.tonal = false,
   });
 
   final IconData icon;
@@ -859,16 +868,39 @@ class _ControlButton extends StatelessWidget {
   final double size;
   final bool active;
 
+  /// Тональный контейнер (назад/вперёд) — как кнопки по бокам от play в
+  /// M3 Expressive.
+  final bool tonal;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final button = IconButton(
-      onPressed: onPressed,
-      iconSize: size,
-      color: active ? scheme.primary : scheme.onSurface,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 42, height: 48),
-      icon: Icon(icon),
+    final motion = Motion.of(context);
+    // Включённый переключатель (повтор, перемешивание, лайк) получает
+    // подложку-пилюлю, а не только цвет иконки.
+    final filled = tonal || active;
+    final button = PressableScale(
+      minScale: 0.85,
+      onTap: onPressed,
+      child: AnimatedContainer(
+        duration: motion.micro(220),
+        curve: Curves.easeOutCubic,
+        width: tonal ? 54 : 42,
+        height: tonal ? 54 : 42,
+        decoration: BoxDecoration(
+          color: !filled
+              ? Colors.transparent
+              : active
+              ? scheme.primary.withValues(alpha: 0.22)
+              : scheme.onSurface.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(tonal ? 18 : 21),
+        ),
+        child: Icon(
+          icon,
+          size: size,
+          color: active ? scheme.primary : scheme.onSurface,
+        ),
+      ),
     );
     if (tooltip == null) return button;
     return Tooltip(message: tooltip!, child: button);
@@ -890,17 +922,19 @@ class _PlayToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final motion = Motion.of(context);
+    // M3 Expressive: на паузе кнопка — широкий скруглённый квадрат, во время
+    // игры сжимается в круг. Форма перетекает пружиной.
     return PressableScale(
       minScale: 0.9,
       onTap: busy ? null : onToggle,
       child: AnimatedContainer(
         duration: motion.morph,
-        curve: Curves.easeOutBack,
-        width: 78,
+        curve: Curves.elasticOut,
+        width: playing ? 78 : 92,
         height: 78,
         decoration: BoxDecoration(
           color: scheme.primary,
-          shape: BoxShape.circle,
+          borderRadius: BorderRadius.circular(playing ? 39 : 26),
           boxShadow: [
             BoxShadow(
               color: scheme.primary.withValues(alpha: 0.3),
@@ -911,12 +945,23 @@ class _PlayToggle extends StatelessWidget {
         ),
         child: AnimatedSwitcher(
           duration: motion.micro(200),
-          child: Icon(
-            playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-            key: ValueKey(playing),
-            size: 40,
-            color: scheme.onPrimary,
+          transitionBuilder: (child, animation) => ScaleTransition(
+            scale: animation,
+            child: FadeTransition(opacity: animation, child: child),
           ),
+          child: busy
+              ? SizedBox(
+                  key: const ValueKey('busy'),
+                  width: 40,
+                  height: 40,
+                  child: ExpressiveLoader(color: scheme.onPrimary),
+                )
+              : Icon(
+                  playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  key: ValueKey(playing),
+                  size: 40,
+                  color: scheme.onPrimary,
+                ),
         ),
       ),
     );
@@ -1166,7 +1211,7 @@ class _QueueSheet extends ConsumerWidget {
             _QueueHeader(),
             Padding(
               padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: ExpressiveLoader()),
             ),
           ],
         ),

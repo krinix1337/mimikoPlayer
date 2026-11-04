@@ -17,6 +17,7 @@ import '../../../widgets/track_badges.dart';
 import '../../../widgets/track_cover.dart';
 import '../../../widgets/track_tile.dart';
 import '../../../widgets/two_line_title.dart';
+import '../../../widgets/expressive_loader.dart';
 
 /// Поиск сразу по всем готовым источникам: локальные файлы и, после входа,
 /// Я.Музыка. Пустой результат — это пустой результат, а не заглушка.
@@ -159,14 +160,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                               .clearSearchHistory(),
                         )
                 : hits.when(
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
+                    loading: () => const Center(child: ExpressiveLoader()),
                     error: (error, _) => Center(child: Text(l.searchFailed)),
                     data: (list) =>
                         list.isEmpty &&
                             sections.value?.isEmpty != false &&
                             sections.isLoading
-                        ? const Center(child: CircularProgressIndicator())
+                        ? const Center(child: ExpressiveLoader())
                         : list.isEmpty && sections.value?.isEmpty != false
                         ? Center(child: Text(l.searchNoResults))
                         : _SearchResults(

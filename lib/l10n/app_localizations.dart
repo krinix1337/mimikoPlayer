@@ -1865,13 +1865,13 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLyricsSource.
   ///
   /// In ru, this message translates to:
-  /// **'Тексты: LRCLIB + Яндекс'**
+  /// **'Тексты: LRCLIB, Musixmatch, NetEase'**
   String get settingsLyricsSource;
 
   /// No description provided for @settingsLyricsSourceNote.
   ///
   /// In ru, this message translates to:
-  /// **'Тайминги строк приходят из LRCLIB; пословной подсветки в источнике нет.'**
+  /// **'Тайминги строк ищутся по очереди в LRCLIB, Musixmatch и NetEase; если их нет — официальный текст Яндекса.'**
   String get settingsLyricsSourceNote;
 
   /// No description provided for @motionOff.
@@ -2339,7 +2339,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutSourcesNote.
   ///
   /// In ru, this message translates to:
-  /// **'Яндекс Музыка — каталог, поток и волна; SoundCloud — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, официальный текст Яндекса и lyrics.ovh.'**
+  /// **'Яндекс Музыка — каталог, поток и волна; SoundCloud — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, Musixmatch, NetEase, официальный текст Яндекса и lyrics.ovh.'**
   String get aboutSourcesNote;
 
   /// No description provided for @settingsAiFilter.

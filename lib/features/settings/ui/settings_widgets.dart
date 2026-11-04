@@ -17,8 +17,14 @@ import '../../../features/downloads/download_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_motion.dart';
 import '../../../theme/keyboard_theme.dart';
+import '../../../widgets/connected_button_group.dart';
 import '../../../widgets/pressable.dart';
+import '../../../widgets/theme_reveal.dart';
 import '../../../widgets/human_bytes.dart';
+
+/// Единый внутренний отступ строк настроек: одинаковый везде, чтобы
+/// плашки групп не отличались друг от друга на глаз.
+const kSettingsRowPadding = EdgeInsets.all(16);
 
 /// Карточка-секция настроек: заголовок и группа строк в общей оболочке.
 class SettingsSection extends StatelessWidget {
@@ -67,7 +73,7 @@ class SettingsSection extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
@@ -78,19 +84,31 @@ class SettingsSection extends StatelessWidget {
               ),
             ),
           ),
-          Container(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(
-                Motion.of(context).prefs.corner.radius * 0.7,
+          // Группа M3 Expressive: каждый пункт — своя плашка с зазором 2 px,
+          // крайние скруглены сильно, средние — слегка.
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const SizedBox(height: 2),
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(
+                    i == 0 ? Motion.of(context).prefs.corner.radius * 0.7 : 6,
+                  ),
+                  bottom: Radius.circular(
+                    i == children.length - 1
+                        ? Motion.of(context).prefs.corner.radius * 0.7
+                        : 6,
+                  ),
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Material(
+                type: MaterialType.transparency,
+                child: children[i],
               ),
             ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: children,
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -182,31 +200,25 @@ class ChoiceRow<T> extends StatelessWidget {
     final theme = Theme.of(context);
     final count = columns ?? values.length.clamp(1, 4);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      padding: kSettingsRowPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: theme.textTheme.titleMedium),
           const SizedBox(height: 10),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const gap = 8.0;
-              final width = (constraints.maxWidth - gap * (count - 1)) / count;
-              return Wrap(
-                spacing: gap,
-                runSpacing: gap,
-                children: [
-                  for (final value in values)
-                    _ChoicePill(
-                      width: width,
-                      label: labelOf(value),
-                      selected: value == current,
-                      onTap: () => onPick(value),
-                    ),
-                ],
-              );
-            },
-          ),
+          // Варианты — группа соединённых кнопок M3 Expressive; длинные
+          // наборы делим на ряды по [columns].
+          for (var start = 0; start < values.length; start += count) ...[
+            if (start > 0) const SizedBox(height: 6),
+            ConnectedButtonGroup<T>(
+              options: [
+                for (final value in values.skip(start).take(count))
+                  ConnectedOption(value: value, label: labelOf(value)),
+              ],
+              selected: current,
+              onPick: onPick,
+            ),
+          ],
           if (note != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -217,83 +229,6 @@ class ChoiceRow<T> extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _ChoicePill extends StatelessWidget {
-  const _ChoicePill({
-    required this.width,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final double width;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final test = kKeyboardTestTheme;
-    final radius = test
-        ? (selected ? 24.0 : 8.0)
-        : Motion.of(context).prefs.corner.radius * 0.7;
-    final background = test
-        ? (selected ? scheme.primary : scheme.secondaryContainer)
-        : (selected ? scheme.primaryContainer : scheme.surfaceContainerHigh);
-    final foreground = test
-        ? (selected ? scheme.onPrimary : scheme.onSecondaryContainer)
-        : (selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant);
-    return SizedBox(
-      width: width,
-      height: 46,
-      child: Material(
-        color: background,
-        borderRadius: BorderRadius.circular(radius),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              // Одиночное слово не рвём по буквам («Выключен-ы»): ужимаем
-              // его целиком. Фразы из нескольких слов переносим по словам.
-              child: label.contains(' ')
-                  ? Text(
-                      label,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: foreground,
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    )
-                  : FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        softWrap: false,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: foreground,
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                        ),
-                      ),
-                    ),
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -368,7 +303,7 @@ class _SliderRowState extends State<SliderRow> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      padding: kSettingsRowPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -475,7 +410,7 @@ class _DiscreteSliderRowState<T> extends State<DiscreteSliderRow<T>> {
     final last = (widget.values.length - 1).clamp(1, 100);
     final index = _value.round().clamp(0, widget.values.length - 1);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: kSettingsRowPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -500,17 +435,13 @@ class _DiscreteSliderRowState<T> extends State<DiscreteSliderRow<T>> {
           const SizedBox(height: 4),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              trackHeight: 4,
               activeTrackColor: scheme.primary,
               inactiveTrackColor: scheme.surfaceContainerHighest,
               thumbColor: scheme.primary,
               overlayColor: scheme.primary.withValues(alpha: 0.12),
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
-              tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 2),
               activeTickMarkColor: scheme.onPrimary.withValues(alpha: 0.7),
               inactiveTickMarkColor: scheme.onSurfaceVariant.withValues(
-                alpha: 0.35,
+                alpha: 0.6,
               ),
             ),
             child: Slider(
@@ -577,7 +508,7 @@ class AccentRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      padding: kSettingsRowPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -594,41 +525,57 @@ class AccentRow extends StatelessWidget {
                   for (final accent in AccentColor.values)
                     SizedBox(
                       width: width,
-                      child: PressableScale(
-                        onTap: () => onPick(accent),
-                        child: Column(
-                          children: [
-                            AnimatedContainer(
-                              duration: Motion.of(context).micro(180),
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: accent.color,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: accent == current
-                                      ? theme.colorScheme.onSurface
-                                      : Colors.transparent,
-                                  width: 3,
+                      child: Builder(
+                        builder: (swatch) => PressableScale(
+                          // Новый акцент расходится кругом от нажатого цвета.
+                          onTap: () {
+                            if (accent == current) return;
+                            final box = swatch.findRenderObject() as RenderBox?;
+                            final center = box == null
+                                ? Offset.zero
+                                : box.localToGlobal(
+                                    Offset(box.size.width / 2, 18),
+                                  );
+                            ThemeReveal.run(
+                              swatch,
+                              center,
+                              () => onPick(accent),
+                            );
+                          },
+                          child: Column(
+                            children: [
+                              AnimatedContainer(
+                                duration: Motion.of(context).micro(180),
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: accent.color,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: accent == current
+                                        ? theme.colorScheme.onSurface
+                                        : Colors.transparent,
+                                    width: 3,
+                                  ),
                                 ),
+                                child: accent == current
+                                    ? const Icon(
+                                        Icons.check_rounded,
+                                        size: 18,
+                                        color: Colors.black87,
+                                      )
+                                    : null,
                               ),
-                              child: accent == current
-                                  ? const Icon(
-                                      Icons.check_rounded,
-                                      size: 18,
-                                      color: Colors.black87,
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              labelOf(accent),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelSmall,
-                            ),
-                          ],
+                              const SizedBox(height: 4),
+                              Text(
+                                labelOf(accent),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -667,7 +614,7 @@ class LauncherIconRow extends ConsumerWidget {
     };
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: kSettingsRowPadding,
       child: LayoutBuilder(
         builder: (context, constraints) {
           const gap = 8.0;

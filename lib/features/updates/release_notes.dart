@@ -18,11 +18,49 @@ class ReleaseNotes extends StatelessWidget {
       color: theme.colorScheme.onSurface.withValues(alpha: 0.92),
     );
     final blocks = _parse(source);
-    final children = <Widget>[];
+    // M3: каждый раздел (## / ###) — своя тональная карточка; то, что до
+    // первого заголовка (обычно картинка-баннер), идёт без карточки.
+    final sections = <Widget>[];
+    var children = <Widget>[];
+    var inCard = false;
+    void flush() {
+      if (children.isEmpty) return;
+      final content = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      );
+      if (sections.isNotEmpty) sections.add(const SizedBox(height: 12));
+      sections.add(
+        inCard
+            ? Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: content,
+              )
+            : content,
+      );
+      children = <Widget>[];
+    }
+
     for (final block in blocks) {
       switch (block.kind) {
         case _BlockKind.heading:
-          if (children.isNotEmpty) children.add(const SizedBox(height: 18));
+          // «Что нового» уже стоит в шапке страницы — дубль не рисуем.
+          if (RegExp(
+            r"^(что нового|what's new)$",
+            caseSensitive: false,
+          ).hasMatch(block.text.trim())) {
+            continue;
+          }
+          if (block.level >= 2) {
+            flush();
+            inCard = true;
+          } else if (children.isNotEmpty) {
+            children.add(const SizedBox(height: 16));
+          }
           final style =
               switch (block.level) {
                 1 => theme.textTheme.headlineSmall,
@@ -48,13 +86,16 @@ class ReleaseNotes extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '•',
-                    style: bodyStyle?.copyWith(
+                  // Тональная точка-маркер вместо символа «•».
+                  Container(
+                    width: 6,
+                    height: 6,
+                    margin: const EdgeInsets.only(top: 8, right: 10),
+                    decoration: BoxDecoration(
                       color: theme.colorScheme.primary,
+                      shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(width: 8),
                   Expanded(
                     child: Text.rich(
                       _inline(block.text, theme),
@@ -134,9 +175,10 @@ class ReleaseNotes extends StatelessWidget {
           );
       }
     }
+    flush();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: children,
+      children: sections,
     );
   }
 }

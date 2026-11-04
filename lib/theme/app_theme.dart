@@ -166,16 +166,16 @@ class AppTheme {
           color: scheme.onSurfaceVariant,
         ),
       ),
+      // Слайдер M3 Expressive (2024): толстая дорожка, ручка-палочка с
+      // зазором и точки-остановки — формы берутся из year2023: false.
       sliderTheme: SliderThemeData(
-        trackHeight: 6,
+        // ignore: deprecated_member_use
+        year2023: false,
         activeTrackColor: _actionInk(scheme),
         inactiveTrackColor: scheme.surfaceContainerHighest,
         thumbColor: _actionInk(scheme),
         overlayColor: _actionInk(scheme).withValues(alpha: 0.14),
         valueIndicatorColor: scheme.inverseSurface,
-        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-        overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
-        trackShape: const RoundedRectSliderTrackShape(),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(

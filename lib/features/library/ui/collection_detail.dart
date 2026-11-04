@@ -23,6 +23,8 @@ import '../../../widgets/pressable.dart';
 import '../../../widgets/track_cover.dart';
 import '../../../widgets/track_tile.dart';
 import 'collection_screen.dart' show SectionHeader, showSortSheet;
+import '../../../widgets/expressive_loader.dart';
+import '../../../widgets/fab_menu.dart';
 
 /// Один раздел коллекции на весь экран: заголовок, счётчик, play/shuffle
 /// и список с тем же сортиром, что и на главной.
@@ -48,7 +50,7 @@ class CollectionKindScreen extends ConsumerWidget {
     return MiniPlayerHost(
       child: Scaffold(
         body: rows.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: ExpressiveLoader()),
           error: (error, _) => _ErrorBox(text: l.dbError('$error')),
           data: (data) => CustomScrollView(
             slivers: [
@@ -554,92 +556,141 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen> {
     }
   }
 
+  Future<void> _importFromYandex() async {
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final lists = await importYandexPlaylists(
+        source: ref.read(yandexSourceProvider),
+        db: ref.read(appServicesProvider).db,
+      );
+      if (!mounted) return;
+      ref.invalidate(playlistsProvider);
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.collectionImportedPlaylists(lists))),
+      );
+    } on Object catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.collectionImportFailed('$error'))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final playlists = ref.watch(playlistsProvider);
 
     // Мини-плеер плавает поверх страницы, как во вкладках.
+    final yandexReady =
+        ref.watch(yandexAuthStateProvider).value?.isReady ?? false;
+
     return MiniPlayerHost(
-      child: Scaffold(
-        body: RefreshIndicator(
-          onRefresh: () =>
-              ref.read(playlistSyncProvider.notifier).refresh(force: true),
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverAppBar(
-                pinned: true,
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                title: Text(l.collectionPlaylists),
-                titleTextStyle: Theme.of(context).textTheme.headlineSmall,
-                actions: [
-                  IconButton(
-                    tooltip: l.playlistCreate,
-                    icon: const Icon(Icons.add_rounded),
-                    onPressed: _create,
+      child: Builder(
+        builder: (hostContext) => Scaffold(
+          // Scaffold ставит FAB над системной полосой, а не над мини-плеером:
+          // добираем высоту пилюли, которую MiniPlayerHost кладёт в padding.
+          // Читаем её снаружи Scaffold — внутри он этот отступ обнуляет.
+          floatingActionButton: Builder(
+            builder: (context) => Padding(
+              padding: EdgeInsets.only(
+                bottom:
+                    (MediaQuery.paddingOf(hostContext).bottom -
+                            MediaQuery.viewPaddingOf(hostContext).bottom)
+                        .clamp(0.0, double.infinity),
+              ),
+              child: FabMenu(
+                tooltip: l.playlistCreate,
+                items: [
+                  if (yandexReady)
+                    FabMenuItem(
+                      icon: Icons.cloud_download_outlined,
+                      label: l.importTitle,
+                      onTap: _importFromYandex,
+                    ),
+                  FabMenuItem(
+                    icon: Icons.playlist_add_rounded,
+                    label: l.playlistCreate,
+                    onTap: _create,
                   ),
                 ],
               ),
-              switch (playlists) {
-                AsyncError(:final error) => SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _ErrorBox(text: l.dbError('$error')),
+            ),
+          ),
+          body: RefreshIndicator(
+            onRefresh: () =>
+                ref.read(playlistSyncProvider.notifier).refresh(force: true),
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                // Крупный заголовок; создание плейлиста — в FAB-меню.
+                SliverAppBar(
+                  pinned: true,
+                  toolbarHeight: 72,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  title: Text(l.collectionPlaylists),
+                  titleTextStyle: Theme.of(context).textTheme.headlineMedium,
                 ),
-                AsyncData(:final value) when value.isEmpty =>
-                  SliverFillRemaining(
+                switch (playlists) {
+                  AsyncError(:final error) => SliverFillRemaining(
                     hasScrollBody: false,
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(28),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              l.collectionEmptyPlaylists,
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyLarge,
-                            ),
-                            const SizedBox(height: 16),
-                            FilledButton.tonalIcon(
-                              onPressed: _create,
-                              icon: const Icon(Icons.add_rounded),
-                              label: Text(l.playlistCreate),
-                            ),
-                          ],
+                    child: _ErrorBox(text: l.dbError('$error')),
+                  ),
+                  AsyncData(:final value) when value.isEmpty =>
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(28),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                l.collectionEmptyPlaylists,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                              const SizedBox(height: 16),
+                              FilledButton.tonalIcon(
+                                onPressed: _create,
+                                icon: const Icon(Icons.add_rounded),
+                                label: Text(l.playlistCreate),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  AsyncData(:final value) => SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    sliver: SliverGrid(
+                      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 220,
+                        mainAxisSpacing: 14,
+                        crossAxisSpacing: 14,
+                        childAspectRatio: 0.78,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        childCount: value.length,
+                        (context, index) => RiseIn(
+                          delay: Duration(
+                            milliseconds: (index * 24).clamp(0, 200),
+                          ),
+                          child: _PlaylistCard(playlist: value[index]),
                         ),
                       ),
                     ),
                   ),
-                AsyncData(:final value) => SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  sliver: SliverGrid(
-                    gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 220,
-                      mainAxisSpacing: 14,
-                      crossAxisSpacing: 14,
-                      childAspectRatio: 0.78,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      childCount: value.length,
-                      (context, index) => RiseIn(
-                        delay: Duration(
-                          milliseconds: (index * 24).clamp(0, 200),
-                        ),
-                        child: _PlaylistCard(playlist: value[index]),
-                      ),
+                  _ => const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(48),
+                      child: Center(child: ExpressiveLoader()),
                     ),
                   ),
-                ),
-                _ => const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.all(48),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                ),
-              },
-              const SliverBottomInset(),
-            ],
+                },
+                const SliverBottomInset(),
+              ],
+            ),
           ),
         ),
       ),
@@ -709,11 +760,8 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
     return MiniPlayerHost(
       child: Scaffold(
         body: detail.when(
-          loading: () => _statusView(
-            context,
-            l,
-            const Center(child: CircularProgressIndicator()),
-          ),
+          loading: () =>
+              _statusView(context, l, const Center(child: ExpressiveLoader())),
           error: (error, _) =>
               _statusView(context, l, Center(child: Text(l.dbError('$error')))),
           data: (value) {
@@ -1009,8 +1057,10 @@ class _PlaylistHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Высота с учётом статус-бара: обложка встаёт под панелью с кнопками,
+    // а не под ней.
     return SizedBox(
-      height: 380,
+      height: MediaQuery.paddingOf(context).top + 350,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -1060,7 +1110,7 @@ class _PlaylistBackdrop extends StatelessWidget {
         // раньше был только blur, и обложку было не разглядеть.
         if (coverUrl != null)
           Positioned(
-            top: 76,
+            top: MediaQuery.paddingOf(context).top + kToolbarHeight + 8,
             left: 0,
             right: 0,
             child: Center(

@@ -9,6 +9,7 @@ import '../../core/sources/source_id.dart';
 import '../../sources/soundcloud/soundcloud_source.dart';
 import 'playlist_link_fetcher.dart';
 import 'track_list_importer.dart';
+import '../../widgets/wavy_slider.dart';
 
 /// [byLink] — отдельный перенос по ссылке на открытый плейлист: только
 /// поле ссылки, без списка строк.
@@ -236,10 +237,12 @@ class _TrackListSheetState extends ConsumerState<_TrackListSheet> {
         ),
         if (_busy) ...[
           const SizedBox(height: 10),
-          LinearProgressIndicator(
-            value: _total == 0 ? null : _done / _total,
-            minHeight: 4,
-            borderRadius: BorderRadius.circular(4),
+          WavyProgress(
+            value: _total == 0 ? 0 : _done / _total,
+            playing: true,
+            height: 12,
+            stroke: 4,
+            amplitude: 2.5,
           ),
           if (_total > 0) ...[
             const SizedBox(height: 6),

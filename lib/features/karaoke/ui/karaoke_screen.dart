@@ -10,6 +10,7 @@ import '../../../sources/lyrics/lrclib.dart';
 import '../../../theme/app_motion.dart';
 import '../../../widgets/track_cover.dart';
 import '../lyric_line_layout.dart';
+import '../../../widgets/expressive_loader.dart';
 
 /// Караоке в духе Apple Music: активная строка крупная и цветная, остальные
 /// приглушены и уходят вверх, маска заполняется по мере строки, список сам
@@ -131,7 +132,7 @@ class _KaraokeScreenState extends ConsumerState<KaraokeScreen> {
                                 .seek(line.start)
                           : null,
                     ),
-                    _ => const Center(child: CircularProgressIndicator()),
+                    _ => const Center(child: ExpressiveLoader()),
                   },
                 ),
               ],

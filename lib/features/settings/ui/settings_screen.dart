@@ -22,7 +22,10 @@ import '../../../l10n/app_localizations.dart';
 import '../../../router/routes.dart';
 import '../../../router/slide_up_route.dart';
 import '../../../theme/keyboard_theme.dart';
+import '../../../widgets/connected_button_group.dart';
+import '../../../widgets/expressive_shapes.dart';
 import 'settings_widgets.dart';
+import '../../../widgets/wavy_slider.dart';
 
 /// Настройки по разделам: хаб с категориями, каждая категория — отдельный
 /// экран. Простыня из двадцати строк подряд читается хуже, чем шесть входа.
@@ -241,10 +244,9 @@ class _AppearancePage extends ConsumerWidget {
                   ),
                 ),
               ),
-            // Тема — сегментированная кнопка: это ровно тот M3-компонент,
-            // который для взаимоисключающего выбора и предназначен.
+            // Тема — группа соединённых кнопок M3 Expressive.
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              padding: kSettingsRowPadding,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -253,25 +255,23 @@ class _AppearancePage extends ConsumerWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 10),
-                  SegmentedButton<ThemeMode>(
-                    segments: [
-                      ButtonSegment(
+                  ConnectedButtonGroup<ThemeMode>(
+                    options: [
+                      ConnectedOption(
                         value: ThemeMode.system,
-                        label: Text(l.themeSystem),
+                        label: l.themeSystem,
                       ),
-                      ButtonSegment(
+                      ConnectedOption(
                         value: ThemeMode.light,
-                        label: Text(l.themeLight),
+                        label: l.themeLight,
                       ),
-                      ButtonSegment(
+                      ConnectedOption(
                         value: ThemeMode.dark,
-                        label: Text(l.themeDark),
+                        label: l.themeDark,
                       ),
                     ],
-                    selected: {prefs.themeMode},
-                    showSelectedIcon: false,
-                    onSelectionChanged: (value) =>
-                        controller.setThemeMode(value.first),
+                    selected: prefs.themeMode,
+                    onPick: controller.setThemeMode,
                   ),
                 ],
               ),
@@ -427,7 +427,7 @@ class _AppearancePage extends ConsumerWidget {
           title: l.settingsBlur,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+              padding: kSettingsRowPadding,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1282,18 +1282,20 @@ class _YandexAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final fallback = Container(
-      width: 62,
-      height: 62,
-      decoration: BoxDecoration(
+    // Аватар в форме «печенья» из набора фигур M3 Expressive.
+    final fallback = ClipPath(
+      clipper: const CookieClipper(),
+      child: Container(
+        width: 62,
+        height: 62,
         color: scheme.primary.withValues(alpha: 0.22),
-        shape: BoxShape.circle,
+        child: Icon(Icons.person_rounded, size: 34, color: scheme.primary),
       ),
-      child: Icon(Icons.person_rounded, size: 34, color: scheme.primary),
     );
     final source = url;
     if (source == null || source.isEmpty) return fallback;
-    return ClipOval(
+    return ClipPath(
+      clipper: const CookieClipper(),
       child: Image.network(
         source,
         width: 62,
@@ -1413,38 +1415,44 @@ class _ProfileHero extends StatelessWidget {
           ),
           if (stats.isNotEmpty) ...[
             const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            // Всегда один ряд: чипы делят ширину, число над подписью.
+            Row(
               children: [
-                for (final stat in stats)
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                    decoration: BoxDecoration(
-                      color: scheme.surfaceContainerHighest.withValues(
-                        alpha: 0.65,
+                for (var i = 0; i < stats.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHighest.withValues(
+                          alpha: 0.65,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          stat.value,
-                          style: text.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            stats[i].value,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          stat.label,
-                          style: text.labelSmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
+                          Text(
+                            stats[i].label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
+                ],
               ],
             ),
           ],
@@ -1928,92 +1936,94 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
           SettingsSection(
             title: l.updatesTokenTitle,
             children: [
+              // Поле, статус и подсказка — одна плашка группы.
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-                child: TextField(
-                  controller: _tokenController,
-                  enabled: !_checking && !_downloading,
-                  obscureText: !_showToken,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  decoration: InputDecoration(
-                    labelText: l.updatesTokenLabel,
-                    hintText: l.updatesTokenHint,
-                    border: const OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(16)),
-                    ),
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_tokenController.text.isNotEmpty)
-                          IconButton(
-                            tooltip: l.updatesTokenDelete,
-                            onPressed: _checking || _downloading
-                                ? null
-                                : _clearToken,
-                            icon: const Icon(
-                              Icons.backspace_outlined,
-                              size: 20,
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: _tokenController,
+                      enabled: !_checking && !_downloading,
+                      obscureText: !_showToken,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      decoration: InputDecoration(
+                        labelText: l.updatesTokenLabel,
+                        hintText: l.updatesTokenHint,
+                        border: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(16)),
+                        ),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_tokenController.text.isNotEmpty)
+                              IconButton(
+                                tooltip: l.updatesTokenDelete,
+                                onPressed: _checking || _downloading
+                                    ? null
+                                    : _clearToken,
+                                icon: const Icon(
+                                  Icons.backspace_outlined,
+                                  size: 20,
+                                ),
+                              ),
+                            IconButton(
+                              onPressed: () =>
+                                  setState(() => _showToken = !_showToken),
+                              icon: Icon(
+                                _showToken
+                                    ? Icons.visibility_off_rounded
+                                    : Icons.visibility_rounded,
+                              ),
                             ),
-                          ),
-                        IconButton(
-                          onPressed: () =>
-                              setState(() => _showToken = !_showToken),
-                          icon: Icon(
-                            _showToken
-                                ? Icons.visibility_off_rounded
-                                : Icons.visibility_rounded,
+                          ],
+                        ),
+                      ),
+                      onChanged: (_) {
+                        setState(() {
+                          _latest = null;
+                          _release = null;
+                          _upToDate = false;
+                          _failure = null;
+                          _tokenValid = null;
+                          _downloadedPath = null;
+                        });
+                      },
+                      onSubmitted: (_) => _check(),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        if (_checking)
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          Icon(tokenIcon, size: 16, color: tokenColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            tokenStatus,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: tokenColor,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  onChanged: (_) {
-                    setState(() {
-                      _latest = null;
-                      _release = null;
-                      _upToDate = false;
-                      _failure = null;
-                      _tokenValid = null;
-                      _downloadedPath = null;
-                    });
-                  },
-                  onSubmitted: (_) => _check(),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
-                child: Row(
-                  children: [
-                    if (_checking)
-                      const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else
-                      Icon(tokenIcon, size: 16, color: tokenColor),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        tokenStatus,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: tokenColor,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${l.updatesTokenHelp}\n${l.updatesTokenCheckHint}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        height: 1.4,
                       ),
                     ),
                   ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Text(
-                  '${l.updatesTokenHelp}\n${l.updatesTokenCheckHint}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.4,
-                  ),
                 ),
               ),
               ListTile(
@@ -2120,9 +2130,12 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
               if (_downloading)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: LinearProgressIndicator(
-                    value: _progress > 0 ? _progress : null,
-                    minHeight: 4,
+                  child: WavyProgress(
+                    value: _progress,
+                    playing: true,
+                    height: 12,
+                    stroke: 4,
+                    amplitude: 2.5,
                   ),
                 ),
             ] else if (latest != null) ...[
@@ -2320,26 +2333,16 @@ class _ReleaseNotesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          tooltip: l.playerBack,
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-        title: Text(
-          l.updatesWhatsNew(version),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+    // Та же оболочка, что у разделов настроек: крупный заголовок, а разделы
+    // заметок — тональные карточки M3.
+    return _Page(
+      title: l.updatesWhatsNew(version),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: ReleaseNotes(body, token: token),
         ),
-      ),
+      ],
     );
   }
 }

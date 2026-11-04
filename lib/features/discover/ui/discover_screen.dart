@@ -17,6 +17,7 @@ import '../../../widgets/pressable.dart';
 import '../../../widgets/remote_track_actions.dart';
 import '../../../widgets/track_cover.dart';
 import '../../../widgets/two_line_title.dart';
+import '../../../widgets/expressive_loader.dart';
 
 /// «Что послушать» — обзорный раздел как вторая вкладка Яндекса: волна,
 /// чарт, новинки, станции и артисты. Только реальные данные каталога.
@@ -367,7 +368,7 @@ class NewReleasesScreen extends ConsumerWidget {
           albums.when(
             loading: () => const SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: ExpressiveLoader()),
             ),
             error: (error, _) => SliverFillRemaining(
               hasScrollBody: false,

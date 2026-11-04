@@ -19,6 +19,7 @@ import '../../../widgets/glass_top_bar.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/remote_track_actions.dart';
 import '../../../widgets/track_cover.dart';
+import '../../../widgets/expressive_loader.dart';
 
 /// Проигрывание пачки удалённых треков: свести в базу, поставить очередь,
 /// открыть плеер. Одно место на все карточки каталога.
@@ -73,7 +74,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen> {
 
     return Scaffold(
       body: brief.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: ExpressiveLoader()),
         error: (error, _) => Center(child: Text(l.dbError('$error'))),
         data: (artist) {
           if (artist == null) {
@@ -429,7 +430,7 @@ class ArtistTracksScreen extends ConsumerWidget {
           tracks.when(
             loading: () => const SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: ExpressiveLoader()),
             ),
             error: (error, _) => SliverFillRemaining(
               hasScrollBody: false,
@@ -485,7 +486,7 @@ class ArtistAlbumsScreen extends ConsumerWidget {
           albums.when(
             loading: () => const SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: ExpressiveLoader()),
             ),
             error: (error, _) => SliverFillRemaining(
               hasScrollBody: false,
@@ -646,7 +647,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen> {
 
     return Scaffold(
       body: album.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: ExpressiveLoader()),
         error: (error, _) => Center(child: Text(l.dbError('$error'))),
         data: (value) {
           if (value == null) return Center(child: Text(l.searchNoResults));
@@ -809,7 +810,7 @@ class _ChartScreenState extends ConsumerState<ChartScreen> {
     if (chart.isLoading && chart.value == null) {
       return Scaffold(
         appBar: AppBar(title: Text(l.chartTitle)),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const Center(child: ExpressiveLoader()),
       );
     }
     if (chart.hasError && chart.value == null) {

@@ -8,6 +8,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_motion.dart';
 import '../../../widgets/track_cover.dart';
 import '../../../widgets/human_bytes.dart';
+import '../../../widgets/expressive_loader.dart';
 
 Future<void> showTrackDetails(
   BuildContext context,
@@ -71,7 +72,7 @@ class _TrackDetailsSheetState extends ConsumerState<_TrackDetailsSheet> {
           if (data == null) {
             return const SizedBox(
               height: 220,
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: ExpressiveLoader()),
             );
           }
           final track = data.track;

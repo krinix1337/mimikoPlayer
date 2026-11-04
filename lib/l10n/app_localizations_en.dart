@@ -986,11 +986,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsResetDone => 'Settings are back to defaults';
 
   @override
-  String get settingsLyricsSource => 'Lyrics source: LRCLIB + Yandex';
+  String get settingsLyricsSource => 'Lyrics: LRCLIB, Musixmatch, NetEase';
 
   @override
   String get settingsLyricsSourceNote =>
-      'Line timings come from LRCLIB; it has no word-level data.';
+      'Line timings are looked up in LRCLIB, Musixmatch and NetEase in turn; otherwise the official Yandex text is shown.';
 
   @override
   String get motionOff => 'Off';
@@ -1250,7 +1250,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutSourcesNote =>
-      'Yandex Music for catalog, streams and the wave; SoundCloud for search and streams; local files from the Music folder. Lyrics: LRCLIB, official Yandex text and lyrics.ovh.';
+      'Yandex Music for catalog, streams and the wave; SoundCloud for search and streams; local files from the Music folder. Lyrics: LRCLIB, Musixmatch, NetEase, official Yandex text and lyrics.ovh.';
 
   @override
   String get settingsAiFilter => 'AI filter';

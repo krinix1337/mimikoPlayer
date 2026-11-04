@@ -18,6 +18,7 @@ import '../../../router/routes.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/track_cover.dart';
 import 'track_details_sheet.dart';
+import '../../../widgets/wavy_slider.dart';
 
 /// Меню трека по образцу Я.Музыки: шапка с обложкой, круглые действия и
 /// список. Только то, что действительно работает.
@@ -290,9 +291,9 @@ Future<void> showTrackMenu(
                           leading: Icon(icon),
                           title: Text(label),
                           subtitle: downloading
-                              ? LinearProgressIndicator(
-                                  value: status?.progress,
-                                  minHeight: 3,
+                              ? WavyProgress(
+                                  value: status?.progress ?? 0,
+                                  playing: true,
                                 )
                               : status?.phase == DownloadPhase.failed ||
                                     status?.phase == DownloadPhase.skipped

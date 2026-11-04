@@ -989,11 +989,11 @@ class AppLocalizationsRu extends AppLocalizations {
       'Настройки вернулись к значениям по умолчанию';
 
   @override
-  String get settingsLyricsSource => 'Тексты: LRCLIB + Яндекс';
+  String get settingsLyricsSource => 'Тексты: LRCLIB, Musixmatch, NetEase';
 
   @override
   String get settingsLyricsSourceNote =>
-      'Тайминги строк приходят из LRCLIB; пословной подсветки в источнике нет.';
+      'Тайминги строк ищутся по очереди в LRCLIB, Musixmatch и NetEase; если их нет — официальный текст Яндекса.';
 
   @override
   String get motionOff => 'Выключены';
@@ -1255,7 +1255,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get aboutSourcesNote =>
-      'Яндекс Музыка — каталог, поток и волна; SoundCloud — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, официальный текст Яндекса и lyrics.ovh.';
+      'Яндекс Музыка — каталог, поток и волна; SoundCloud — поиск и поток; локальные файлы из папки Music. Тексты: LRCLIB, Musixmatch, NetEase, официальный текст Яндекса и lyrics.ovh.';
 
   @override
   String get settingsAiFilter => 'ИИ-фильтр';
