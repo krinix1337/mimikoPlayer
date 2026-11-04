@@ -2057,44 +2057,50 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
                   ),
                   title: Text(l.updatesReady),
                 ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _downloading ? null : action,
-                        icon: Icon(
-                          _downloading
-                              ? Icons.downloading_rounded
-                              : _downloadedPath != null
-                              ? Icons.system_update_alt_rounded
-                              : Icons.download_rounded,
+              // Кнопка и волна загрузки — одна плашка группы.
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _downloading ? null : action,
+                            icon: Icon(
+                              _downloading
+                                  ? Icons.downloading_rounded
+                                  : _downloadedPath != null
+                                  ? Icons.system_update_alt_rounded
+                                  : Icons.download_rounded,
+                            ),
+                            label: Text(actionLabel),
+                          ),
                         ),
-                        label: Text(actionLabel),
+                        if (_downloading) ...[
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: _cancelDownload,
+                            child: Text(l.updatesCancel),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (_downloading)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                      child: WavyProgress(
+                        value: _progress,
+                        playing: true,
+                        height: 12,
+                        stroke: 4,
+                        amplitude: 2.5,
                       ),
                     ),
-                    if (_downloading) ...[
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: _cancelDownload,
-                        child: Text(l.updatesCancel),
-                      ),
-                    ],
-                  ],
-                ),
+                ],
               ),
-              if (_downloading)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: WavyProgress(
-                    value: _progress,
-                    playing: true,
-                    height: 12,
-                    stroke: 4,
-                    amplitude: 2.5,
-                  ),
-                ),
             ] else if (latest != null) ...[
               ListTile(
                 leading: Icon(
@@ -2108,39 +2114,44 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
                 ),
               ),
               if (_upToDate)
-                ListTile(
-                  leading: Icon(
-                    Icons.restart_alt_rounded,
-                    color: theme.colorScheme.primary,
-                  ),
-                  title: Text(
-                    _downloading
-                        ? l.updatesDownloading((_progress * 100).round())
-                        : l.updatesReinstallTitle(latest.version),
-                  ),
-                  subtitle: Text(l.updatesReinstallNote),
-                  trailing: _downloading
-                      ? TextButton(
-                          onPressed: _cancelDownload,
-                          child: Text(l.updatesCancel),
-                        )
-                      : const Icon(Icons.chevron_right_rounded, size: 18),
-                  onTap: _downloading || _checking
-                      ? null
-                      : _downloadedPath != null
-                      ? _install
-                      : () => _reinstall(latest),
-                ),
-              if (_upToDate && _downloading)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: WavyProgress(
-                    value: _progress,
-                    playing: true,
-                    height: 12,
-                    stroke: 4,
-                    amplitude: 2.5,
-                  ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: Icon(
+                        Icons.restart_alt_rounded,
+                        color: theme.colorScheme.primary,
+                      ),
+                      title: Text(
+                        _downloading
+                            ? l.updatesDownloading((_progress * 100).round())
+                            : l.updatesReinstallTitle(latest.version),
+                      ),
+                      subtitle: Text(l.updatesReinstallNote),
+                      trailing: _downloading
+                          ? TextButton(
+                              onPressed: _cancelDownload,
+                              child: Text(l.updatesCancel),
+                            )
+                          : const Icon(Icons.chevron_right_rounded, size: 18),
+                      onTap: _downloading || _checking
+                          ? null
+                          : _downloadedPath != null
+                          ? _install
+                          : () => _reinstall(latest),
+                    ),
+                    if (_downloading)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                        child: WavyProgress(
+                          value: _progress,
+                          playing: true,
+                          height: 12,
+                          stroke: 4,
+                          amplitude: 2.5,
+                        ),
+                      ),
+                  ],
                 ),
               if (latest.notes != null && latest.notes!.isNotEmpty)
                 ListTile(
