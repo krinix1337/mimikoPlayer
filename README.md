@@ -7,7 +7,7 @@
 
 <br>
 
-<a href="https://github.com/krinix1337/mimikoPlayer/releases/latest"><img alt="Версия 1.4.0" src="https://img.shields.io/badge/версия-1.4.0-D8F544?style=for-the-badge&labelColor=1C1B1F"></a>
+<a href="https://github.com/krinix1337/mimikoPlayer/releases/latest"><img alt="Версия 1.4.1" src="https://img.shields.io/badge/версия-1.4.1-D8F544?style=for-the-badge&labelColor=1C1B1F"></a>
 <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white&labelColor=1C1B1F">
 <a href="https://flutter.dev"><img alt="Flutter 3.47" src="https://img.shields.io/badge/Flutter-3.47-02569B?style=for-the-badge&logo=flutter&logoColor=white&labelColor=1C1B1F"></a>
 <img alt="203 теста" src="https://img.shields.io/badge/тесты-203-22C7A9?style=for-the-badge&labelColor=1C1B1F">
@@ -68,6 +68,7 @@
 - Свои плейлисты с синхронизацией в Яндекс
 - Офлайн: очередь загрузок, докачка, лимит места
 - Автозагрузка лайков по Wi-Fi
+- Статистика прослушиваний: время, график, топы
 
 </td>
     <td valign="top">
@@ -114,17 +115,22 @@
     <td align="center"><img src="docs/screenshots/collection.jpg" alt="Коллекция"><br><sub><b>Коллекция</b></sub></td>
     <td align="center"><img src="docs/screenshots/settings.jpg" alt="Настройки"><br><sub><b>Настройки</b></sub></td>
   </tr>
+  <tr>
+    <td></td>
+    <td align="center"><img src="docs/screenshots/stats.jpg" alt="Статистика прослушиваний"><br><sub><b>Статистика</b></sub></td>
+    <td></td>
+  </tr>
 </table>
 </div>
 
 ## 📦 Установка
 
-1. Скачайте `mimikoPlayer-1.4.0.apk` со страницы **[Releases](https://github.com/krinix1337/mimikoPlayer/releases/latest)**.
+1. Скачайте `mimikoPlayer-1.4.1.apk` со страницы **[Releases](https://github.com/krinix1337/mimikoPlayer/releases/latest)**.
 2. Откройте файл и разрешите установку из этого источника.
 3. Войдите в Яндекс в разделе **Настройки → Аккаунт и сервисы**. SoundCloud и локальные файлы работают без входа.
 
 > [!TIP]
-> Дальше обновляться можно из самого приложения: **Настройки → Обновления**. Нужен fine-grained токен GitHub с доступом *Contents: Read-only*; он хранится только на телефоне.
+> Дальше обновляться можно из самого приложения: **Настройки → Обновления**. Когда выходит новая версия, у пункта появляется значок.
 
 > [!IMPORTANT]
 > На Xiaomi с HyperOS отключите для приложения оптимизацию батареи и разрешите автозапуск — иначе система может останавливать фоновое воспроизведение и загрузки.
@@ -191,8 +197,6 @@ adb logcat -s flutter | grep frames
 
 </details>
 
-> [!WARNING]
-> Не передавайте `--dart-define=GITHUB_TOKEN=...` в сборки, которые раздаёте другим: токен окажется внутри APK.
 
 ## ⚖️ Лицензия и данные
 
