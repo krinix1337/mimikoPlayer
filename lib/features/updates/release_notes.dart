@@ -162,14 +162,12 @@ class ReleaseNotes extends StatelessWidget {
           children.add(
             Padding(
               padding: EdgeInsets.only(top: children.isEmpty ? 0 : 12),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.network(
-                  source.url,
-                  headers: source.headers,
-                  fit: BoxFit.fitWidth,
-                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                ),
+              // Баннер открывается на весь экран: там его можно
+              // приблизить пальцами и рассмотреть мелкий текст.
+              child: _ZoomableImage(
+                tag: 'release-image-${children.length}-${source.url}',
+                url: source.url,
+                headers: source.headers,
               ),
             ),
           );
@@ -181,6 +179,120 @@ class ReleaseNotes extends StatelessWidget {
       children: sections,
     );
   }
+}
+
+class _ZoomableImage extends StatelessWidget {
+  const _ZoomableImage({
+    required this.tag,
+    required this.url,
+    required this.headers,
+  });
+
+  final String tag;
+  final String url;
+  final Map<String, String> headers;
+
+  Widget _image(BoxFit fit) => Image.network(
+    url,
+    headers: headers,
+    fit: fit,
+    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+  );
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: () => Navigator.of(context, rootNavigator: true).push(
+      PageRouteBuilder<void>(
+        opaque: false,
+        barrierColor: Colors.black,
+        transitionDuration: const Duration(milliseconds: 320),
+        reverseTransitionDuration: const Duration(milliseconds: 240),
+        pageBuilder: (context, animation, _) => FadeTransition(
+          opacity: animation,
+          child: _ImageViewer(tag: tag, child: _image(BoxFit.contain)),
+        ),
+      ),
+    ),
+    child: Hero(
+      tag: tag,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: _image(BoxFit.fitWidth),
+      ),
+    ),
+  );
+}
+
+/// Полноэкранный просмотр картинки: щипок приближает до 5×, двойное
+/// касание — 2.5× и обратно, тап или «назад» закрывают.
+class _ImageViewer extends StatefulWidget {
+  const _ImageViewer({required this.tag, required this.child});
+
+  final String tag;
+  final Widget child;
+
+  @override
+  State<_ImageViewer> createState() => _ImageViewerState();
+}
+
+class _ImageViewerState extends State<_ImageViewer> {
+  final _controller = TransformationController();
+  TapDownDetails? _doubleTap;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _toggleZoom() {
+    final point = _doubleTap?.localPosition;
+    if (_controller.value.getMaxScaleOnAxis() > 1.01 || point == null) {
+      _controller.value = Matrix4.identity();
+      return;
+    }
+    const scale = 2.5;
+    _controller.value = Matrix4.identity()
+      ..translateByDouble(
+        -point.dx * (scale - 1),
+        -point.dy * (scale - 1),
+        0,
+        1,
+      )
+      ..scaleByDouble(scale, scale, 1, 1);
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.transparent,
+    body: Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).maybePop(),
+            onDoubleTapDown: (details) => _doubleTap = details,
+            onDoubleTap: _toggleZoom,
+            child: InteractiveViewer(
+              transformationController: _controller,
+              maxScale: 5,
+              child: Center(
+                child: Hero(tag: widget.tag, child: widget.child),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: MediaQuery.paddingOf(context).top + 8,
+          right: 12,
+          child: IconButton.filledTonal(
+            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 enum _BlockKind { heading, paragraph, bullet, ordered, code, rule, image }
