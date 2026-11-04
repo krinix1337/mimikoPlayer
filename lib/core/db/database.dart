@@ -7,6 +7,7 @@ import 'daos/history_dao.dart';
 import 'daos/library_dao.dart';
 import 'daos/queue_dao.dart';
 import 'daos/settings_dao.dart';
+import 'daos/stats_dao.dart';
 import 'daos/streams_dao.dart';
 import 'daos/tracks_dao.dart';
 import 'migrations/schema_versions.dart';
@@ -63,6 +64,7 @@ class AppDatabase extends _$AppDatabase {
   DownloadsDao get downloadsDao => DownloadsDao(this);
   StreamsDao get streamsDao => StreamsDao(this);
   HistoryDao get historyDao => HistoryDao(this);
+  StatsDao get statsDao => StatsDao(this);
   QueueDao get queueDao => QueueDao(this);
   SettingsDao get settingsDao => SettingsDao(this);
   AuthDao get authDao => AuthDao(this);
@@ -94,6 +96,10 @@ class AppDatabase extends _$AppDatabase {
     4: MigrationStep(
       description: 'пометка «скачан без цензуры»',
       up: (m) => m.addColumn(downloadedFiles, downloadedFiles.uncensored),
+    ),
+    5: MigrationStep(
+      description: 'флаг «в статистике» у истории',
+      up: (m) => m.addColumn(history, history.inStats),
     ),
   };
 

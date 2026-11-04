@@ -15,4 +15,4 @@ final class MigrationStep {
   final MigrationUp up;
 }
 
-const int latestSchemaVersion = 4;
+const int latestSchemaVersion = 5;

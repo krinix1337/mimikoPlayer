@@ -55,4 +55,17 @@ void main() {
     expect(restored.themeMode, ThemeMode.dark);
     expect(restored.accent, AccentColor.acid);
   });
+
+  test('старый токен GitHub стирается из сохранённых настроек', () async {
+    await db.settingsDao.setValue(prefsKey, {
+      'theme_mode': 'light',
+      'github_token': 'github_pat_secret',
+    });
+
+    final restored = await loadPrefs(db);
+    expect(restored.themeMode, ThemeMode.light);
+    final raw = await db.settingsDao.value(prefsKey);
+    expect(raw, isNot(contains('github_token')));
+    expect(raw, isNot(contains('github_pat_secret')));
+  });
 }

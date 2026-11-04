@@ -12,6 +12,10 @@ void _createV1(File file) {
   final raw = sqlite3.open(file.path);
   try {
     raw.execute('CREATE TABLE tracks (id TEXT NOT NULL PRIMARY KEY)');
+    raw.execute(
+      'CREATE TABLE history (id INTEGER PRIMARY KEY, local_track_id TEXT, '
+      'played_at INTEGER, played_ms INTEGER, completed INTEGER, source TEXT)',
+    );
     raw.execute('''
       CREATE TABLE likes (
         local_track_id TEXT NOT NULL PRIMARY KEY
@@ -77,14 +81,14 @@ void _createV1(File file) {
 }
 
 void main() {
-  test('апгрейд v1 → v4 сохраняет лайки и старые загрузки', () async {
+  test('апгрейд v1 → v5 сохраняет лайки и старые загрузки', () async {
     final dir = await Directory.systemTemp.createTemp('mimiko_migration_');
     final file = File(p.join(dir.path, 'app.sqlite'));
     _createV1(file);
 
     final db = AppDatabase.forTesting(NativeDatabase(file));
     try {
-      expect(await db.schemaVersionInDb(), 4);
+      expect(await db.schemaVersionInDb(), 5);
       expect(await db.libraryDao.likedTrackIds(), ['t_1']);
 
       final downloads = await db.select(db.downloadedFiles).get();
@@ -103,7 +107,7 @@ void main() {
   test('чистая установка создаёт всю схему v4', () async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     try {
-      expect(await db.schemaVersionInDb(), 4);
+      expect(await db.schemaVersionInDb(), 5);
       final counts = await db.rowCountSnapshot();
       expect(
         counts.keys,

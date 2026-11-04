@@ -27,9 +27,12 @@ Future<Prefs> loadPrefs(AppDatabase db) async {
     // Старый формат писал строку внутрь строки (jsonEncode в savePrefs и
     // ещё один в SettingsDao.setValue) — такие данные тоже читаем.
     if (decoded is String) decoded = jsonDecode(decoded);
-    return decoded is Map<String, Object?>
-        ? Prefs.fromJson(decoded)
-        : const Prefs();
+    if (decoded is! Map<String, Object?>) return const Prefs();
+    final prefs = Prefs.fromJson(decoded);
+    // До 1.4.1 обновления качались по личному токену GitHub. Репозиторий
+    // открыт, токен больше не нужен — стираем его из снимка насовсем.
+    if (decoded.containsKey('github_token')) await savePrefs(db, prefs);
+    return prefs;
   } on FormatException {
     return const Prefs();
   }

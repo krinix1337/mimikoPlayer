@@ -1218,6 +1218,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       played: played,
       completed: type == PlaybackEventType.trackFinished,
       skipReason: type == PlaybackEventType.skip ? 'manual' : null,
+      inStats: _services.collectStats,
     );
   }
 

@@ -1176,49 +1176,11 @@ class AppLocalizationsRu extends AppLocalizations {
       'Разреши установку из этого приложения и нажми ещё раз';
 
   @override
-  String get updatesTokenTitle => 'Доступ к приватному репозиторию';
-
-  @override
-  String get updatesTokenLabel => 'Токен GitHub';
-
-  @override
-  String get updatesTokenHint => 'fine-grained PAT, Contents: Read-only';
-
-  @override
-  String get updatesTokenHelp =>
-      'Токен хранится только на этом телефоне. Нужен fine-grained PAT с доступом Contents: Read-only к krinix1337/mimikoPlayer.';
-
-  @override
-  String get updatesTokenCheckHint => 'Вставь токен и нажми «Проверить».';
-
-  @override
-  String get updatesTokenMissing => 'Токен не задан';
-
-  @override
-  String get updatesTokenUnchecked => 'Токен введён, но не проверен';
-
-  @override
-  String get updatesTokenValid => 'Токен принят';
-
-  @override
-  String get updatesTokenInvalid => 'Токен не подошёл';
-
-  @override
-  String get updatesTokenDelete => 'Удалить токен';
-
-  @override
-  String get updatesTokenCreate => 'Создать токен';
-
-  @override
-  String get updatesTokenNeeded =>
-      'Вставь токен GitHub или собери приложение с GITHUB_TOKEN.';
-
-  @override
   String get updatesErrorUnauthorized =>
-      'Токен не подошёл или нет доступа к репозиторию';
+      'GitHub временно ограничил запросы, попробуй позже';
 
   @override
-  String get updatesErrorNotFound => 'Нет доступа к репозиторию или релизам';
+  String get updatesErrorNotFound => 'Релизы пока недоступны';
 
   @override
   String get updatesErrorNoAsset => 'В последнем релизе нет APK';
@@ -1242,9 +1204,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get updatesInstall => 'Установить';
-
-  @override
-  String get updatesBuildToken => 'Токен задан при сборке';
 
   @override
   String get settingsAboutNote =>
@@ -1634,4 +1593,108 @@ class AppLocalizationsRu extends AppLocalizations {
   String downloadsFreeSpace(String size) {
     return 'Свободно: $size';
   }
+
+  @override
+  String get settingsGroupAppearance => 'Внешний вид';
+
+  @override
+  String get settingsGroupMusic => 'Музыка';
+
+  @override
+  String get settingsGroupData => 'Данные';
+
+  @override
+  String get settingsGroupAccount => 'Аккаунт';
+
+  @override
+  String get spinCookies => 'Вращение фигур';
+
+  @override
+  String get spinCookiesNote =>
+      'Фигуры у иконок на главной настроек медленно крутятся';
+
+  @override
+  String get statsTitle => 'Статистика';
+
+  @override
+  String get statsTileSubtitle => 'Время, топ треков и артистов';
+
+  @override
+  String get statsCollect => 'Собирать статистику';
+
+  @override
+  String get statsCollectNote =>
+      'Хранится только на телефоне. Трек засчитывается после 30 секунд';
+
+  @override
+  String get stats7d => '7 дней';
+
+  @override
+  String get stats30d => '30 дней';
+
+  @override
+  String get statsYear => 'Год';
+
+  @override
+  String get statsAll => 'Всё';
+
+  @override
+  String get statsTime => 'Время';
+
+  @override
+  String get statsPlays => 'Прослушано';
+
+  @override
+  String get statsTracks => 'Треков';
+
+  @override
+  String get statsByDay => 'По дням';
+
+  @override
+  String get statsTopTracks => 'Топ треков';
+
+  @override
+  String get statsTopArtists => 'Топ артистов';
+
+  @override
+  String get statsExport => 'Экспорт JSON';
+
+  @override
+  String get statsClear => 'Очистить';
+
+  @override
+  String get statsClearConfirm =>
+      'Очистить статистику? История для волны останется.';
+
+  @override
+  String get statsEmpty => 'Пока пусто. Послушай что-нибудь дольше 30 секунд';
+
+  @override
+  String statsHours(int h, int m) {
+    return '$h ч $m мин';
+  }
+
+  @override
+  String statsMinutes(int m) {
+    return '$m мин';
+  }
+
+  @override
+  String statsPlaysCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count прослушивания',
+      many: '$count прослушиваний',
+      few: '$count прослушивания',
+      one: '$count прослушивание',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsCleared => 'Статистика очищена';
+
+  @override
+  String get aboutRepository => 'Репозиторий';
 }

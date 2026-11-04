@@ -2,7 +2,10 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+
+import '../../core/platform/mimiko_platform.dart';
 
 /// Что именно пошло не так при проверке или скачивании. UI переводит код
 /// в понятную строку, чтобы сервис не зависел от локализации.
@@ -117,8 +120,7 @@ int compareVersions(String a, String b) {
 
 /// Проверка обновлений в приватных релизах GitHub.
 ///
-/// Токен нужен только для чтения: fine-grained PAT с доступом
-/// Contents: Read-only к [repository].
+/// Репозиторий открыт: релизы читаются без авторизации.
 class GithubUpdater {
   GithubUpdater({Dio? dio})
     : _dio =
@@ -140,8 +142,8 @@ class GithubUpdater {
   /// Последний опубликованный релиз независимо от того, новее он или нет.
   /// Сравнение с установленной версией делает UI: так можно показать
   /// описание последнего релиза, даже когда обновляться не нужно.
-  Future<UpdateRelease?> latest({required String token}) async {
-    final data = await _latestRelease(token);
+  Future<UpdateRelease?> latest() async {
+    final data = await _latestRelease();
     final release = UpdateRelease.fromReleaseJson(data);
     if (release == null) throw const UpdateException(UpdateFailure.noAsset);
     return release;
@@ -149,7 +151,6 @@ class GithubUpdater {
 
   Future<File> download({
     required UpdateRelease release,
-    required String token,
     required void Function(int received, int total) onProgress,
     CancelToken? cancelToken,
   }) async {
@@ -171,12 +172,7 @@ class GithubUpdater {
         release.assetApiUrl,
         file.path,
         cancelToken: cancelToken,
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/octet-stream',
-          },
-        ),
+        options: Options(headers: {'Accept': 'application/octet-stream'}),
         onReceiveProgress: onProgress,
       );
     } on DioException catch (error) {
@@ -197,11 +193,10 @@ class GithubUpdater {
     return file;
   }
 
-  Future<Map<String, Object?>> _latestRelease(String token) async {
+  Future<Map<String, Object?>> _latestRelease() async {
     try {
       final response = await _dio.get<Object?>(
         'https://api.github.com/repos/$repository/releases/latest',
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
       final data = response.data;
       if (data is Map<String, Object?>) return data;
@@ -238,3 +233,19 @@ class GithubUpdater {
   static String formatMb(int bytes) =>
       (bytes / (1024 * 1024)).toStringAsFixed(1);
 }
+
+/// Номер новой версии, если на GitHub есть релиз новее установленного.
+/// Проверяется раз за запуск, когда открывают настройки; любая ошибка —
+/// просто «нет обновления», значок тогда не показывается.
+final updateAvailableProvider = FutureProvider<String?>((ref) async {
+  try {
+    final installed = await MimikoPlatform.appVersion();
+    if (installed.isEmpty) return null;
+    final latest = await GithubUpdater().latest();
+    return latest != null && latest.isNewerThan(installed)
+        ? latest.version
+        : null;
+  } on Object {
+    return null;
+  }
+});

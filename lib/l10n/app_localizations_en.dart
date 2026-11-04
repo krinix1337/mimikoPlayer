@@ -1172,49 +1172,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Allow installs from this app, then try again';
 
   @override
-  String get updatesTokenTitle => 'Private repository access';
-
-  @override
-  String get updatesTokenLabel => 'GitHub token';
-
-  @override
-  String get updatesTokenHint => 'fine-grained PAT, Contents: Read-only';
-
-  @override
-  String get updatesTokenHelp =>
-      'The token stays on this phone. Use a fine-grained PAT with Contents: Read-only access to krinix1337/mimikoPlayer.';
-
-  @override
-  String get updatesTokenCheckHint => 'Paste a token and press Check.';
-
-  @override
-  String get updatesTokenMissing => 'No token set';
-
-  @override
-  String get updatesTokenUnchecked => 'Token entered but not checked';
-
-  @override
-  String get updatesTokenValid => 'Token accepted';
-
-  @override
-  String get updatesTokenInvalid => 'Token rejected';
-
-  @override
-  String get updatesTokenDelete => 'Remove token';
-
-  @override
-  String get updatesTokenCreate => 'Create a token';
-
-  @override
-  String get updatesTokenNeeded =>
-      'Enter a GitHub token or build the app with GITHUB_TOKEN.';
-
-  @override
   String get updatesErrorUnauthorized =>
-      'The token was rejected or has no access to the repository';
+      'GitHub is rate limiting requests, try again later';
 
   @override
-  String get updatesErrorNotFound => 'No access to the repository or releases';
+  String get updatesErrorNotFound => 'Releases are not available yet';
 
   @override
   String get updatesErrorNoAsset => 'The latest release has no APK';
@@ -1237,9 +1199,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updatesInstall => 'Install';
-
-  @override
-  String get updatesBuildToken => 'Token provided at build time';
 
   @override
   String get settingsAboutNote =>
@@ -1632,4 +1591,106 @@ class AppLocalizationsEn extends AppLocalizations {
   String downloadsFreeSpace(String size) {
     return 'Free: $size';
   }
+
+  @override
+  String get settingsGroupAppearance => 'Appearance';
+
+  @override
+  String get settingsGroupMusic => 'Music';
+
+  @override
+  String get settingsGroupData => 'Data';
+
+  @override
+  String get settingsGroupAccount => 'Account';
+
+  @override
+  String get spinCookies => 'Spinning shapes';
+
+  @override
+  String get spinCookiesNote =>
+      'Icon shapes on the settings home slowly rotate';
+
+  @override
+  String get statsTitle => 'Statistics';
+
+  @override
+  String get statsTileSubtitle => 'Time, top tracks and artists';
+
+  @override
+  String get statsCollect => 'Collect statistics';
+
+  @override
+  String get statsCollectNote =>
+      'Stored only on this phone. A track counts after 30 seconds';
+
+  @override
+  String get stats7d => '7 days';
+
+  @override
+  String get stats30d => '30 days';
+
+  @override
+  String get statsYear => 'Year';
+
+  @override
+  String get statsAll => 'All';
+
+  @override
+  String get statsTime => 'Time';
+
+  @override
+  String get statsPlays => 'Plays';
+
+  @override
+  String get statsTracks => 'Tracks';
+
+  @override
+  String get statsByDay => 'By day';
+
+  @override
+  String get statsTopTracks => 'Top tracks';
+
+  @override
+  String get statsTopArtists => 'Top artists';
+
+  @override
+  String get statsExport => 'Export JSON';
+
+  @override
+  String get statsClear => 'Clear';
+
+  @override
+  String get statsClearConfirm => 'Clear statistics? Wave history stays.';
+
+  @override
+  String get statsEmpty =>
+      'Nothing yet. Listen to something for over 30 seconds';
+
+  @override
+  String statsHours(int h, int m) {
+    return '$h h $m min';
+  }
+
+  @override
+  String statsMinutes(int m) {
+    return '$m min';
+  }
+
+  @override
+  String statsPlaysCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count plays',
+      one: '$count play',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsCleared => 'Statistics cleared';
+
+  @override
+  String get aboutRepository => 'Repository';
 }

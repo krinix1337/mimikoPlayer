@@ -162,9 +162,6 @@ class PrefsController extends Notifier<Prefs> {
     ),
   );
 
-  Future<void> setGithubToken(String token) =>
-      _write(state.copyWith(githubToken: token.trim()));
-
   Future<void> setLyricsSize(LyricsSize size) =>
       _write(state.copyWith(lyricsSize: size));
 
@@ -179,6 +176,12 @@ class PrefsController extends Notifier<Prefs> {
 
   Future<void> setShowNavLabels(bool value) =>
       _write(state.copyWith(showNavLabels: value));
+
+  Future<void> setSpinCookies(bool value) =>
+      _write(state.copyWith(spinCookies: value));
+
+  Future<void> setCollectStats(bool value) =>
+      _write(state.copyWith(collectStats: value));
 
   Future<void> setArtworkShape(ArtworkShape value) =>
       _write(state.copyWith(artworkShape: value));

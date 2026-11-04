@@ -19,7 +19,6 @@ import '../../../theme/app_motion.dart';
 import '../../../theme/keyboard_theme.dart';
 import '../../../widgets/connected_button_group.dart';
 import '../../../widgets/pressable.dart';
-import '../../../widgets/theme_reveal.dart';
 import '../../../widgets/human_bytes.dart';
 
 /// Единый внутренний отступ строк настроек: одинаковый везде, чтобы
@@ -75,22 +74,23 @@ class SettingsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-            child: Text(
-              title,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.primary,
+          if (title.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+              child: Text(
+                title,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.primary,
+                ),
               ),
             ),
-          ),
           // Группа M3 Expressive: каждый пункт — своя плашка с зазором 2 px,
           // крайние скруглены сильно, средние — слегка.
           for (var i = 0; i < children.length; i++) ...[
             if (i > 0) const SizedBox(height: 2),
             Container(
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLow,
+                color: theme.colorScheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.vertical(
                   top: Radius.circular(
                     i == 0 ? Motion.of(context).prefs.corner.radius * 0.7 : 6,
@@ -526,21 +526,10 @@ class AccentRow extends StatelessWidget {
                     SizedBox(
                       width: width,
                       child: Builder(
-                        builder: (swatch) => PressableScale(
-                          // Новый акцент расходится кругом от нажатого цвета.
+                        builder: (_) => PressableScale(
+                          // Мягкая смена: MaterialApp сам переливает цвета темы.
                           onTap: () {
-                            if (accent == current) return;
-                            final box = swatch.findRenderObject() as RenderBox?;
-                            final center = box == null
-                                ? Offset.zero
-                                : box.localToGlobal(
-                                    Offset(box.size.width / 2, 18),
-                                  );
-                            ThemeReveal.run(
-                              swatch,
-                              center,
-                              () => onPick(accent),
-                            );
+                            if (accent != current) onPick(accent);
                           },
                           child: Column(
                             children: [

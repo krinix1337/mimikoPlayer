@@ -22,6 +22,10 @@ class History extends Table {
 
   /// Сырое событие источника, чтобы досылать feedback без повторных запросов.
   TextColumn get eventJson => text().nullable()();
+
+  /// Попадает ли прослушивание в статистику. «Очистить» снимает флаг, не
+  /// трогая саму историю: волна по ней помнит недавно слышанное.
+  BoolColumn get inStats => boolean().withDefault(const Constant(true))();
 }
 
 @TableIndex(name: 'queue_snapshots_unique', columns: {#kind}, unique: true)

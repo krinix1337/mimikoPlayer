@@ -45,6 +45,9 @@ class AppServices {
   /// Длина кроссфейда между треками, секунды. 0 — выключен.
   int crossfadeSeconds = 6;
 
+  /// Учитывать ли прослушивания в статистике (история для волны пишется всегда).
+  bool collectStats = true;
+
   /// Фильтр явно помеченных ИИ-треков; нужен и фоновой докачке волны.
   bool hideAiTracks = false;
 
@@ -67,6 +70,7 @@ class AppServices {
     defaultQuality = Quality.fromWire(prefs.quality);
     fadeEnabled = prefs.fade;
     crossfadeSeconds = prefs.crossfadeSeconds;
+    collectStats = prefs.collectStats;
     hideAiTracks = prefs.hideAiTracks;
     eqEnabled = prefs.eqEnabled;
     eqPreset = prefs.eqPreset;

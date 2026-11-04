@@ -4695,6 +4695,21 @@ class $HistoryTable extends History with TableInfo<$HistoryTable, HistoryData> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _inStatsMeta = const VerificationMeta(
+    'inStats',
+  );
+  @override
+  late final GeneratedColumn<bool> inStats = GeneratedColumn<bool>(
+    'in_stats',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("in_stats" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -4707,6 +4722,7 @@ class $HistoryTable extends History with TableInfo<$HistoryTable, HistoryData> {
     skipReason,
     device,
     eventJson,
+    inStats,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4784,6 +4800,12 @@ class $HistoryTable extends History with TableInfo<$HistoryTable, HistoryData> {
         eventJson.isAcceptableOrUnknown(data['event_json']!, _eventJsonMeta),
       );
     }
+    if (data.containsKey('in_stats')) {
+      context.handle(
+        _inStatsMeta,
+        inStats.isAcceptableOrUnknown(data['in_stats']!, _inStatsMeta),
+      );
+    }
     return context;
   }
 
@@ -4833,6 +4855,10 @@ class $HistoryTable extends History with TableInfo<$HistoryTable, HistoryData> {
         DriftSqlType.string,
         data['${effectivePrefix}event_json'],
       ),
+      inStats: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}in_stats'],
+      )!,
     );
   }
 
@@ -4859,6 +4885,10 @@ class HistoryData extends DataClass implements Insertable<HistoryData> {
 
   /// Сырое событие источника, чтобы досылать feedback без повторных запросов.
   final String? eventJson;
+
+  /// Попадает ли прослушивание в статистику. «Очистить» снимает флаг, не
+  /// трогая саму историю: волна по ней помнит недавно слышанное.
+  final bool inStats;
   const HistoryData({
     required this.id,
     required this.localTrackId,
@@ -4870,6 +4900,7 @@ class HistoryData extends DataClass implements Insertable<HistoryData> {
     this.skipReason,
     this.device,
     this.eventJson,
+    required this.inStats,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4890,6 +4921,7 @@ class HistoryData extends DataClass implements Insertable<HistoryData> {
     if (!nullToAbsent || eventJson != null) {
       map['event_json'] = Variable<String>(eventJson);
     }
+    map['in_stats'] = Variable<bool>(inStats);
     return map;
   }
 
@@ -4911,6 +4943,7 @@ class HistoryData extends DataClass implements Insertable<HistoryData> {
       eventJson: eventJson == null && nullToAbsent
           ? const Value.absent()
           : Value(eventJson),
+      inStats: Value(inStats),
     );
   }
 
@@ -4930,6 +4963,7 @@ class HistoryData extends DataClass implements Insertable<HistoryData> {
       skipReason: serializer.fromJson<String?>(json['skipReason']),
       device: serializer.fromJson<String?>(json['device']),
       eventJson: serializer.fromJson<String?>(json['eventJson']),
+      inStats: serializer.fromJson<bool>(json['inStats']),
     );
   }
   @override
@@ -4946,6 +4980,7 @@ class HistoryData extends DataClass implements Insertable<HistoryData> {
       'skipReason': serializer.toJson<String?>(skipReason),
       'device': serializer.toJson<String?>(device),
       'eventJson': serializer.toJson<String?>(eventJson),
+      'inStats': serializer.toJson<bool>(inStats),
     };
   }
 
@@ -4960,6 +4995,7 @@ class HistoryData extends DataClass implements Insertable<HistoryData> {
     Value<String?> skipReason = const Value.absent(),
     Value<String?> device = const Value.absent(),
     Value<String?> eventJson = const Value.absent(),
+    bool? inStats,
   }) => HistoryData(
     id: id ?? this.id,
     localTrackId: localTrackId ?? this.localTrackId,
@@ -4971,6 +5007,7 @@ class HistoryData extends DataClass implements Insertable<HistoryData> {
     skipReason: skipReason.present ? skipReason.value : this.skipReason,
     device: device.present ? device.value : this.device,
     eventJson: eventJson.present ? eventJson.value : this.eventJson,
+    inStats: inStats ?? this.inStats,
   );
   HistoryData copyWithCompanion(HistoryCompanion data) {
     return HistoryData(
@@ -4988,6 +5025,7 @@ class HistoryData extends DataClass implements Insertable<HistoryData> {
           : this.skipReason,
       device: data.device.present ? data.device.value : this.device,
       eventJson: data.eventJson.present ? data.eventJson.value : this.eventJson,
+      inStats: data.inStats.present ? data.inStats.value : this.inStats,
     );
   }
 
@@ -5003,7 +5041,8 @@ class HistoryData extends DataClass implements Insertable<HistoryData> {
           ..write('quality: $quality, ')
           ..write('skipReason: $skipReason, ')
           ..write('device: $device, ')
-          ..write('eventJson: $eventJson')
+          ..write('eventJson: $eventJson, ')
+          ..write('inStats: $inStats')
           ..write(')'))
         .toString();
   }
@@ -5020,6 +5059,7 @@ class HistoryData extends DataClass implements Insertable<HistoryData> {
     skipReason,
     device,
     eventJson,
+    inStats,
   );
   @override
   bool operator ==(Object other) =>
@@ -5034,7 +5074,8 @@ class HistoryData extends DataClass implements Insertable<HistoryData> {
           other.quality == this.quality &&
           other.skipReason == this.skipReason &&
           other.device == this.device &&
-          other.eventJson == this.eventJson);
+          other.eventJson == this.eventJson &&
+          other.inStats == this.inStats);
 }
 
 class HistoryCompanion extends UpdateCompanion<HistoryData> {
@@ -5048,6 +5089,7 @@ class HistoryCompanion extends UpdateCompanion<HistoryData> {
   final Value<String?> skipReason;
   final Value<String?> device;
   final Value<String?> eventJson;
+  final Value<bool> inStats;
   const HistoryCompanion({
     this.id = const Value.absent(),
     this.localTrackId = const Value.absent(),
@@ -5059,6 +5101,7 @@ class HistoryCompanion extends UpdateCompanion<HistoryData> {
     this.skipReason = const Value.absent(),
     this.device = const Value.absent(),
     this.eventJson = const Value.absent(),
+    this.inStats = const Value.absent(),
   });
   HistoryCompanion.insert({
     this.id = const Value.absent(),
@@ -5071,6 +5114,7 @@ class HistoryCompanion extends UpdateCompanion<HistoryData> {
     this.skipReason = const Value.absent(),
     this.device = const Value.absent(),
     this.eventJson = const Value.absent(),
+    this.inStats = const Value.absent(),
   }) : localTrackId = Value(localTrackId),
        source = Value(source);
   static Insertable<HistoryData> custom({
@@ -5084,6 +5128,7 @@ class HistoryCompanion extends UpdateCompanion<HistoryData> {
     Expression<String>? skipReason,
     Expression<String>? device,
     Expression<String>? eventJson,
+    Expression<bool>? inStats,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -5096,6 +5141,7 @@ class HistoryCompanion extends UpdateCompanion<HistoryData> {
       if (skipReason != null) 'skip_reason': skipReason,
       if (device != null) 'device': device,
       if (eventJson != null) 'event_json': eventJson,
+      if (inStats != null) 'in_stats': inStats,
     });
   }
 
@@ -5110,6 +5156,7 @@ class HistoryCompanion extends UpdateCompanion<HistoryData> {
     Value<String?>? skipReason,
     Value<String?>? device,
     Value<String?>? eventJson,
+    Value<bool>? inStats,
   }) {
     return HistoryCompanion(
       id: id ?? this.id,
@@ -5122,6 +5169,7 @@ class HistoryCompanion extends UpdateCompanion<HistoryData> {
       skipReason: skipReason ?? this.skipReason,
       device: device ?? this.device,
       eventJson: eventJson ?? this.eventJson,
+      inStats: inStats ?? this.inStats,
     );
   }
 
@@ -5158,6 +5206,9 @@ class HistoryCompanion extends UpdateCompanion<HistoryData> {
     if (eventJson.present) {
       map['event_json'] = Variable<String>(eventJson.value);
     }
+    if (inStats.present) {
+      map['in_stats'] = Variable<bool>(inStats.value);
+    }
     return map;
   }
 
@@ -5173,7 +5224,8 @@ class HistoryCompanion extends UpdateCompanion<HistoryData> {
           ..write('quality: $quality, ')
           ..write('skipReason: $skipReason, ')
           ..write('device: $device, ')
-          ..write('eventJson: $eventJson')
+          ..write('eventJson: $eventJson, ')
+          ..write('inStats: $inStats')
           ..write(')'))
         .toString();
   }
@@ -14012,6 +14064,7 @@ typedef $$HistoryTableCreateCompanionBuilder = HistoryCompanion Function({
   Value<String?> skipReason,
   Value<String?> device,
   Value<String?> eventJson,
+  Value<bool> inStats,
 });
 typedef $$HistoryTableUpdateCompanionBuilder = HistoryCompanion Function({
   Value<int> id,
@@ -14024,6 +14077,7 @@ typedef $$HistoryTableUpdateCompanionBuilder = HistoryCompanion Function({
   Value<String?> skipReason,
   Value<String?> device,
   Value<String?> eventJson,
+  Value<bool> inStats,
 });
 
 final class $$HistoryTableReferences
@@ -14099,6 +14153,11 @@ class $$HistoryTableFilterComposer
 
   ColumnFilters<String> get eventJson => $composableBuilder(
     column: $table.eventJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get inStats => $composableBuilder(
+    column: $table.inStats,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -14180,6 +14239,11 @@ class $$HistoryTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get inStats => $composableBuilder(
+    column: $table.inStats,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$TracksTableOrderingComposer get localTrackId {
     final $$TracksTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -14241,6 +14305,9 @@ class $$HistoryTableAnnotationComposer
 
   GeneratedColumn<String> get eventJson =>
       $composableBuilder(column: $table.eventJson, builder: (column) => column);
+
+  GeneratedColumn<bool> get inStats =>
+      $composableBuilder(column: $table.inStats, builder: (column) => column);
 
   $$TracksTableAnnotationComposer get localTrackId {
     final $$TracksTableAnnotationComposer composer = $composerBuilder(
@@ -14304,6 +14371,7 @@ class $$HistoryTableTableManager
                 Value<String?> skipReason = const Value.absent(),
                 Value<String?> device = const Value.absent(),
                 Value<String?> eventJson = const Value.absent(),
+                Value<bool> inStats = const Value.absent(),
               }) => HistoryCompanion(
                 id: id,
                 localTrackId: localTrackId,
@@ -14315,6 +14383,7 @@ class $$HistoryTableTableManager
                 skipReason: skipReason,
                 device: device,
                 eventJson: eventJson,
+                inStats: inStats,
               ),
           createCompanionCallback:
               ({
@@ -14328,6 +14397,7 @@ class $$HistoryTableTableManager
                 Value<String?> skipReason = const Value.absent(),
                 Value<String?> device = const Value.absent(),
                 Value<String?> eventJson = const Value.absent(),
+                Value<bool> inStats = const Value.absent(),
               }) => HistoryCompanion.insert(
                 id: id,
                 localTrackId: localTrackId,
@@ -14339,6 +14409,7 @@ class $$HistoryTableTableManager
                 skipReason: skipReason,
                 device: device,
                 eventJson: eventJson,
+                inStats: inStats,
               ),
           withReferenceMapper: (p0) => p0
               .map(

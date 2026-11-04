@@ -19,6 +19,7 @@ class HistoryDao {
     required bool completed,
     String? skipReason,
     String? eventJson,
+    bool inStats = true,
   }) => _db
       .into(_db.history)
       .insert(
@@ -30,6 +31,7 @@ class HistoryDao {
           quality: Value(quality.wire),
           skipReason: Value(skipReason),
           eventJson: Value(eventJson),
+          inStats: Value(inStats),
         ),
       );
 

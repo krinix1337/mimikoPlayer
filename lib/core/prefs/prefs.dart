@@ -30,6 +30,8 @@ final class Prefs {
     this.waveOnWifiOnly = false,
     this.waveSoundCloud = false,
     this.showNavLabels = true,
+    this.spinCookies = true,
+    this.collectStats = true,
     this.artworkShape = ArtworkShape.rounded,
     this.hideAiTracks = false,
     this.censorBypass = true,
@@ -48,7 +50,6 @@ final class Prefs {
     this.eqPreset = 'flat',
     this.eqCustomGains = const [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     this.eqCustomLevel = 0,
-    this.githubToken = '',
   });
 
   final ThemeMode themeMode;
@@ -88,6 +89,12 @@ final class Prefs {
 
   /// Подписи в нижней навигации. Без них пилюля ниже и иконки крупнее.
   final bool showNavLabels;
+
+  /// Иконки-«печенья» на главной настроек медленно вращаются.
+  final bool spinCookies;
+
+  /// Локальный сбор статистики прослушиваний.
+  final bool collectStats;
 
   /// Форма большой обложки в плеере.
   final ArtworkShape artworkShape;
@@ -136,10 +143,6 @@ final class Prefs {
   final List<double> eqCustomGains;
   final double eqCustomLevel;
 
-  /// Fine-grained PAT для приватных GitHub Releases. Хранится только на
-  /// устройстве и никогда не попадает в APK, если не задан при сборке.
-  final String githubToken;
-
   Locale? get locale => localeCode == null ? null : Locale(localeCode!);
 
   /// Длительность перехода с учётом пользовательского масштаба анимаций.
@@ -174,6 +177,8 @@ final class Prefs {
     bool? showMiniPlayer,
     HomeBackground? homeBackground,
     bool? showNavLabels,
+    bool? spinCookies,
+    bool? collectStats,
     ArtworkShape? artworkShape,
     bool? hideAiTracks,
     bool? censorBypass,
@@ -193,7 +198,6 @@ final class Prefs {
     String? eqPreset,
     List<double>? eqCustomGains,
     double? eqCustomLevel,
-    String? githubToken,
   }) => Prefs(
     themeMode: themeMode ?? this.themeMode,
     palette: palette ?? this.palette,
@@ -215,6 +219,8 @@ final class Prefs {
     showMiniPlayer: showMiniPlayer ?? this.showMiniPlayer,
     homeBackground: homeBackground ?? this.homeBackground,
     showNavLabels: showNavLabels ?? this.showNavLabels,
+    spinCookies: spinCookies ?? this.spinCookies,
+    collectStats: collectStats ?? this.collectStats,
     artworkShape: artworkShape ?? this.artworkShape,
     hideAiTracks: hideAiTracks ?? this.hideAiTracks,
     censorBypass: censorBypass ?? this.censorBypass,
@@ -236,7 +242,6 @@ final class Prefs {
     eqPreset: eqPreset ?? this.eqPreset,
     eqCustomGains: eqCustomGains ?? this.eqCustomGains,
     eqCustomLevel: eqCustomLevel ?? this.eqCustomLevel,
-    githubToken: githubToken ?? this.githubToken,
   );
 
   Map<String, Object?> toJson() => {
@@ -260,6 +265,8 @@ final class Prefs {
     'show_mini_player': showMiniPlayer,
     'home_background': homeBackground.name,
     'show_nav_labels': showNavLabels,
+    'spin_cookies': spinCookies,
+    'collect_stats': collectStats,
     'artwork_shape': artworkShape.name,
     'hide_ai_tracks': hideAiTracks,
     'censor_bypass': censorBypass,
@@ -278,7 +285,6 @@ final class Prefs {
     'eq_preset': eqPreset,
     'eq_custom_gains': eqCustomGains,
     'eq_custom_level': eqCustomLevel,
-    'github_token': githubToken,
   };
 
   static Prefs fromJson(Map<String, Object?> json) {
@@ -334,6 +340,8 @@ final class Prefs {
       compactUi: json['compact_ui'] != false,
       showMiniPlayer: json['show_mini_player'] != false,
       showNavLabels: json['show_nav_labels'] != false,
+      spinCookies: json['spin_cookies'] != false,
+      collectStats: json['collect_stats'] != false,
       artworkShape: required(
         'artwork_shape',
         ArtworkShape.values,
@@ -388,9 +396,6 @@ final class Prefs {
         final num value => value.toDouble().clamp(-12.0, 12.0).toDouble(),
         _ => 0,
       },
-      githubToken: json['github_token'] is String
-          ? (json['github_token']! as String).trim()
-          : '',
       searchHistory: switch (json['search_history']) {
         final List<Object?> items => [
           for (final item in items)

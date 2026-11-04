@@ -2192,88 +2192,16 @@ abstract class AppLocalizations {
   /// **'Разреши установку из этого приложения и нажми ещё раз'**
   String get updatesInstallPermission;
 
-  /// No description provided for @updatesTokenTitle.
-  ///
-  /// In ru, this message translates to:
-  /// **'Доступ к приватному репозиторию'**
-  String get updatesTokenTitle;
-
-  /// No description provided for @updatesTokenLabel.
-  ///
-  /// In ru, this message translates to:
-  /// **'Токен GitHub'**
-  String get updatesTokenLabel;
-
-  /// No description provided for @updatesTokenHint.
-  ///
-  /// In ru, this message translates to:
-  /// **'fine-grained PAT, Contents: Read-only'**
-  String get updatesTokenHint;
-
-  /// No description provided for @updatesTokenHelp.
-  ///
-  /// In ru, this message translates to:
-  /// **'Токен хранится только на этом телефоне. Нужен fine-grained PAT с доступом Contents: Read-only к krinix1337/mimikoPlayer.'**
-  String get updatesTokenHelp;
-
-  /// No description provided for @updatesTokenCheckHint.
-  ///
-  /// In ru, this message translates to:
-  /// **'Вставь токен и нажми «Проверить».'**
-  String get updatesTokenCheckHint;
-
-  /// No description provided for @updatesTokenMissing.
-  ///
-  /// In ru, this message translates to:
-  /// **'Токен не задан'**
-  String get updatesTokenMissing;
-
-  /// No description provided for @updatesTokenUnchecked.
-  ///
-  /// In ru, this message translates to:
-  /// **'Токен введён, но не проверен'**
-  String get updatesTokenUnchecked;
-
-  /// No description provided for @updatesTokenValid.
-  ///
-  /// In ru, this message translates to:
-  /// **'Токен принят'**
-  String get updatesTokenValid;
-
-  /// No description provided for @updatesTokenInvalid.
-  ///
-  /// In ru, this message translates to:
-  /// **'Токен не подошёл'**
-  String get updatesTokenInvalid;
-
-  /// No description provided for @updatesTokenDelete.
-  ///
-  /// In ru, this message translates to:
-  /// **'Удалить токен'**
-  String get updatesTokenDelete;
-
-  /// No description provided for @updatesTokenCreate.
-  ///
-  /// In ru, this message translates to:
-  /// **'Создать токен'**
-  String get updatesTokenCreate;
-
-  /// No description provided for @updatesTokenNeeded.
-  ///
-  /// In ru, this message translates to:
-  /// **'Вставь токен GitHub или собери приложение с GITHUB_TOKEN.'**
-  String get updatesTokenNeeded;
-
   /// No description provided for @updatesErrorUnauthorized.
   ///
   /// In ru, this message translates to:
-  /// **'Токен не подошёл или нет доступа к репозиторию'**
+  /// **'GitHub временно ограничил запросы, попробуй позже'**
   String get updatesErrorUnauthorized;
 
   /// No description provided for @updatesErrorNotFound.
   ///
   /// In ru, this message translates to:
-  /// **'Нет доступа к репозиторию или релизам'**
+  /// **'Релизы пока недоступны'**
   String get updatesErrorNotFound;
 
   /// No description provided for @updatesErrorNoAsset.
@@ -2317,12 +2245,6 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Установить'**
   String get updatesInstall;
-
-  /// No description provided for @updatesBuildToken.
-  ///
-  /// In ru, this message translates to:
-  /// **'Токен задан при сборке'**
-  String get updatesBuildToken;
 
   /// No description provided for @settingsAboutNote.
   ///
@@ -3025,6 +2947,180 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Свободно: {size}'**
   String downloadsFreeSpace(String size);
+
+  /// No description provided for @settingsGroupAppearance.
+  ///
+  /// In ru, this message translates to:
+  /// **'Внешний вид'**
+  String get settingsGroupAppearance;
+
+  /// No description provided for @settingsGroupMusic.
+  ///
+  /// In ru, this message translates to:
+  /// **'Музыка'**
+  String get settingsGroupMusic;
+
+  /// No description provided for @settingsGroupData.
+  ///
+  /// In ru, this message translates to:
+  /// **'Данные'**
+  String get settingsGroupData;
+
+  /// No description provided for @settingsGroupAccount.
+  ///
+  /// In ru, this message translates to:
+  /// **'Аккаунт'**
+  String get settingsGroupAccount;
+
+  /// No description provided for @spinCookies.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вращение фигур'**
+  String get spinCookies;
+
+  /// No description provided for @spinCookiesNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Фигуры у иконок на главной настроек медленно крутятся'**
+  String get spinCookiesNote;
+
+  /// No description provided for @statsTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Статистика'**
+  String get statsTitle;
+
+  /// No description provided for @statsTileSubtitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Время, топ треков и артистов'**
+  String get statsTileSubtitle;
+
+  /// No description provided for @statsCollect.
+  ///
+  /// In ru, this message translates to:
+  /// **'Собирать статистику'**
+  String get statsCollect;
+
+  /// No description provided for @statsCollectNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Хранится только на телефоне. Трек засчитывается после 30 секунд'**
+  String get statsCollectNote;
+
+  /// No description provided for @stats7d.
+  ///
+  /// In ru, this message translates to:
+  /// **'7 дней'**
+  String get stats7d;
+
+  /// No description provided for @stats30d.
+  ///
+  /// In ru, this message translates to:
+  /// **'30 дней'**
+  String get stats30d;
+
+  /// No description provided for @statsYear.
+  ///
+  /// In ru, this message translates to:
+  /// **'Год'**
+  String get statsYear;
+
+  /// No description provided for @statsAll.
+  ///
+  /// In ru, this message translates to:
+  /// **'Всё'**
+  String get statsAll;
+
+  /// No description provided for @statsTime.
+  ///
+  /// In ru, this message translates to:
+  /// **'Время'**
+  String get statsTime;
+
+  /// No description provided for @statsPlays.
+  ///
+  /// In ru, this message translates to:
+  /// **'Прослушано'**
+  String get statsPlays;
+
+  /// No description provided for @statsTracks.
+  ///
+  /// In ru, this message translates to:
+  /// **'Треков'**
+  String get statsTracks;
+
+  /// No description provided for @statsByDay.
+  ///
+  /// In ru, this message translates to:
+  /// **'По дням'**
+  String get statsByDay;
+
+  /// No description provided for @statsTopTracks.
+  ///
+  /// In ru, this message translates to:
+  /// **'Топ треков'**
+  String get statsTopTracks;
+
+  /// No description provided for @statsTopArtists.
+  ///
+  /// In ru, this message translates to:
+  /// **'Топ артистов'**
+  String get statsTopArtists;
+
+  /// No description provided for @statsExport.
+  ///
+  /// In ru, this message translates to:
+  /// **'Экспорт JSON'**
+  String get statsExport;
+
+  /// No description provided for @statsClear.
+  ///
+  /// In ru, this message translates to:
+  /// **'Очистить'**
+  String get statsClear;
+
+  /// No description provided for @statsClearConfirm.
+  ///
+  /// In ru, this message translates to:
+  /// **'Очистить статистику? История для волны останется.'**
+  String get statsClearConfirm;
+
+  /// No description provided for @statsEmpty.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пока пусто. Послушай что-нибудь дольше 30 секунд'**
+  String get statsEmpty;
+
+  /// No description provided for @statsHours.
+  ///
+  /// In ru, this message translates to:
+  /// **'{h} ч {m} мин'**
+  String statsHours(int h, int m);
+
+  /// No description provided for @statsMinutes.
+  ///
+  /// In ru, this message translates to:
+  /// **'{m} мин'**
+  String statsMinutes(int m);
+
+  /// No description provided for @statsPlaysCount.
+  ///
+  /// In ru, this message translates to:
+  /// **'{count, plural, one{{count} прослушивание} few{{count} прослушивания} many{{count} прослушиваний} other{{count} прослушивания}}'**
+  String statsPlaysCount(int count);
+
+  /// No description provided for @statsCleared.
+  ///
+  /// In ru, this message translates to:
+  /// **'Статистика очищена'**
+  String get statsCleared;
+
+  /// No description provided for @aboutRepository.
+  ///
+  /// In ru, this message translates to:
+  /// **'Репозиторий'**
+  String get aboutRepository;
 }
 
 class _AppLocalizationsDelegate

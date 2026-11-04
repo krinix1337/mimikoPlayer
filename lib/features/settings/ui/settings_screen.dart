@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:dio/dio.dart' show CancelToken, DioException;
 import 'package:flutter/material.dart';
@@ -25,17 +26,57 @@ import '../../../theme/keyboard_theme.dart';
 import '../../../widgets/connected_button_group.dart';
 import '../../../widgets/expressive_shapes.dart';
 import 'settings_widgets.dart';
+import 'stats_page.dart';
 import '../../../widgets/wavy_slider.dart';
 
 /// Настройки по разделам: хаб с категориями, каждая категория — отдельный
-/// экран. Простыня из двадцати строк подряд читается хуже, чем шесть входа.
-class SettingsScreen extends ConsumerWidget {
+/// экран. Категории собраны в четыре группы, у каждой иконки своя фигура
+/// из набора M3 Expressive; набор перетасовывается при каждом заходе.
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+/// Фигуры для иконок: печенья с разным числом лепестков, клевер и цветок.
+const _kCookieShapes = <(int, double)>[
+  (4, 0.22),
+  (4, 0.08),
+  (5, 0.12),
+  (6, 0.09),
+  (7, 0.10),
+  (8, 0.14),
+  (9, 0.08),
+  (12, 0.07),
+  (16, 0.04),
+];
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen>
+    with SingleTickerProviderStateMixin {
+  late final List<(int, double)> _shapes = [..._kCookieShapes]
+    ..shuffle(math.Random());
+  late final AnimationController _spin = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 24),
+  );
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final prefs = ref.watch(prefsProvider);
+    final spin = prefs.spinCookies && !MediaQuery.disableAnimationsOf(context);
+    if (spin && !_spin.isAnimating) {
+      _spin.repeat();
+    } else if (!spin && _spin.isAnimating) {
+      _spin.stop();
+    }
 
     String appearanceSummary() {
       final theme = switch (prefs.themeMode) {
@@ -52,6 +93,27 @@ class SettingsScreen extends ConsumerWidget {
       return '$theme · $accent · $language';
     }
 
+    var next = 0;
+    Widget tile({
+      required IconData icon,
+      required String title,
+      required String subtitle,
+      required Widget page,
+      String? badge,
+    }) {
+      final index = next++;
+      return _CategoryTile(
+        badge: badge,
+        index: index,
+        icon: icon,
+        title: title,
+        subtitle: subtitle,
+        page: page,
+        shape: _shapes[index % _shapes.length],
+        spin: _spin,
+      );
+    }
+
     // Список режется по низ статус-бара: при прокрутке крупный заголовок
     // заезжал на часы и значки.
     return Scaffold(
@@ -63,74 +125,94 @@ class SettingsScreen extends ConsumerWidget {
           ),
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 4),
               child: Text(
                 l.settingsTitle,
                 style: Theme.of(context).textTheme.displaySmall,
               ),
             ),
             SettingsSection(
-              title: kKeyboardTestTheme ? '' : l.settingsTitle,
+              title: l.settingsGroupAppearance,
               children: [
-                _CategoryTile(
-                  index: 0,
+                tile(
                   icon: Icons.palette_outlined,
                   title: l.settingsSectionAppearance,
                   subtitle: appearanceSummary(),
                   page: const _AppearancePage(),
                 ),
-                _CategoryTile(
-                  index: 1,
+              ],
+            ),
+            const SizedBox(height: 12),
+            SettingsSection(
+              title: l.settingsGroupMusic,
+              children: [
+                tile(
                   icon: Icons.graphic_eq_rounded,
                   title: l.settingsSectionSound,
                   subtitle: '${l.settingsQuality}: ${prefs.qualityLabel(l)}',
                   page: const _SoundPage(),
                 ),
-                _CategoryTile(
-                  index: 2,
+                tile(
                   icon: Icons.lyrics_rounded,
                   title: l.settingsSectionKaraoke,
                   subtitle: l.settingsLyricsSource,
                   page: const _KaraokeSettingsPage(),
                 ),
-                _CategoryTile(
-                  index: 3,
+                tile(
+                  icon: Icons.bar_chart_rounded,
+                  title: l.statsTitle,
+                  subtitle: l.statsTileSubtitle,
+                  page: const StatsPage(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SettingsSection(
+              title: l.settingsGroupData,
+              children: [
+                tile(
                   icon: Icons.sd_storage_rounded,
                   title: l.settingsSectionStorage,
                   subtitle: l.settingsData,
                   page: const _StoragePage(),
                 ),
-                _CategoryTile(
-                  index: 4,
-                  icon: Icons.account_circle_outlined,
-                  title: l.settingsSectionAccount,
-                  subtitle: l.settingsAccount,
-                  page: const _AccountPage(),
-                ),
-                _CategoryTile(
-                  index: 5,
+                tile(
                   icon: Icons.move_to_inbox_rounded,
                   title: l.importTitle,
                   subtitle: l.importTileSubtitle,
                   page: const _ImportPage(),
                 ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SettingsSection(
+              title: l.settingsGroupAccount,
+              children: [
+                tile(
+                  icon: Icons.account_circle_outlined,
+                  title: l.settingsSectionAccount,
+                  subtitle: l.settingsAccount,
+                  page: const _AccountPage(),
+                ),
                 FutureBuilder<String>(
-                  future: MimikoPlatform.appVersion(),
+                  future: _version,
                   builder: (context, snapshot) {
                     final version = snapshot.data;
-                    return _CategoryTile(
-                      index: 6,
+                    final fresh = ref.watch(updateAvailableProvider).value;
+                    return tile(
                       icon: Icons.system_update_rounded,
                       title: l.updatesTitle,
-                      subtitle: version == null || version.isEmpty
+                      subtitle: fresh != null
+                          ? l.updatesAvailable(fresh)
+                          : version == null || version.isEmpty
                           ? l.updatesTileSubtitle
                           : l.settingsVersion(version),
+                      badge: fresh,
                       page: const _UpdatesPage(),
                     );
                   },
                 ),
-                _CategoryTile(
-                  index: 7,
+                tile(
                   icon: Icons.info_outline_rounded,
                   title: l.settingsSectionAbout,
                   subtitle: l.appTitle,
@@ -143,6 +225,8 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
+
+  late final Future<String> _version = MimikoPlatform.appVersion();
 }
 
 class _CategoryTile extends StatelessWidget {
@@ -152,13 +236,20 @@ class _CategoryTile extends StatelessWidget {
     required this.subtitle,
     required this.page,
     required this.index,
+    required this.shape,
+    required this.spin,
+    this.badge,
   });
 
+  /// Пилюля перед стрелкой, например номер новой версии.
+  final String? badge;
   final IconData icon;
   final String title;
   final String subtitle;
   final Widget page;
   final int index;
+  final (int, double) shape;
+  final Animation<double> spin;
 
   @override
   Widget build(BuildContext context) {
@@ -206,11 +297,57 @@ class _CategoryTile extends StatelessWidget {
         ),
       );
     }
+    final (lobes, depth) = shape;
+    // Соседние фигуры крутятся в разные стороны — так набор живее.
+    final direction = index.isEven ? 1.0 : -1.0;
     return ListTile(
-      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+      contentPadding: const EdgeInsets.fromLTRB(14, 6, 16, 6),
+      leading: SizedBox.square(
+        dimension: 44,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: spin,
+              builder: (context, child) => Transform.rotate(
+                angle: direction * spin.value * 2 * math.pi,
+                child: child,
+              ),
+              child: ClipPath(
+                clipper: CookieClipper(lobes: lobes, depth: depth),
+                child: ColoredBox(
+                  color: scheme.primaryContainer,
+                  child: const SizedBox.square(dimension: 44),
+                ),
+              ),
+            ),
+            Icon(icon, size: 22, color: scheme.onPrimaryContainer),
+          ],
+        ),
+      ),
       title: Text(title),
       subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-      trailing: const Icon(Icons.chevron_right_rounded),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (badge != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: scheme.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                badge!,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: scheme.onPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+        ],
+      ),
       onTap: () => Navigator.of(context).push(slideUpRoute(page)),
     );
   }
@@ -390,6 +527,12 @@ class _AppearancePage extends ConsumerWidget {
               value: prefs.showNavLabels,
               note: l.showNavLabelsNote,
               onChanged: controller.setShowNavLabels,
+            ),
+            SwitchRow(
+              label: l.spinCookies,
+              value: prefs.spinCookies,
+              note: l.spinCookiesNote,
+              onChanged: controller.setSpinCookies,
             ),
             SwitchRow(
               label: l.hideAi,
@@ -1524,6 +1667,16 @@ class _AboutPageState extends ConsumerState<_AboutPage> {
               title: Text(l.appTitle),
               subtitle: const Text('Flutter · Material 3 · Android'),
             ),
+            ListTile(
+              leading: const Icon(Icons.source_rounded),
+              title: Text(l.aboutRepository),
+              subtitle: const Text('github.com/krinix1337/mimikoPlayer'),
+              trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+              onTap: () => launchUrl(
+                Uri.parse('https://github.com/${GithubUpdater.repository}'),
+                mode: LaunchMode.externalApplication,
+              ),
+            ),
           ],
         ),
         SettingsSection(
@@ -1595,32 +1748,21 @@ class _UpdatesPage extends ConsumerStatefulWidget {
 }
 
 class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
-  static const _buildToken = String.fromEnvironment('GITHUB_TOKEN');
-
   final GithubUpdater _updater = GithubUpdater();
-  late final TextEditingController _tokenController;
   CancelToken? _cancelToken;
   String _version = '';
   bool _checking = false;
   bool _downloading = false;
-  bool _showToken = false;
   bool _upToDate = false;
-  bool? _tokenValid;
   double _progress = 0;
   UpdateRelease? _latest;
   UpdateRelease? _release;
   UpdateFailure? _failure;
   String? _downloadedPath;
 
-  String get _token =>
-      _buildToken.isNotEmpty ? _buildToken : _tokenController.text.trim();
-
   @override
   void initState() {
     super.initState();
-    _tokenController = TextEditingController(
-      text: ref.read(prefsProvider).githubToken,
-    );
     unawaited(_init());
   }
 
@@ -1628,13 +1770,12 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
     final version = await MimikoPlatform.appVersion();
     if (!mounted) return;
     setState(() => _version = version);
-    if (_token.isNotEmpty) await _check(silent: true);
+    await _check(silent: true);
   }
 
   @override
   void dispose() {
     _cancelToken?.cancel();
-    _tokenController.dispose();
     super.dispose();
   }
 
@@ -1657,25 +1798,6 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
   Future<void> _check({bool silent = false}) async {
     if (_checking || _downloading) return;
     final l = AppLocalizations.of(context);
-    final token = _token;
-    if (token.isEmpty) {
-      if (_buildToken.isEmpty &&
-          ref.read(prefsProvider).githubToken.isNotEmpty) {
-        await ref.read(prefsProvider.notifier).setGithubToken('');
-      }
-      if (mounted) {
-        setState(() {
-          _tokenValid = null;
-          _failure = null;
-          _latest = null;
-          _release = null;
-          _upToDate = false;
-          _downloadedPath = null;
-        });
-      }
-      if (!silent) _show(l.updatesTokenNeeded);
-      return;
-    }
     setState(() {
       _checking = true;
       _failure = null;
@@ -1693,10 +1815,7 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
       if (version.isEmpty) {
         throw const UpdateException(UpdateFailure.unknown);
       }
-      if (_buildToken.isEmpty && token != ref.read(prefsProvider).githubToken) {
-        await ref.read(prefsProvider.notifier).setGithubToken(token);
-      }
-      final latest = await _updater.latest(token: token);
+      final latest = await _updater.latest();
       if (!mounted) return;
       final release = latest != null && latest.isNewerThan(version)
           ? latest
@@ -1705,20 +1824,11 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
         _latest = latest;
         _release = release;
         _upToDate = release == null;
-        _tokenValid = true;
       });
     } on UpdateException catch (error) {
       if (!mounted) return;
       final kind = error.kind;
-      setState(() {
-        _failure = kind;
-        if (kind == UpdateFailure.unauthorized ||
-            kind == UpdateFailure.notFound) {
-          _tokenValid = false;
-        } else if (kind == UpdateFailure.noAsset) {
-          _tokenValid = true;
-        }
-      });
+      setState(() => _failure = kind);
       if (!silent) _show(_failureText(l) ?? l.updatesErrorUnknown);
     } catch (_) {
       if (!mounted) return;
@@ -1733,11 +1843,6 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
     final release = _release;
     if (release == null) return;
     final l = AppLocalizations.of(context);
-    final token = _token;
-    if (token.isEmpty) {
-      _show(l.updatesTokenNeeded);
-      return;
-    }
     setState(() {
       _downloading = true;
       _progress = 0;
@@ -1749,7 +1854,6 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
     try {
       final file = await _updater.download(
         release: release,
-        token: token,
         cancelToken: cancel,
         onProgress: (received, total) {
           if (!mounted) return;
@@ -1810,28 +1914,8 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
       _downloading = false;
       _progress = 0;
       _failure = kind;
-      if (kind == UpdateFailure.unauthorized ||
-          kind == UpdateFailure.notFound) {
-        _tokenValid = false;
-      }
     });
     _show(_failureText(l) ?? l.updatesErrorUnknown);
-  }
-
-  Future<void> _clearToken() async {
-    _tokenController.clear();
-    if (_buildToken.isEmpty) {
-      await ref.read(prefsProvider.notifier).setGithubToken('');
-    }
-    if (!mounted) return;
-    setState(() {
-      _tokenValid = null;
-      _failure = null;
-      _latest = null;
-      _release = null;
-      _upToDate = false;
-      _downloadedPath = null;
-    });
   }
 
   Future<void> _showNotes(UpdateRelease release) async {
@@ -1844,9 +1928,7 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
       '',
     );
     await Navigator.of(context, rootNavigator: true).push(
-      slideUpRoute(
-        _ReleaseNotesPage(version: release.version, body: body, token: _token),
-      ),
+      slideUpRoute(_ReleaseNotesPage(version: release.version, body: body)),
     );
   }
 
@@ -1854,12 +1936,7 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final authFailure =
-        _failure == UpdateFailure.unauthorized ||
-        _failure == UpdateFailure.notFound;
-    // При отказе доступа статус токена уже красный; второй такой же
-    // ошибки в блоке обновлений не нужно.
-    final failure = authFailure ? null : _failureText(l);
+    final failure = _failureText(l);
     final release = _release;
     final action = _downloadedPath != null ? _install : _downloadAndInstall;
     final actionLabel = _downloading
@@ -1867,27 +1944,6 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
         : _downloadedPath != null
         ? l.updatesInstall
         : l.updatesDownload;
-    final tokenStatus = _token.isEmpty
-        ? l.updatesTokenMissing
-        : _checking
-        ? l.updatesChecking
-        : _tokenValid == true
-        ? l.updatesTokenValid
-        : _tokenValid == false
-        ? l.updatesTokenInvalid
-        : l.updatesTokenUnchecked;
-    final tokenColor = _tokenValid == false
-        ? theme.colorScheme.error
-        : _tokenValid == true
-        ? theme.colorScheme.primary
-        : theme.colorScheme.onSurfaceVariant;
-    final tokenIcon = _tokenValid == false
-        ? Icons.error_rounded
-        : _tokenValid == true
-        ? Icons.check_circle_rounded
-        : _token.isEmpty
-        ? Icons.key_off_rounded
-        : Icons.info_outline_rounded;
     final latest = _latest;
     final iconAsset = LauncherIconRow.assetFor(
       ref.watch(prefsProvider.select((p) => p.launcherIcon)),
@@ -1896,26 +1952,20 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
         ? l.updatesChecking
         : release != null
         ? l.updatesAvailable(release.version)
-        : authFailure
-        ? l.updatesTokenInvalid
         : _upToDate
         ? l.updatesUpToDate
-        : _token.isEmpty
-        ? l.updatesTokenMissing
-        : l.updatesTokenUnchecked;
-    final heroColor = authFailure
+        : failure ?? l.updatesChecking;
+    final heroColor = failure != null && release == null && !_upToDate
         ? theme.colorScheme.error
         : release != null || _upToDate
         ? theme.colorScheme.primary
         : theme.colorScheme.onSurfaceVariant;
-    final heroIcon = authFailure
+    final heroIcon = failure != null && release == null && !_upToDate
         ? Icons.error_rounded
         : release != null
         ? Icons.new_releases_rounded
         : _upToDate
         ? Icons.check_circle_rounded
-        : _token.isEmpty
-        ? Icons.key_off_rounded
         : Icons.info_outline_rounded;
 
     return _Page(
@@ -1932,127 +1982,6 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
           checkLabel: l.updatesCheckShort,
           onCheck: _checking || _downloading ? null : () => _check(),
         ),
-        if (_buildToken.isEmpty)
-          SettingsSection(
-            title: l.updatesTokenTitle,
-            children: [
-              // Поле, статус и подсказка — одна плашка группы.
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      controller: _tokenController,
-                      enabled: !_checking && !_downloading,
-                      obscureText: !_showToken,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      decoration: InputDecoration(
-                        labelText: l.updatesTokenLabel,
-                        hintText: l.updatesTokenHint,
-                        border: const OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(16)),
-                        ),
-                        suffixIcon: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_tokenController.text.isNotEmpty)
-                              IconButton(
-                                tooltip: l.updatesTokenDelete,
-                                onPressed: _checking || _downloading
-                                    ? null
-                                    : _clearToken,
-                                icon: const Icon(
-                                  Icons.backspace_outlined,
-                                  size: 20,
-                                ),
-                              ),
-                            IconButton(
-                              onPressed: () =>
-                                  setState(() => _showToken = !_showToken),
-                              icon: Icon(
-                                _showToken
-                                    ? Icons.visibility_off_rounded
-                                    : Icons.visibility_rounded,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      onChanged: (_) {
-                        setState(() {
-                          _latest = null;
-                          _release = null;
-                          _upToDate = false;
-                          _failure = null;
-                          _tokenValid = null;
-                          _downloadedPath = null;
-                        });
-                      },
-                      onSubmitted: (_) => _check(),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        if (_checking)
-                          const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        else
-                          Icon(tokenIcon, size: 16, color: tokenColor),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            tokenStatus,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: tokenColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${l.updatesTokenHelp}\n${l.updatesTokenCheckHint}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.open_in_new_rounded),
-                title: Text(l.updatesTokenCreate),
-                onTap: () => launchUrl(
-                  Uri.parse('https://github.com/settings/tokens?type=beta'),
-                  mode: LaunchMode.externalApplication,
-                ),
-              ),
-            ],
-          )
-        else
-          SettingsSection(
-            title: l.updatesTokenTitle,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.key_rounded),
-                title: Text(l.updatesTokenLabel),
-                subtitle: Text(
-                  _tokenValid == false
-                      ? l.updatesTokenInvalid
-                      : _tokenValid == true
-                      ? l.updatesTokenValid
-                      : l.updatesBuildToken,
-                ),
-              ),
-            ],
-          ),
         SettingsSection(
           title: l.updatesReleases,
           children: [
@@ -2166,7 +2095,7 @@ class _UpdatesPageState extends ConsumerState<_UpdatesPage> {
                     mode: LaunchMode.externalApplication,
                   ),
                 ),
-            ] else if (!_checking && !authFailure && !_upToDate)
+            ] else if (!_checking && failure == null && !_upToDate)
               ListTile(
                 leading: const Icon(Icons.info_outline_rounded),
                 title: Text(l.updatesNotChecked),
@@ -2320,15 +2249,10 @@ class _UpdatesHero extends StatelessWidget {
 }
 
 class _ReleaseNotesPage extends StatelessWidget {
-  const _ReleaseNotesPage({
-    required this.version,
-    required this.body,
-    required this.token,
-  });
+  const _ReleaseNotesPage({required this.version, required this.body});
 
   final String version;
   final String body;
-  final String token;
 
   @override
   Widget build(BuildContext context) {
@@ -2340,7 +2264,7 @@ class _ReleaseNotesPage extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: ReleaseNotes(body, token: token),
+          child: ReleaseNotes(body),
         ),
       ],
     );
