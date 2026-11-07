@@ -160,7 +160,7 @@ class CollectionKindScreen extends ConsumerWidget {
     };
     await controller.playQueue(
       [for (final row in rows) row.localTrackId],
-      startIndex: index,
+      startIndex: shuffle ? shuffleStartIndex(rows.length) : index,
       sourceHint: {'kind': kind.name, 'title': title},
     );
     if (shuffle) {
@@ -952,7 +952,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
     final controller = ref.read(playbackControllerProvider);
     await controller.playQueue(
       [for (final row in rows) row.localTrackId],
-      startIndex: index,
+      startIndex: shuffle ? shuffleStartIndex(rows.length) : index,
       sourceHint: {
         'kind': 'playlist',
         'playlist': widget.playlistId,

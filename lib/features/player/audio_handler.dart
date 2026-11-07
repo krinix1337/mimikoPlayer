@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:io';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
@@ -37,13 +38,18 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     _bindPlayer();
     _services.onEqualizerChanged = _syncEqualizer;
     unawaited(_syncEqualizer());
-    unawaited(_restoreModes());
+    _restoring = _restoreState();
   }
 
-  /// Повтор и перемешивание — настройка пользователя, а не свойство одной
-  /// очереди: раньше они читались из снапшота только при восстановлении
-  /// очереди, и после перезапуска кнопка повтора была выключена.
-  Future<void> _restoreModes() async {
+  /// Восстановление прошлой сессии: режимы, очередь, источник и позиция.
+  /// play() ждёт его, чтобы кнопка гарнитуры на холодном старте не
+  /// разошлась с ним.
+  late final Future<void> _restoring;
+
+  /// После перезапуска плеер сразу знает прошлую очередь: мини-плеер
+  /// показывает трек, «играть» продолжает с сохранённой позиции, а заголовок
+  /// источника («Любимое», волна) не теряется. Звук при этом не грузится.
+  Future<void> _restoreState() async {
     try {
       final row = await _services.db.queueDao.load(QueueDao.kindPlayer);
       if (row == null) return;
@@ -51,20 +57,77 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       final shuffle = row.shuffleEnabled
           ? PlaybackShuffle.shuffled
           : PlaybackShuffle.ordered;
+      final items = QueueDao.itemsOf(row);
+      final index = row.queueIndex;
+      final currentId = index >= 0 && index < items.length
+          ? items[index]
+          : null;
+      final now = currentId == null ? null : await _nowPlayingOf(currentId);
+      // Пока читали базу, пользователь мог уже включить что-то своё.
+      if (_queue.items.isNotEmpty) {
+        _queue.setRepeat(repeat);
+        _publish(_snapshot.copyWith(repeat: repeat));
+        return;
+      }
       _queue.setRepeat(repeat);
       _queue.setShuffle(shuffle);
+      if (now != null) {
+        final hint = QueueDao.hintOf(row);
+        _queue.setQueue(items, startIndex: index);
+        _sourceHint = hint;
+        _pendingSeek = Duration(milliseconds: row.positionMs);
+      }
       _publish(
         _snapshot.copyWith(
           repeat: repeat,
           shuffle: shuffle,
           queue: _queue.displayOrder,
           index: _queue.displayPosition,
+          current: now?.$1,
+          duration: now?.$2,
+          position: now == null ? null : _pendingSeek,
+          liked: now?.$3,
+          disliked: now?.$4,
+          sourceKind: now == null ? null : '${_sourceHint?['kind'] ?? ''}',
+          sourceTitle: now == null ? null : '${_sourceHint?['title'] ?? ''}',
+          isRadio: now == null ? null : _isRadio,
         ),
       );
     } on Object catch (error) {
-      AppLogger.instance.warn('режимы плеера не восстановились: $error');
+      AppLogger.instance.warn('прошлая очередь не восстановилась: $error');
     }
   }
+
+  /// Карточка трека для мини-плеера без загрузки звука.
+  Future<(NowPlaying, Duration, bool, bool)?> _nowPlayingOf(String id) async {
+    final db = _services.db;
+    final track = await db.tracksDao.byId(id);
+    if (track == null) return null;
+    final artists = await db.tracksDao.artistNamesOf(id);
+    final feedback = await db.libraryDao.likeState(id);
+    return (
+      NowPlaying(
+        localTrackId: id,
+        title: track.title.trim().isNotEmpty ? track.title : id,
+        artist: artists.isEmpty ? _localFileLabel : artists.join(', '),
+        coverUrl: track.coverUrl,
+        explicitFlag: track.explicitFlag,
+      ),
+      Duration(seconds: track.durationSec),
+      feedback == 1,
+      feedback == -1,
+    );
+  }
+
+  /// Язык подписей, которые видит система (уведомление, блокировка): у
+  /// фонового плеера нет BuildContext, поэтому читаем настройку напрямую.
+  bool get _english {
+    final code =
+        _services.localeCode ?? PlatformDispatcher.instance.locale.languageCode;
+    return code == 'en';
+  }
+
+  String get _localFileLabel => _english ? 'Local file' : 'Локальный файл';
 
   static MusicBackgroundAudioHandler? instance;
 
@@ -131,14 +194,33 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     _sleepAtTrackEnd = false;
     if (delay == null) {
       AppLogger.instance.info('таймер сна выключен');
+      _publish(_snapshot.copyWith(clearSleep: true));
       return;
     }
     _sleepTimer = Timer(delay, () {
-      if (!_wantPlaying) return;
+      if (!_wantPlaying) {
+        // Музыка уже стоит — цель таймера достигнута, отметку снимаем.
+        _publish(_snapshot.copyWith(clearSleep: true));
+        return;
+      }
       AppLogger.instance.info('таймер сна: пауза после текущего трека');
       _sleepAtTrackEnd = true;
     });
+    // Отметка видна в плеере: раньше нельзя было понять, включён ли таймер.
+    _publish(_snapshot.copyWith(sleepAt: DateTime.now().add(delay)));
     AppLogger.instance.info('таймер сна: ${delay.inMinutes} мин');
+  }
+
+  /// Сколько трек реально звучал. Раньше в историю писалась позиция в
+  /// момент перехода: перемотал на 3:00 — засчитано три минуты.
+  final Stopwatch _listened = Stopwatch();
+  String? _listenedTrack;
+
+  /// Забрать накопленное время прослушивания текущего трека и обнулить его.
+  Duration _takeListened() {
+    final value = _listened.elapsed;
+    _listened.reset();
+    return value;
   }
 
   @override
@@ -186,6 +268,11 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       return;
     }
 
+    // Трек, который играл до нового списка, тоже прослушан: без отчёта он
+    // пропадал из истории, статистики и рекомендаций.
+    if (_snapshot.current != null) {
+      await _reportCurrent(PlaybackEventType.skip);
+    }
     _pendingSeek = Duration.zero;
     _queue.setQueue(localTrackIds, startIndex: startIndex);
     _consecutiveFailures = 0;
@@ -209,7 +296,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       MediaItem(
         id: localTrackId,
         title: track?.title ?? localTrackId,
-        artist: artists.isEmpty ? 'Локальный файл' : artists.join(', '),
+        artist: artists.isEmpty ? _localFileLabel : artists.join(', '),
         artUri: track?.coverUrl == null ? null : Uri.tryParse(track!.coverUrl!),
         duration: Duration(seconds: track?.durationSec ?? 0),
       ),
@@ -229,7 +316,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       MediaItem(
         id: localTrackId,
         title: track?.title ?? localTrackId,
-        artist: artists.isEmpty ? 'Локальный файл' : artists.join(', '),
+        artist: artists.isEmpty ? _localFileLabel : artists.join(', '),
         artUri: track?.coverUrl == null ? null : Uri.tryParse(track!.coverUrl!),
         duration: Duration(seconds: track?.durationSec ?? 0),
       ),
@@ -326,6 +413,8 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       await _player.seek(Duration.zero);
       return;
     }
+    if (_queue.isEmpty) return;
+    await _reportCurrent(PlaybackEventType.skip);
     final id = _queue.rewind();
     if (id == null) return;
     _wantPlaying = true;
@@ -336,6 +425,12 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> skipToIndex(int displayIndex) async {
+    if (displayIndex < 0 || displayIndex >= _queue.items.length) return;
+    // Свайп обложки и выбор в очереди — такой же переход, как «дальше»:
+    // прослушанный трек должен попасть в историю и в статистику.
+    if (displayIndex != _queue.displayPosition) {
+      await _reportCurrent(PlaybackEventType.skip);
+    }
     final id = _queue.jumpToPosition(displayIndex);
     if (id == null) return;
     _wantPlaying = true;
@@ -378,12 +473,11 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     _sleepAtTrackEnd = false;
     _pauseWatchdog?.cancel();
     _stallProbe?.cancel();
-    final played = _player.position;
     await _fadeOut();
     await _player.stop();
     await _player.setVolume(1);
     if (report) {
-      await _reportCurrent(PlaybackEventType.skip, forcePlayed: played);
+      await _reportCurrent(PlaybackEventType.skip);
     }
     mediaItem.add(null);
     _publish(
@@ -395,6 +489,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         clearCurrent: true,
         sourceKind: '',
         sourceTitle: '',
+        clearSleep: true,
       ),
     );
     _emitServiceState(stopped: true);
@@ -407,6 +502,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> play() async {
+    await _restoring;
     if (_queue.currentId == null && !(await _restoreSnapshot())) return;
     _wantPlaying = true;
     // Новый трек ещё резолвится: он сам стартует, увидев [_wantPlaying].
@@ -423,6 +519,12 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     }
     _pauseWatchdog?.cancel();
     await _player.setVolume(0);
+    // Пауза успела прийти, пока ставилась громкость: без проверки трек
+    // всё равно запускался, и быстрое «играть→пауза» оставляло музыку.
+    if (!_wantPlaying) {
+      await _player.setVolume(1);
+      return;
+    }
     // just_audio резолвит play() только на паузе или в конце трека: ждать
     // его — значит повесить вызов на всю длину песни.
     _startPlayback();
@@ -440,10 +542,16 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     await _player.pause();
     await _player.setVolume(1);
     _startPauseWatchdog();
+    // Позиция паузы сразу в базу: процесс могут убить раньше 30-секундного
+    // автосохранения.
+    _scheduleSnapshot();
   }
 
   @override
-  Future<void> seek(Duration position) => _player.seek(position);
+  Future<void> seek(Duration position) async {
+    await _player.seek(position);
+    _scheduleSnapshot();
+  }
 
   @override
   Future<void> skipToNext() => skipNext();
@@ -562,6 +670,11 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     _playerSubs.addAll([
       player.playerStateStream.listen((state) {
         final completed = state.processingState == ProcessingState.completed;
+        if (state.playing && state.processingState == ProcessingState.ready) {
+          _listened.start();
+        } else {
+          _listened.stop();
+        }
         _publish(
           _snapshot.copyWith(
             playing: state.playing,
@@ -754,6 +867,12 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     if (!crossfade) _killOutgoing();
     final localTrackId = _queue.currentId;
     if (localTrackId == null) return;
+    // Новый трек копит своё время с нуля; тот же (после долгой паузы) —
+    // продолжает.
+    if (_listenedTrack != localTrackId) {
+      _listened.reset();
+      _listenedTrack = localTrackId;
+    }
 
     final db = _services.db;
     final track = await db.tracksDao.byId(localTrackId);
@@ -761,7 +880,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     final title = track?.title.trim().isNotEmpty == true
         ? track!.title
         : localTrackId;
-    final artist = artists.isEmpty ? 'Локальный файл' : artists.join(', ');
+    final artist = artists.isEmpty ? _localFileLabel : artists.join(', ');
     final feedback = await db.libraryDao.likeState(localTrackId);
     final liked = feedback == 1;
     final disliked = feedback == -1;
@@ -1020,6 +1139,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
       // Таймер сна: следующий трек ставим, но не запускаем.
       _sleepAtTrackEnd = false;
       _wantPlaying = false;
+      _publish(_snapshot.copyWith(clearSleep: true));
       AppLogger.instance.info('таймер сна: пауза');
       final next = _queue.repeat == PlaybackRepeat.one
           ? _queue.currentId
@@ -1207,7 +1327,9 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     final used = _snapshot.usedSource;
     if (localTrackId == null || used == null) return;
 
-    final played = forcePlayed ?? _player.position;
+    // Забираем синхронно, до первого await: следующий трек уже может
+    // начать копить своё время.
+    final played = forcePlayed ?? _takeListened();
     final variants = await _services.db.tracksDao.variantsOf(localTrackId);
     await _reportEvent(variants, used, type, played);
 
@@ -1405,6 +1527,9 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
     _pauseWatchdog?.cancel();
     _pauseWatchdog = Timer(maxPausedServiceDuration, () async {
       // Держать mediaPlayback-сервис на паузе дольше 10 минут нельзя.
+      // Позицию запоминаем: после stop() «играть» грузит трек заново, и без
+      // этого он начинался с нуля.
+      _pendingSeek = _player.position;
       await _player.stop();
       _emitServiceState(stopped: true);
       await _saveSnapshotNow();
@@ -1429,6 +1554,11 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
         index: _queue.displayPosition,
         repeat: _queue.repeat,
         shuffle: _queue.shuffle,
+        // Без этого после перезапуска главная писала «Моя волна» поверх
+        // «Любимого», а волна переставала считаться волной.
+        sourceKind: '${_sourceHint?['kind'] ?? ''}',
+        sourceTitle: '${_sourceHint?['title'] ?? ''}',
+        isRadio: _isRadio,
       ),
     );
     return true;
@@ -1493,7 +1623,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
           if (!stopped)
             MediaControl.custom(
               name: 'like',
-              label: 'Нравится',
+              label: _english ? 'Like' : 'Нравится',
               androidIcon: _snapshot.liked
                   ? 'drawable/ic_like_filled'
                   : 'drawable/ic_like',
@@ -1501,7 +1631,7 @@ class MusicBackgroundAudioHandler extends BaseAudioHandler
           if (!stopped)
             MediaControl.custom(
               name: 'dislike',
-              label: 'Не нравится',
+              label: _english ? 'Dislike' : 'Не нравится',
               androidIcon: _snapshot.disliked
                   ? 'drawable/ic_dislike_filled'
                   : 'drawable/ic_dislike',

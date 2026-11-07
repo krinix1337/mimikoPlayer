@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../../core/sources/source_errors.dart';
 import '../../core/sources/source_id.dart';
 import '../../core/sources/stream_target.dart';
@@ -30,6 +32,7 @@ final class PlayerSnapshot {
     this.disliked = false,
     this.sourceKind = '',
     this.sourceTitle = '',
+    this.sleepAt,
   });
 
   final NowPlaying? current;
@@ -76,6 +79,9 @@ final class PlayerSnapshot {
   /// плейлиста. Пусто — UI показывает нейтральный заголовок.
   final String sourceTitle;
 
+  /// Когда сработает таймер сна; null — таймер выключен.
+  final DateTime? sleepAt;
+
   PlayerSnapshot copyWith({
     NowPlaying? current,
     List<String>? queue,
@@ -99,6 +105,8 @@ final class PlayerSnapshot {
     bool? disliked,
     String? sourceKind,
     String? sourceTitle,
+    DateTime? sleepAt,
+    bool clearSleep = false,
   }) => PlayerSnapshot(
     current: clearCurrent ? null : (current ?? this.current),
     queue: queue ?? this.queue,
@@ -119,6 +127,7 @@ final class PlayerSnapshot {
     disliked: disliked ?? this.disliked,
     sourceKind: sourceKind ?? this.sourceKind,
     sourceTitle: sourceTitle ?? this.sourceTitle,
+    sleepAt: clearSleep ? null : (sleepAt ?? this.sleepAt),
   );
 
   bool get hasTrack => current != null;
@@ -167,3 +176,7 @@ final class PlayerIssue {
     return 'Трек недоступен ни в одном источнике';
   }
 }
+
+/// Старт кнопки «Перемешать»: случайный трек, а не всегда первый в списке.
+int shuffleStartIndex(int length) =>
+    length <= 1 ? 0 : math.Random().nextInt(length);

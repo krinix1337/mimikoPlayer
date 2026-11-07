@@ -3145,6 +3145,30 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Приложение скачает последний релиз и откроет установщик. Аккаунт, коллекция, статистика и настройки сохранятся.'**
   String get updatesReinstallConfirm;
+
+  /// No description provided for @playerSleepLeft.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сработает через {count} мин'**
+  String playerSleepLeft(int count);
+
+  /// No description provided for @downloadRemoveQuestion.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить скачанный файл этого трека? Слушать его можно будет только с сетью.'**
+  String get downloadRemoveQuestion;
+
+  /// No description provided for @settingsResetQuestion.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вернуть все настройки к значениям по умолчанию? Значок приложения останется прежним.'**
+  String get settingsResetQuestion;
+
+  /// No description provided for @settingsStorageSubtitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Кэш, загрузки и база'**
+  String get settingsStorageSubtitle;
 }
 
 class _AppLocalizationsDelegate

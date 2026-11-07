@@ -48,6 +48,10 @@ class AppServices {
   /// Учитывать ли прослушивания в статистике (история для волны пишется всегда).
   bool collectStats = true;
 
+  /// Язык из настроек (null — системный): фоновый плеер подписывает
+  /// уведомление без BuildContext.
+  String? localeCode;
+
   /// Фильтр явно помеченных ИИ-треков; нужен и фоновой докачке волны.
   bool hideAiTracks = false;
 
@@ -71,6 +75,7 @@ class AppServices {
     fadeEnabled = prefs.fade;
     crossfadeSeconds = prefs.crossfadeSeconds;
     collectStats = prefs.collectStats;
+    localeCode = prefs.localeCode;
     hideAiTracks = prefs.hideAiTracks;
     eqEnabled = prefs.eqEnabled;
     eqPreset = prefs.eqPreset;

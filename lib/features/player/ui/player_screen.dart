@@ -467,6 +467,13 @@ class _TopBar extends ConsumerWidget {
           ),
           IconButton(
             tooltip: l.playerSleep,
+            // Включённый таймер видно по цвету значка.
+            color:
+                ref.watch(
+                  playerSnapshotProviderValue.select((s) => s.sleepAt != null),
+                )
+                ? theme.colorScheme.primary
+                : null,
             icon: const Icon(Icons.bedtime_rounded),
             onPressed: () => showSleepSheet(context, ref),
           ),
@@ -625,6 +632,26 @@ class _DownloadButton extends ConsumerWidget {
           if (paused) {
             await downloader.resume(trackId);
           } else if (complete) {
+            // Удаление файла с одного тапа по значку «скачано» — слишком
+            // легко промахнуться, поэтому спрашиваем.
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                title: Text(l.menuDownloaded),
+                content: Text(l.downloadRemoveQuestion),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    child: Text(l.commonCancel),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                    child: Text(l.commonDelete),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed != true) return;
             await downloader.remove(trackId);
             if (context.mounted) {
               ScaffoldMessenger.of(context)
@@ -1142,11 +1169,40 @@ Future<void> showQueueSheet(BuildContext context) => showModalBottomSheet<void>(
   builder: (context) => const _QueueSheet(),
 );
 
-class _QueueSheet extends ConsumerWidget {
+class _QueueSheet extends ConsumerStatefulWidget {
   const _QueueSheet();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_QueueSheet> createState() => _QueueSheetState();
+}
+
+class _QueueSheetState extends ConsumerState<_QueueSheet> {
+  /// Строка текущего трека: к ней лист прокручивается при открытии.
+  final GlobalKey _currentRow = GlobalKey();
+  bool _scrolledToCurrent = false;
+
+  /// В длинной очереди текущий трек мог стоять пятисотым, а лист всегда
+  /// открывался на первом. Сначала прыгаем примерно (строки строятся лениво),
+  /// потом доводим точно по ключу строки.
+  void _revealCurrent(ScrollController scroll, int current) {
+    if (_scrolledToCurrent || current <= 0) return;
+    _scrolledToCurrent = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !scroll.hasClients) return;
+      final position = scroll.position;
+      scroll.jumpTo(
+        (current * 58.0).clamp(0.0, position.maxScrollExtent).toDouble(),
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final row = _currentRow.currentContext;
+        if (!mounted || row == null) return;
+        Scrollable.ensureVisible(row, alignment: 0.3);
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final snapshot = ref.watch(
       playerSnapshotProviderValue.select((s) => (s.queue, s.index)),
     );
@@ -1183,28 +1239,32 @@ class _QueueSheet extends ConsumerWidget {
             ),
           ],
         ),
-        AsyncValue(:final value?) => ListView.builder(
-          controller: scroll,
-          padding: EdgeInsets.only(
-            bottom: 8 + MediaQuery.viewPaddingOf(context).bottom,
-          ),
-          itemCount: value.length + 1,
-          itemBuilder: (context, index) {
-            if (index == 0) return _QueueHeader(count: value.length);
-            final position = index - 1;
-            return _QueueRow(
-              row: value[position],
-              position: position,
-              current: position == current,
-              onTap: () {
-                // Позиция, а не id: у повтора в плейлисте одна и та же строка
-                // стоит несколько раз, и поиск по id прыгал всегда на первую.
-                ref.read(playbackControllerProvider).skipToIndex(position);
-                Navigator.of(context).pop();
-              },
-            );
-          },
-        ),
+        AsyncValue(:final value?) => (() {
+          _revealCurrent(scroll, current);
+          return ListView.builder(
+            controller: scroll,
+            padding: EdgeInsets.only(
+              bottom: 8 + MediaQuery.viewPaddingOf(context).bottom,
+            ),
+            itemCount: value.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) return _QueueHeader(count: value.length);
+              final position = index - 1;
+              return _QueueRow(
+                key: position == current ? _currentRow : null,
+                row: value[position],
+                position: position,
+                current: position == current,
+                onTap: () {
+                  // Позиция, а не id: у повтора в плейлисте одна и та же строка
+                  // стоит несколько раз, и поиск по id прыгал всегда на первую.
+                  ref.read(playbackControllerProvider).skipToIndex(position);
+                  Navigator.of(context).pop();
+                },
+              );
+            },
+          );
+        })(),
         _ => ListView(
           controller: scroll,
           children: const [
@@ -1265,6 +1325,7 @@ class _QueueHeader extends StatelessWidget {
 
 class _QueueRow extends StatelessWidget {
   const _QueueRow({
+    super.key,
     required this.row,
     required this.position,
     required this.current,
@@ -1362,6 +1423,8 @@ Future<void> showSleepSheet(BuildContext context, WidgetRef ref) =>
       builder: (context) {
         final l = AppLocalizations.of(context);
         final controller = ref.read(playbackControllerProvider);
+        final sleepAt = ref.read(playerSnapshotProviderValue).sleepAt;
+        final left = sleepAt?.difference(DateTime.now());
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1374,6 +1437,18 @@ Future<void> showSleepSheet(BuildContext context, WidgetRef ref) =>
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
+              if (left != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Text(
+                    left.isNegative
+                        ? l.playerSleepUntilEnd
+                        : l.playerSleepLeft((left.inSeconds / 60).ceil()),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
               for (final minutes in const [15, 30, 45, 60, 90])
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20),

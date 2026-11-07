@@ -11,6 +11,7 @@ import 'app_providers.dart';
 import 'app_services.dart';
 import 'core/logging/app_logger.dart';
 import 'core/logging/frame_stats.dart';
+import 'core/platform/mimiko_platform.dart';
 import 'core/prefs/prefs_store.dart';
 import 'features/downloads/download_worker.dart';
 import 'features/player/audio_handler.dart';
@@ -57,6 +58,7 @@ Future<void> main() async {
   );
 
   step('плеер');
+  unawaited(MimikoPlatform.patchMediaButtons());
 
   // Плагин при service-запуске исполняет стандартный entrypoint, то есть этот
   // же main() без окна. runApp тут безопасен: движок без поверхности просто не

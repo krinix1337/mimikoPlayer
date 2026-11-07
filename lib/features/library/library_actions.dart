@@ -57,6 +57,24 @@ final class LibraryActions {
       services.db.libraryDao.likeState(localTrackId);
 }
 
+/// Лайки и «не рекомендовать», поставленные без сети: при синхронизации
+/// досылаем их в Яндекс, иначе они так и живут только на телефоне.
+final class PendingFeedback {
+  const PendingFeedback._();
+
+  /// Возвращает, сколько отметок дошло.
+  static Future<int> retry(AppDatabase db, YandexSource source) async {
+    final pending = await db.libraryDao.unsyncedFeedback(SourceId.yandex);
+    var sent = 0;
+    for (final (localTrackId, remoteId, state) in pending) {
+      if (!await source.setTrackFeedback(remoteId, state)) break;
+      await db.libraryDao.markFeedbackSynced(localTrackId, SourceId.yandex);
+      sent++;
+    }
+    return sent;
+  }
+}
+
 /// Лайки, снятые локально, но ещё не снятые в Яндексе. Пока запись здесь, она
 /// и повторяется при каждой синхронизации, и скрывает трек от импорта.
 final class PendingUnlikes {

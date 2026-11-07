@@ -63,6 +63,18 @@ class MimikoPlatform {
     }
   }
 
+  /// Кнопки PLAY и PAUSE гарнитуры: плагин делает из них переключатель,
+  /// натив чинит это после старта медиасервиса. Без канала — молча мимо.
+  static Future<void> patchMediaButtons() async {
+    try {
+      await _channel.invokeMethod<void>('patchMediaButtons');
+    } on PlatformException {
+      // Остаётся поведение плагина.
+    } on MissingPluginException {
+      // Фоновый движок без активности.
+    }
+  }
+
   /// Свободные байты на разделе данных; 0 — канал недоступен.
   static Future<int> freeBytes() async {
     try {

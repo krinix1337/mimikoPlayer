@@ -173,7 +173,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                 tile(
                   icon: Icons.sd_storage_rounded,
                   title: l.settingsSectionStorage,
-                  subtitle: l.settingsData,
+                  subtitle: l.settingsStorageSubtitle,
                   page: const _StoragePage(),
                 ),
                 tile(
@@ -191,7 +191,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                 tile(
                   icon: Icons.account_circle_outlined,
                   title: l.settingsSectionAccount,
-                  subtitle: l.settingsAccount,
+                  subtitle: switch (ref.watch(yandexAuthStateProvider).value) {
+                    AuthReady(:final login) when login.isNotEmpty => login,
+                    _ => l.settingsAccount,
+                  },
                   page: const _AccountPage(),
                 ),
                 FutureBuilder<String>(
@@ -1168,7 +1171,8 @@ class _StoragePage extends ConsumerWidget {
             ),
             DiscreteSliderRow<int>(
               label: l.downloadsLimit,
-              values: const [0, 2, 5, 10, 20],
+              // «Без лимита» — правый край шкалы: больше места, чем 20 ГБ.
+              values: const [2, 5, 10, 20, 0],
               current: limitGb,
               labelOf: (gb) =>
                   gb == 0 ? l.downloadsUnlimited : l.downloadsGb(gb),
@@ -1219,7 +1223,7 @@ class _StoragePage extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l.settingsReset),
-        content: Text(l.settingsResetDone),
+        content: Text(l.settingsResetQuestion),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),

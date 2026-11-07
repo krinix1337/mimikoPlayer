@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app_providers.dart';
 import 'core/links/yandex_playlist_link.dart';
 import 'core/prefs/prefs.dart';
+import 'core/sources/source_dto.dart';
 import 'core/platform/mimiko_platform.dart';
 import 'features/downloads/download_service.dart';
 import 'features/player/playback_controller.dart';
@@ -81,6 +82,22 @@ class _MimikoAppState extends ConsumerState<MimikoApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(ref.read(playlistSyncProvider.notifier).refresh());
+      unawaited(_retrySignIn());
+    }
+  }
+
+  /// Запуск без сети оставлял аккаунт «не вошёл» до перезапуска. При
+  /// возврате в приложение пробуем ещё раз и догоняем синхронизацию.
+  Future<void> _retrySignIn() async {
+    final auth = ref.read(appServicesProvider).yandexAuth;
+    if (auth == null || auth.state is! AuthFailed) return;
+    await auth.retryIfFailed();
+    if (!mounted || auth.state is! AuthReady) return;
+    ref.invalidate(librarySyncProvider);
+    try {
+      await ref.read(librarySyncProvider.future);
+    } on Object {
+      // Повторим при следующем возврате.
     }
   }
 

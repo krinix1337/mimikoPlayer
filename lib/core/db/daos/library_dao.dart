@@ -49,6 +49,50 @@ class LibraryDao {
         );
   }
 
+  /// Отметки, которые не дошли до [source] (поставлены без сети или при
+  /// ошибке API): локальный id, id трека в источнике и сама отметка.
+  Future<List<(String, String, int)>> unsyncedFeedback(
+    SourceId source, {
+    int limit = 50,
+  }) async {
+    final query =
+        _db.select(_db.likes).join([
+            innerJoin(
+              _db.remoteIdMappings,
+              _db.remoteIdMappings.localTrackId.equalsExp(
+                    _db.likes.localTrackId,
+                  ) &
+                  _db.remoteIdMappings.source.equals(source.wire),
+            ),
+          ])
+          ..where(
+            _db.likes.syncedToRemote.equals(false) &
+                _db.likes.state.equals(0).not(),
+          )
+          ..limit(limit);
+    final seen = <String>{};
+    return [
+      for (final row in await query.get())
+        if (seen.add(row.readTable(_db.likes).localTrackId))
+          (
+            row.readTable(_db.likes).localTrackId,
+            row.readTable(_db.remoteIdMappings).remoteId,
+            row.readTable(_db.likes).state,
+          ),
+    ];
+  }
+
+  /// Отметка дошла до источника — больше не повторяем.
+  Future<void> markFeedbackSynced(String localTrackId, SourceId source) =>
+      (_db.update(
+        _db.likes,
+      )..where((t) => t.localTrackId.equals(localTrackId))).write(
+        LikesCompanion(
+          syncedToRemote: const Value(true),
+          remoteSource: Value(source.wire),
+        ),
+      );
+
   /// 1 любимое, -1 нелюбимое, 0 ничего.
   Future<int> likeState(String localTrackId) async {
     final row =

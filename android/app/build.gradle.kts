@@ -62,3 +62,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+// MimikoMediaButtons наследует колбэк сессии audio_service.
+dependencies {
+    implementation("androidx.media:media:1.7.0")
+}

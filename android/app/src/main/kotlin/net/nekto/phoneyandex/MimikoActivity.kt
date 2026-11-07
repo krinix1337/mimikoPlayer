@@ -12,6 +12,7 @@ import android.os.StatFs
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.ryanheise.audioservice.AudioServiceActivity
+import com.ryanheise.audioservice.MimikoMediaButtons
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
@@ -37,6 +38,12 @@ class MimikoActivity : AudioServiceActivity() {
         // FlutterView появляется не в onCreate, а когда движок прицепился к
         // окну — просим частоту ещё раз после первой раскладки.
         window.decorView.post { applyFrameRate(preferredHz) }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Сервис мог пересоздаться без нас — ставим обработку кнопок заново.
+        MimikoMediaButtons.install()
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -115,6 +122,10 @@ class MimikoActivity : AudioServiceActivity() {
                 }
 
                 "networkStatus" -> result.success(networkStatus())
+                "patchMediaButtons" -> {
+                    MimikoMediaButtons.install()
+                    result.success(null)
+                }
 
                 else -> result.notImplemented()
             }

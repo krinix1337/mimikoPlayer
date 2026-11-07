@@ -265,7 +265,11 @@ class PrefsController extends Notifier<Prefs> {
   Future<void> setHomeBackground(HomeBackground value) =>
       _write(state.copyWith(homeBackground: value));
 
-  Future<void> reset() => _write(const Prefs());
+  /// Значок лаунчера при сбросе не трогаем: он переключается в системе, и
+  /// сброс одной строки в настройках разводил их — в лаунчере оставался
+  /// выбранный значок, а настройки и заставка показывали стандартный.
+  Future<void> reset() =>
+      _write(const Prefs().copyWith(launcherIcon: state.launcherIcon));
 
   Future<void> setWaveOnWifiOnly(bool value) =>
       _write(state.copyWith(waveOnWifiOnly: value));
@@ -713,6 +717,11 @@ final librarySyncProvider = FutureProvider<void>((ref) async {
   } on Object catch (error) {
     AppLogger.instance.warn('снятие лайков не повторилось: $error');
   }
+  try {
+    await PendingFeedback.retry(services.db, source);
+  } on Object catch (error) {
+    AppLogger.instance.warn('офлайн-лайки не дошли: $error');
+  }
 
   final lastRaw = await services.db.settingsDao.value(_likesSyncedKey);
   final last = lastRaw == null
@@ -921,10 +930,11 @@ Future<int> syncYandexPlaylists({
   int limit = 50,
 }) async {
   if (source == null) return 0;
-  final summaries = <PlaylistSummary>[
-    ...await source.playlists(),
-    ...await source.likedPlaylists(),
-  ];
+  final own = await source.playlists();
+  final liked = await source.likedPlaylists();
+  // Один из списков не пришёл — удалять «пропавшие» плейлисты нельзя.
+  final complete = own != null && liked != null;
+  final summaries = <PlaylistSummary>[...?own, ...?liked];
   final local = {
     for (final playlist in await db.libraryDao.playlistsOverview())
       playlist.id: playlist,
@@ -945,7 +955,7 @@ Future<int> syncYandexPlaylists({
     );
     fetched++;
   }
-  if (summaries.length <= limit) {
+  if (complete && summaries.length <= limit) {
     await db.libraryDao.removePlaylistsExcept({
       for (final summary in summaries) 'yandex:${summary.remotePlaylistId}',
     });
@@ -1011,10 +1021,11 @@ Future<int> importYandexPlaylists({
   // чтения встают на секунды.
   final snapshots = <PlaylistSnapshot>[];
   // Свои плейлисты и понравившиеся чужие — это два разных эндпоинта.
-  final summaries = <PlaylistSummary>[
-    ...await source.playlists(),
-    ...await source.likedPlaylists(),
-  ];
+  final own = await source.playlists();
+  final liked = await source.likedPlaylists();
+  // Один из списков не пришёл — удалять «пропавшие» плейлисты нельзя.
+  final complete = own != null && liked != null;
+  final summaries = <PlaylistSummary>[...?own, ...?liked];
   for (final summary in summaries.take(limit)) {
     final snapshot = await source.getPlaylist(summary.remotePlaylistId);
     if (snapshot != null) snapshots.add(snapshot);
@@ -1029,7 +1040,7 @@ Future<int> importYandexPlaylists({
   });
   // Плейлисты, удалённые на сервере, больше не висят в коллекции. Чистим
   // только если список пришёл целиком — иначе снесём лишнее при обрезке.
-  if (summaries.length <= limit) {
+  if (complete && summaries.length <= limit) {
     await db.libraryDao.removePlaylistsExcept({
       for (final summary in summaries) 'yandex:${summary.remotePlaylistId}',
     });

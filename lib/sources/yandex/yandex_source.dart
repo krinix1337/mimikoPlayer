@@ -191,12 +191,13 @@ class YandexSource implements MusicSource {
     return liked;
   }
 
-  Future<List<PlaylistSummary>> playlists() async {
+  /// null — список не получен (нет входа или ошибка сети), а не «пусто».
+  Future<List<PlaylistSummary>?> playlists() async {
     final uid = auth is AuthReady ? (auth as AuthReady).uid : null;
-    if (uid == null) return const [];
+    if (uid == null) return null;
 
     final result = await _api.get('/users/$uid/playlists/list');
-    if (!result.isOk) return const [];
+    if (!result.isOk) return null;
 
     return [
       for (final playlist in result.asList)
@@ -213,11 +214,11 @@ class YandexSource implements MusicSource {
   }
 
   /// Плейлисты, которые пользователь лайкнул у других авторов.
-  Future<List<PlaylistSummary>> likedPlaylists() async {
+  Future<List<PlaylistSummary>?> likedPlaylists() async {
     final uid = auth is AuthReady ? (auth as AuthReady).uid : null;
-    if (uid == null) return const [];
+    if (uid == null) return null;
     final result = await _api.get('/users/$uid/likes/playlists');
-    if (!result.isOk) return const [];
+    if (!result.isOk) return null;
     final out = <PlaylistSummary>[];
     for (final item in result.asList) {
       final playlist = item['playlist'];

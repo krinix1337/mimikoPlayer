@@ -1712,4 +1712,20 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get updatesReinstallConfirm =>
       'Приложение скачает последний релиз и откроет установщик. Аккаунт, коллекция, статистика и настройки сохранятся.';
+
+  @override
+  String playerSleepLeft(int count) {
+    return 'Сработает через $count мин';
+  }
+
+  @override
+  String get downloadRemoveQuestion =>
+      'Удалить скачанный файл этого трека? Слушать его можно будет только с сетью.';
+
+  @override
+  String get settingsResetQuestion =>
+      'Вернуть все настройки к значениям по умолчанию? Значок приложения останется прежним.';
+
+  @override
+  String get settingsStorageSubtitle => 'Кэш, загрузки и база';
 }

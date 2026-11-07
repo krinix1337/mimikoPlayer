@@ -831,5 +831,10 @@
   "updatesReinstallTitle": "Переустановить {version}",
   "@updatesReinstallTitle": {"placeholders": {"version": {"type": "String"}}},
   "updatesReinstallNote": "Скачать APK этой версии заново",
-  "updatesReinstallConfirm": "Приложение скачает последний релиз и откроет установщик. Аккаунт, коллекция, статистика и настройки сохранятся."
+  "updatesReinstallConfirm": "Приложение скачает последний релиз и откроет установщик. Аккаунт, коллекция, статистика и настройки сохранятся.",
+  "playerSleepLeft": "Сработает через {count} мин",
+  "@playerSleepLeft": {"placeholders": {"count": {"type": "int"}}},
+  "downloadRemoveQuestion": "Удалить скачанный файл этого трека? Слушать его можно будет только с сетью.",
+  "settingsResetQuestion": "Вернуть все настройки к значениям по умолчанию? Значок приложения останется прежним.",
+  "settingsStorageSubtitle": "Кэш, загрузки и база"
 }

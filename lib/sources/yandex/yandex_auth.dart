@@ -138,6 +138,27 @@ class YandexAuth {
     if (_state is AuthExpired) {
       await _refresh();
     }
+    await retryIfFailed();
+  }
+
+  DateTime? _lastRetry;
+
+  /// Старт без сети оставлял аккаунт в AuthFailed до перезапуска: токен цел,
+  /// просто `/account/status` не ответил. Повторяем не чаще раза в 30 секунд.
+  Future<void> retryIfFailed() async {
+    if (_state is! AuthFailed || !hasUsableToken) return;
+    final last = _lastRetry;
+    if (last != null &&
+        DateTime.now().difference(last) < const Duration(seconds: 30)) {
+      return;
+    }
+    _lastRetry = DateTime.now();
+    try {
+      final row = await _dao.load(provider);
+      await _loadAccount(row?.uid, row?.login, row?.hasPlus ?? false);
+    } on Object catch (error) {
+      AppLogger.instance.warn('повтор входа не удался: $error');
+    }
   }
 
   Future<DeviceLogin> startDeviceLogin() async {
@@ -298,20 +319,28 @@ class YandexAuth {
 
     // Обновление по refresh_token не проверялась живым запросом: срок жизни
     // выданного токена — год, так что до проверки это мёртвый путь.
-    final response = await _oauth.post<dynamic>(
-      '${AppConfig.yandexOAuthHost}/token',
-      options: Options(
-        headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
-      ),
-      data: Uri(
-        queryParameters: {
-          'grant_type': 'refresh_token',
-          'refresh_token': refresh,
-          'client_id': AppConfig.yandexClientId,
-          'client_secret': AppConfig.yandexClientSecret,
-        },
-      ).query,
-    );
+    // Без сети dio бросает исключение: оно улетало из restore() мимо всех
+    // обработчиков. Сбой сети — это «не обновили», а не «токен умер».
+    final Response<dynamic> response;
+    try {
+      response = await _oauth.post<dynamic>(
+        '${AppConfig.yandexOAuthHost}/token',
+        options: Options(
+          headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
+        ),
+        data: Uri(
+          queryParameters: {
+            'grant_type': 'refresh_token',
+            'refresh_token': refresh,
+            'client_id': AppConfig.yandexClientId,
+            'client_secret': AppConfig.yandexClientSecret,
+          },
+        ).query,
+      );
+    } on Object catch (error) {
+      AppLogger.instance.warn('обновление токена: нет связи ($error)');
+      return false;
+    }
 
     final json = _asMap(response.data);
     final token = json['access_token'];

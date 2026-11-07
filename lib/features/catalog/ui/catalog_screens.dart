@@ -39,7 +39,7 @@ Future<void> playRemoteTracks(
   final ids = await services.db.tracksDao.ingestAll(tracks);
   await controller.playQueue(
     ids,
-    startIndex: startIndex,
+    startIndex: shuffle ? shuffleStartIndex(tracks.length) : startIndex,
     sourceHint: {
       'kind': kind,
       if (title != null && title.isNotEmpty) 'title': title,

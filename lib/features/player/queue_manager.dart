@@ -33,11 +33,13 @@ class QueueManager {
   void setQueue(List<String> localTrackIds, {int startIndex = 0}) {
     _items = List.of(localTrackIds);
     _order = List.generate(_items.length, (i) => i);
-    if (_shuffle == PlaybackShuffle.shuffled) _reshuffle();
-    _position =
-        (_items.isEmpty || startIndex < 0 || startIndex >= _items.length)
-        ? -1
-        : _order.indexOf(startIndex);
+    final valid = startIndex >= 0 && startIndex < _items.length;
+    // При перемешивании выбранный трек встаёт первым: иначе он оказывался
+    // в случайном месте, и всё, что перед ним, уже никогда не звучало.
+    if (_shuffle == PlaybackShuffle.shuffled) {
+      _reshuffle(keepFirst: valid ? startIndex : null);
+    }
+    _position = !valid ? -1 : _order.indexOf(startIndex);
     if (_position < 0 && _items.isNotEmpty) _position = 0;
   }
 

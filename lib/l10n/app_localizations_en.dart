@@ -1708,4 +1708,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get updatesReinstallConfirm =>
       'The app will download the latest release and open the installer. Your account, collection, statistics and settings stay.';
+
+  @override
+  String playerSleepLeft(int count) {
+    return 'Fires in $count min';
+  }
+
+  @override
+  String get downloadRemoveQuestion =>
+      'Remove the downloaded file of this track? It will only play with a connection.';
+
+  @override
+  String get settingsResetQuestion =>
+      'Reset all settings to defaults? The app icon stays as it is.';
+
+  @override
+  String get settingsStorageSubtitle => 'Cache, downloads and database';
 }

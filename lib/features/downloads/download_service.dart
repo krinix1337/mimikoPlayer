@@ -611,7 +611,10 @@ class DownloadController extends Notifier<Map<String, DownloadStatus>> {
   /// Id треков, чью автозагрузку вытеснила ручная: им возвращаем очередь.
   final Set<String> _preempted = {};
   final Map<String, DateTime> _lastProgressWrite = {};
-  bool _pumpingAuto = false;
+
+  /// Какие очереди сейчас крутятся. Ручная и авто раньше делили один флаг:
+  /// «Скачать всё» во время автозагрузки молча не стартовало вовсе.
+  final Set<DownloadOrigin> _pumping = {};
 
   @override
   Map<String, DownloadStatus> build() => const {};
@@ -807,17 +810,28 @@ class DownloadController extends Notifier<Map<String, DownloadStatus>> {
       _lastProgressWrite.remove(localTrackId);
       // Освободившийся слот забирает очередь автозагрузки — иначе она ждала бы
       // следующего пинка до перезапуска.
-      unawaited(_continueAuto());
+      unawaited(_continueManual().then((_) => _continueAuto()));
     }
   }
 
   Future<void> _continueAuto() async {
-    if (_pumpingAuto || _active.isNotEmpty) return;
+    if (_pumping.isNotEmpty || _active.isNotEmpty) return;
     if (!ref.read(prefsProvider).autoDownloadLikes) return;
     try {
       await pumpAutoQueue();
     } on Object {
       // Очередь разберётся на следующем пинке; здесь только фоновый ход.
+    }
+  }
+
+  /// Ручная очередь («Скачать всё»), прерванная одиночной загрузкой или
+  /// автозагрузкой, продолжается, как только слот освободился.
+  Future<void> _continueManual() async {
+    if (_pumping.contains(DownloadOrigin.manual) || _active.isNotEmpty) return;
+    try {
+      await _pump(origin: DownloadOrigin.manual);
+    } on Object {
+      // Следующий освободившийся слот попробует снова.
     }
   }
 
@@ -927,8 +941,7 @@ class DownloadController extends Notifier<Map<String, DownloadStatus>> {
     Duration? timeBudget,
   }) async {
     final auto = origin == DownloadOrigin.auto;
-    if (_pumpingAuto) return;
-    _pumpingAuto = true;
+    if (!_pumping.add(origin)) return;
     var failures = 0;
     final startedAt = DateTime.now();
     try {
@@ -941,6 +954,8 @@ class DownloadController extends Notifier<Map<String, DownloadStatus>> {
         }
         if (auto && requireNetworkCheck && !await _autoNetworkAllowed()) break;
         if (_active.isNotEmpty) break;
+        // Ручные загрузки важнее: авто уступает очередь.
+        if (auto && _pumping.contains(DownloadOrigin.manual)) break;
         final task = await _dao.nextTask(origin: origin);
         if (task == null) break;
         try {
@@ -969,7 +984,8 @@ class DownloadController extends Notifier<Map<String, DownloadStatus>> {
         if (failures >= 3) break;
       }
     } finally {
-      _pumpingAuto = false;
+      _pumping.remove(origin);
+      if (!auto) unawaited(_continueAuto());
     }
   }
 

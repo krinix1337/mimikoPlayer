@@ -14,6 +14,17 @@ void main() {
       expect(q.displayOrder, ['t_0', 't_1', 't_2']);
     });
 
+    test('при включённом shuffle выбранный трек идёт первым', () {
+      for (var start = 0; start < 10; start++) {
+        final q = QueueManager()
+          ..setShuffle(PlaybackShuffle.shuffled)
+          ..setQueue(ids(10), startIndex: start);
+        expect(q.currentId, 't_$start');
+        expect(q.displayPosition, 0);
+        expect(q.displayOrder.toSet(), ids(10).toSet());
+      }
+    });
+
     test('индекс вне списка не роняет очередь', () {
       final q = QueueManager()..setQueue(ids(2), startIndex: 7);
       expect(q.currentId, 't_0');

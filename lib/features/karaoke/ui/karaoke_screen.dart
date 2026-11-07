@@ -29,6 +29,9 @@ class _KaraokeScreenState extends ConsumerState<KaraokeScreen> {
   final Map<int, GlobalKey> _lineKeys = {};
   int _lastActive = -1;
 
+  /// Трек, чей текст сейчас на экране.
+  String? _shownTrack;
+
   /// Пока пользователь сам крутит список, автоскролл молчит — иначе
   /// прокрутка у него под пальцем прыгает обратно.
   bool _userScrolling = false;
@@ -62,7 +65,27 @@ class _KaraokeScreenState extends ConsumerState<KaraokeScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final lyrics = ref.watch(trackLyricsProvider(widget.trackId));
+    // Текст идёт за тем, что играет: раньше экран оставался на треке, с
+    // которого его открыли, и после автоперехода подсвечивал чужие строки
+    // по времени нового трека.
+    final trackId =
+        ref.watch(
+          playerSnapshotProviderValue.select((s) => s.current?.localTrackId),
+        ) ??
+        widget.trackId;
+    if (trackId != _shownTrack) {
+      final changed = _shownTrack != null;
+      _shownTrack = trackId;
+      if (changed) {
+        _lineKeys.clear();
+        _lastActive = -1;
+        _userScrolling = false;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _scroll.hasClients) _scroll.jumpTo(0);
+        });
+      }
+    }
+    final lyrics = ref.watch(trackLyricsProvider(trackId));
     final position = ref.watch(
       playerSnapshotProviderValue.select(
         (s) => (s.position, s.current?.coverUrl),
