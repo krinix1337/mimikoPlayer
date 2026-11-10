@@ -12,20 +12,22 @@ import '../../../widgets/sliver_bottom_inset.dart';
 import '../../../widgets/track_cover.dart';
 import 'settings_widgets.dart';
 
-enum StatsPeriod { week, month, year, all }
+enum StatsPeriod { day, week, month, year, all }
 
 class _StatsData {
   const _StatsData({
     required this.summary,
-    required this.daily,
-    required this.days,
+    required this.bars,
+    required this.byHour,
     required this.tracks,
     required this.artists,
   });
 
   final StatsSummary summary;
-  final Map<DateTime, Duration> daily;
-  final int days;
+
+  /// Столбики графика слева направо: по часам за сегодня или по дням.
+  final List<int> bars;
+  final bool byHour;
   final List<StatsEntry> tracks;
   final List<StatsEntry> artists;
 }
@@ -46,6 +48,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     return switch (_period) {
+      StatsPeriod.day => today,
       StatsPeriod.week => today.subtract(const Duration(days: 6)),
       StatsPeriod.month => today.subtract(const Duration(days: 29)),
       StatsPeriod.year => DateTime(now.year - 1, now.month, now.day + 1),
@@ -56,6 +59,15 @@ class _StatsPageState extends ConsumerState<StatsPage> {
   Future<_StatsData> _load() async {
     final dao = ref.read(appServicesProvider).db.statsDao;
     final since = _since();
+    if (_period == StatsPeriod.day) {
+      return _StatsData(
+        summary: await dao.summary(since),
+        bars: [for (final d in await dao.hourly(since!)) d.inSeconds],
+        byHour: true,
+        tracks: await dao.topTracks(since),
+        artists: await dao.topArtists(since),
+      );
+    }
     // График на «год» и «всё» слишком мелкий по дням — показываем 30 дней.
     final days = _period == StatsPeriod.week ? 7 : 30;
     final now = DateTime.now();
@@ -64,10 +76,20 @@ class _StatsPageState extends ConsumerState<StatsPage> {
       now.month,
       now.day,
     ).subtract(Duration(days: days - 1));
+    final daily = await dao.daily(chartFrom);
     return _StatsData(
       summary: await dao.summary(since),
-      daily: await dao.daily(chartFrom),
-      days: days,
+      bars: [
+        for (var i = 0; i < days; i++)
+          (daily[DateTime(
+                    chartFrom.year,
+                    chartFrom.month,
+                    chartFrom.day + i,
+                  )] ??
+                  Duration.zero)
+              .inSeconds,
+      ],
+      byHour: false,
       tracks: await dao.topTracks(since),
       artists: await dao.topArtists(since),
     );
@@ -150,6 +172,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
             sliver: SliverToBoxAdapter(
               child: ConnectedButtonGroup<StatsPeriod>(
                 options: [
+                  ConnectedOption(value: StatsPeriod.day, label: l.stats1d),
                   ConnectedOption(value: StatsPeriod.week, label: l.stats7d),
                   ConnectedOption(value: StatsPeriod.month, label: l.stats30d),
                   ConnectedOption(value: StatsPeriod.year, label: l.statsYear),
@@ -288,7 +311,7 @@ class _StatsBody extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  l.statsByDay,
+                  data.byHour ? l.statsByHour : l.statsByDay,
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),
@@ -296,7 +319,13 @@ class _StatsBody extends StatelessWidget {
                 const SizedBox(height: 10),
                 SizedBox(
                   height: 96,
-                  child: _DailyBars(daily: data.daily, days: data.days),
+                  child: _DailyBars(
+                    values: data.bars,
+                    // Сегодня по часам подсвечиваем текущий час.
+                    highlight: data.byHour
+                        ? DateTime.now().hour
+                        : data.bars.length - 1,
+                  ),
                 ),
               ],
             ),
@@ -335,28 +364,20 @@ class _StatsBody extends StatelessWidget {
 }
 
 class _DailyBars extends StatelessWidget {
-  const _DailyBars({required this.daily, required this.days});
+  const _DailyBars({required this.values, required this.highlight});
 
-  final Map<DateTime, Duration> daily;
-  final int days;
+  final List<int> values;
+  final int highlight;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final values = [
-      for (var i = days - 1; i >= 0; i--)
-        (daily[DateTime(today.year, today.month, today.day - i)] ??
-                Duration.zero)
-            .inSeconds,
-    ];
     final peak = values.fold<int>(1, (a, b) => b > a ? b : a);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         for (var i = 0; i < values.length; i++) ...[
-          if (i > 0) SizedBox(width: days > 7 ? 3 : 8),
+          if (i > 0) SizedBox(width: values.length > 7 ? 3 : 8),
           Expanded(
             child: TweenAnimationBuilder<double>(
               tween: Tween(begin: 0, end: values[i] / peak),
@@ -367,7 +388,7 @@ class _DailyBars extends StatelessWidget {
                 alignment: Alignment.bottomCenter,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: i == values.length - 1
+                    color: i == highlight
                         ? scheme.primary
                         : values[i] == 0
                         ? scheme.surfaceContainerHighest

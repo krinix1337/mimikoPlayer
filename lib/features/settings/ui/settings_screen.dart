@@ -3,6 +3,9 @@ import 'dart:math' as math;
 
 import 'package:dio/dio.dart' show CancelToken, DioException;
 import 'package:flutter/material.dart';
+
+import '../../../widgets/expressive_loader.dart';
+
 import 'package:phoneyandex/widgets/sliver_bottom_inset.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -2294,7 +2297,7 @@ class _UpdatesHero extends StatelessWidget {
                           ? const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: ExpressiveLoader(),
                             )
                           : const Icon(Icons.refresh_rounded, size: 18),
                       label: Text(checkLabel),
@@ -2308,7 +2311,7 @@ class _UpdatesHero extends StatelessWidget {
                       const SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: ExpressiveLoader(),
                       )
                     else
                       Icon(statusIcon, size: 18, color: statusColor),

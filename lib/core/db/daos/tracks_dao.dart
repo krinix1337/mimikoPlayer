@@ -8,6 +8,32 @@ import '../../sources/source_dto.dart';
 import '../../sources/source_id.dart';
 import '../database.dart';
 
+/// Точки сведения из карточки Яндекса (`fade`): где кончается вступление
+/// и начинается концовка. Ими сводит треки и сам Яндекс.
+final class FadePoints {
+  const FadePoints({this.inStart, this.inStop, this.outStart, this.outStop});
+
+  final Duration? inStart;
+  final Duration? inStop;
+  final Duration? outStart;
+  final Duration? outStop;
+
+  static Duration? _sec(Object? value) => value is num && value >= 0
+      ? Duration(milliseconds: (value * 1000).round())
+      : null;
+
+  static FadePoints? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final points = FadePoints(
+      inStart: _sec(value['inStart']),
+      inStop: _sec(value['inStop']),
+      outStart: _sec(value['outStart']),
+      outStop: _sec(value['outStop']),
+    );
+    return points.outStart == null && points.inStop == null ? null : points;
+  }
+}
+
 final class IngestResult {
   const IngestResult(this.localTrackId, this.tier);
 
@@ -226,6 +252,31 @@ class TracksDao {
   Future<Track?> byId(String localTrackId) => (_db.select(
     _db.tracks,
   )..where((t) => t.id.equals(localTrackId))).getSingleOrNull();
+
+  /// Точки сведения трека; null — источник их не отдал.
+  Future<FadePoints?> fadePointsOf(String localTrackId) async {
+    final mappings =
+        await (_db.select(_db.remoteIdMappings)..where(
+              (t) =>
+                  t.localTrackId.equals(localTrackId) &
+                  t.source.equals(SourceId.yandex.wire),
+            ))
+            .get();
+    for (final mapping in mappings) {
+      final raw = mapping.remoteJson;
+      if (raw == null) continue;
+      try {
+        final json = jsonDecode(raw);
+        if (json is Map) {
+          final points = FadePoints.fromJson(json['fade']);
+          if (points != null) return points;
+        }
+      } on Object {
+        // Битый JSON — сводим без точек.
+      }
+    }
+    return null;
+  }
 
   Future<List<String>> artistNamesOf(String trackId) async {
     final query =

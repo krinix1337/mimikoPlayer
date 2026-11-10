@@ -59,6 +59,20 @@ Route<void> slideUpRoute(Widget page) => PageRouteBuilder<void>(
 
 const _m3 = FadeForwardsPageTransitionsBuilder();
 
+/// Длительность штатного перехода — для вкладок, которые переключаются
+/// внутри одной страницы.
+Duration get m3TransitionDuration =>
+    currentMotion.micro(_m3.transitionDuration.inMilliseconds);
+
+/// Тот же переход M3, что у страниц, но для вкладок: они живут на одной
+/// странице навигатора и сами анимируют смену.
+Widget m3TabTransition(
+  BuildContext context,
+  Animation<double> animation,
+  Animation<double> secondary,
+  Widget child,
+) => _m3Transition(context, animation, secondary, child);
+
 Widget _m3Transition(
   BuildContext context,
   Animation<double> animation,

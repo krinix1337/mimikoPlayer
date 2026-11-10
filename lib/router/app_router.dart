@@ -40,6 +40,108 @@ const _tabs = <({String path, IconData icon})>[
   (path: Routes.settings, icon: Icons.tune_rounded),
 ];
 
+/// Все четыре вкладки — одна и та же страница навигатора (общий ключ):
+/// переход между ними не пересоздаёт экраны, а только переключает индекс.
+/// Раньше каждая смена вкладки строила экран с нуля — запросы к базе,
+/// декодирование обложек — и это давало заметные рывки.
+const _tabsPageKey = ValueKey<String>('tabs');
+
+Page<void> _tabsPage(int index) => NoTransitionPage<void>(
+  key: _tabsPageKey,
+  child: _TabsHost(index: index),
+);
+
+/// Держит построенные вкладки живыми: прокрутка, загруженные данные и
+/// обложки сохраняются. Вкладка строится при первом заходе, не раньше.
+class _TabsHost extends StatefulWidget {
+  const _TabsHost({required this.index});
+
+  final int index;
+
+  @override
+  State<_TabsHost> createState() => _TabsHostState();
+}
+
+class _TabsHostState extends State<_TabsHost>
+    with SingleTickerProviderStateMixin {
+  final Set<int> _built = {};
+
+  /// Вкладка, которая уходит, пока идёт переход; null — перехода нет.
+  int? _leaving;
+
+  /// Штатный переход M3 «fade forwards», как у остальных страниц.
+  late final AnimationController _switch =
+      AnimationController(vsync: this, duration: m3TransitionDuration, value: 1)
+        ..addStatusListener((status) {
+          if (status == AnimationStatus.completed && _leaving != null) {
+            setState(() => _leaving = null);
+          }
+        });
+
+  static const _screens = <Widget>[
+    HomeScreen(),
+    DiscoverScreen(),
+    CollectionScreen(),
+    SettingsScreen(),
+  ];
+
+  @override
+  void didUpdateWidget(_TabsHost oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.index == widget.index) return;
+    if (!currentMotion.enabled) {
+      _leaving = null;
+      return;
+    }
+    _leaving = oldWidget.index;
+    _switch
+      ..duration = m3TransitionDuration
+      ..forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _switch.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _built.add(widget.index);
+    final leaving = _leaving;
+    // Все вкладки всегда обёрнуты одним и тем же переходом — меняются только
+    // анимации. Так дерево стабильно, и состояние вкладок не теряется.
+    // Открываемая вкладка всегда рисуется последней, то есть сверху: иначе
+    // при переходе назад (4 → 3) уходящая страница вместе с фоном перехода
+    // закрывала новую, и был виден чёрный экран. Ключи сохраняют состояние
+    // вкладок, когда порядок слоёв меняется.
+    final order = [
+      for (var i = 0; i < _screens.length; i++)
+        if (i != widget.index) i,
+      widget.index,
+    ];
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        for (final i in order)
+          Offstage(
+            key: ValueKey<int>(i),
+            offstage: i != widget.index && i != leaving,
+            child: TickerMode(
+              enabled: i == widget.index || i == leaving,
+              child: m3TabTransition(
+                context,
+                i == widget.index ? _switch : kAlwaysCompleteAnimation,
+                i == leaving ? _switch : kAlwaysDismissedAnimation,
+                _built.contains(i) ? _screens[i] : const SizedBox(),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 /// Индекс последней вкладки: на `/player` и в разделах коллекции подсветка
 /// навигации должна оставаться там, откуда пользователь пришёл.
 class ShellTabController extends Notifier<int> {
@@ -75,18 +177,15 @@ final appRouterProvider = GoRouter(
       routes: [
         GoRoute(
           path: Routes.home,
-          pageBuilder: (context, state) =>
-              slideUpPage(state, const HomeScreen()),
+          pageBuilder: (context, state) => _tabsPage(0),
         ),
         GoRoute(
           path: Routes.discover,
-          pageBuilder: (context, state) =>
-              slideUpPage(state, const DiscoverScreen()),
+          pageBuilder: (context, state) => _tabsPage(1),
         ),
         GoRoute(
           path: Routes.library,
-          pageBuilder: (context, state) =>
-              slideUpPage(state, const CollectionScreen()),
+          pageBuilder: (context, state) => _tabsPage(2),
           routes: [
             GoRoute(
               path: 'liked',
@@ -152,8 +251,7 @@ final appRouterProvider = GoRouter(
         ),
         GoRoute(
           path: Routes.settings,
-          pageBuilder: (context, state) =>
-              slideUpPage(state, const SettingsScreen()),
+          pageBuilder: (context, state) => _tabsPage(3),
         ),
         GoRoute(
           path: Routes.chart,
@@ -228,6 +326,14 @@ final appRouterProvider = GoRouter(
   ],
 );
 
+/// Последний адрес внутри оболочки (см. [AppShell.build]).
+String _shellLocation = Routes.home;
+
+bool _coversShell(String location) =>
+    location == Routes.player ||
+    location == Routes.karaoke ||
+    location == Routes.logs;
+
 /// Нижняя навигация + всегда видимый мини-плеер над ней.
 class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.child});
@@ -242,7 +348,13 @@ class AppShell extends ConsumerWidget {
     // Берём верхний маршрут роутера.
     // GoRouterState.of — только чтобы оболочка пересобиралась на переходах.
     GoRouterState.of(context);
-    final location = GoRouter.of(context).state.matchedLocation;
+    final top = GoRouter.of(context).state.matchedLocation;
+    // Плеер, караоке и журнал лежат поверх оболочки, а не внутри неё: пока
+    // они открыты, оболочка остаётся на прежнем экране. Раньше под плеером
+    // она считала, что волна закрыта, и показывала мини-плеер — после
+    // возврата он прятался, и весь экран волны съезжал вверх и обратно.
+    if (!_coversShell(top)) _shellLocation = top;
+    final location = _shellLocation;
     final matched = _tabs.indexWhere(
       (t) => t.path != Routes.home && location.startsWith(t.path),
     );
@@ -318,6 +430,9 @@ class AppShell extends ConsumerWidget {
       body: SafeArea(
         top: false,
         bottom: false,
+        // Экраны вкладок — отдельные Scaffold под плавающей навигацией:
+        // их уведомления вставали у нижнего края и прятались под мини-плеер.
+        // Поднимаем их на высоту панели (её Scaffold отдаёт в padding).
         child: ScrollActivityTracker(child: child),
       ),
       // SafeArea снаружи, а внутренний нижний отступ навбара убираем:
@@ -353,6 +468,10 @@ class AppShell extends ConsumerWidget {
                   selected: index,
                   showLabels: withLabels,
                   onSelected: (i) {
+                    // Страница вкладок общая, поэтому открытое поверх неё
+                    // (подстраницы настроек, артист) закрываем явно — иначе
+                    // оно осталось бы висеть над другой вкладкой.
+                    _shellKey.currentState?.popUntil((route) => route.isFirst);
                     ref.read(shellTabProvider.notifier).select(i);
                     context.go(_tabs[i].path);
                   },
@@ -392,7 +511,7 @@ class _PillNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final motion = currentMotion;
-    final indicatorWidth = 56.0;
+    final indicatorWidth = 64.0;
     final indicatorHeight = showLabels ? 32.0 : 36.0;
     final contentHeight = indicatorHeight + (showLabels ? 14.0 : 0.0);
     final selectedIconColor = kKeyboardTestTheme
@@ -411,17 +530,17 @@ class _PillNavBar extends StatelessWidget {
 
           return Stack(
             children: [
-              // Индикатор едет пружиной и по дороге вытягивается каплей —
-              // движение M3 Expressive вместо простого сдвига.
+              // Индикатор переезжает мягко, без пружинного дрожания, и по
+              // дороге чуть вытягивается — движение M3 Expressive, но спокойное.
               TweenAnimationBuilder<double>(
                 tween: Tween(end: selected.toDouble()),
-                duration: motion.micro(520),
-                curve: Curves.elasticOut,
+                duration: motion.micro(380),
+                curve: Curves.easeOutCubic,
                 builder: (context, pos, child) {
                   final travel = (pos - pos.roundToDouble()).abs();
-                  final stretch = (travel * itemWidth * 0.9).clamp(
+                  final stretch = (travel * itemWidth * 0.35).clamp(
                     0.0,
-                    itemWidth * 0.6,
+                    itemWidth * 0.2,
                   );
                   final width = indicatorWidth + stretch;
                   return Positioned(
@@ -458,9 +577,9 @@ class _PillNavBar extends StatelessWidget {
                                   height: indicatorHeight,
                                   child: Center(
                                     child: AnimatedScale(
-                                      scale: i == selected ? 1.12 : 1.0,
-                                      duration: motion.micro(320),
-                                      curve: Curves.easeOutBack,
+                                      scale: i == selected ? 1.06 : 1.0,
+                                      duration: motion.micro(260),
+                                      curve: Curves.easeOutCubic,
                                       child: Icon(
                                         destinations[i].icon,
                                         size: showLabels ? 22 : 24,
@@ -523,32 +642,15 @@ class _GlassIndicator extends StatelessWidget {
         ),
       );
     }
+    // M3 Expressive: сплошная тональная пилюля без обводки, градиента и
+    // тени. Стеклянная капсула с рамкой выглядела чужой рядом с остальным UI.
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      // Без своего BackdropFilter: панель навигации уже размывает подложку,
-      // а отдельный фильтр на индикаторе 56×32 только тратил GPU.
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              scheme.primary.withValues(alpha: 0.30),
-              scheme.primary.withValues(alpha: 0.06),
-            ],
-          ),
-          border: Border.all(color: scheme.primary.withValues(alpha: 0.35)),
+        color: Color.alphaBlend(
+          scheme.primary.withValues(alpha: 0.24),
+          scheme.surfaceContainerHigh,
         ),
+        borderRadius: BorderRadius.circular(100),
       ),
     );
   }

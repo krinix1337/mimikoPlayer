@@ -84,6 +84,24 @@ class StatsDao {
     return out;
   }
 
+  /// Минуты прослушивания по часам (0–23) начиная с [since].
+  Future<List<Duration>> hourly(DateTime since) async {
+    final rows = await _db
+        .customSelect(
+          'SELECT h.played_at AS at, h.played_ms AS ms FROM history h '
+          'WHERE h.in_stats = 1 AND h.played_at >= ?',
+          variables: [Variable.withInt(_sec(since))],
+          readsFrom: {_db.history},
+        )
+        .get();
+    final out = List<Duration>.filled(24, Duration.zero);
+    for (final r in rows) {
+      final at = DateTime.fromMillisecondsSinceEpoch(r.read<int>('at') * 1000);
+      out[at.hour] += Duration(milliseconds: r.read<int>('ms'));
+    }
+    return out;
+  }
+
   Future<List<StatsEntry>> topTracks(DateTime? since, {int limit = 5}) async {
     final rows = await _db
         .customSelect(

@@ -1,4 +1,5 @@
 import '../../core/content/artist_blocklist.dart';
+import '../../core/content/remix_filter.dart';
 import '../../core/sources/source_dto.dart';
 
 /// Какие треки пачки волны стоит играть, в порядке выдачи.
@@ -22,6 +23,7 @@ List<int> pickWaveIndexes({
     final id = ids[i];
     if (disliked.contains(id) || !seen.add(id)) continue;
     if (ArtistBlocklist.instance.isBlocked(tracks[i].artists)) continue;
+    if (RemixFilter.instance.isFiltered(tracks[i])) continue;
     final artist = tracks[i].mainArtist.toLowerCase();
     final count = perArtistCount[artist] ?? 0;
     if (count >= perArtist) continue;

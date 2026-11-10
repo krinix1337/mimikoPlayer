@@ -381,6 +381,35 @@ Future<void> showTrackMenu(
   );
 }
 
+/// Выбор плейлиста прямо из плеера: сам находит, откуда трек и в какие
+/// плейлисты его можно положить.
+Future<void> showAddToPlaylist(
+  BuildContext context,
+  WidgetRef ref,
+  String localTrackId,
+) async {
+  final services = ref.read(appServicesProvider);
+  final albumId = await services.db.tracksDao.albumRemoteIdOf(localTrackId);
+  final variants = await services.db.tracksDao.variantsOf(localTrackId);
+  final remote = variants
+      .where((v) => v.ref.source != SourceId.local)
+      .firstOrNull;
+  final yandexTrackId = variants
+      .where((v) => v.ref.source == SourceId.yandex)
+      .map((v) => v.ref.remoteId)
+      .firstOrNull;
+  if (!context.mounted) return;
+  await _showAddToPlaylist(
+    context,
+    ref,
+    localTrackId,
+    yandexTrackId: yandexTrackId,
+    albumId: albumId,
+    linkSource: remote?.ref.source.wire ?? SourceId.local.wire,
+    linkRemoteId: remote?.ref.remoteId ?? localTrackId,
+  );
+}
+
 /// Выбор плейлиста для трека. Свои плейлисты Яндекса принимают только треки
 /// Яндекса (запись идёт на сервер), а плейлисты на устройстве — любые, в том
 /// числе локальные файлы.

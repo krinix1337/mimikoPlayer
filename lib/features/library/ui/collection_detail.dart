@@ -22,19 +22,42 @@ import '../../../widgets/glass_top_bar.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/track_cover.dart';
 import '../../../widgets/track_tile.dart';
+import 'collection_facets.dart';
 import 'collection_screen.dart' show SectionHeader, showSortSheet;
 import '../../../widgets/expressive_loader.dart';
 import '../../../widgets/fab_menu.dart';
 
 /// Один раздел коллекции на весь экран: заголовок, счётчик, play/shuffle
 /// и список с тем же сортиром, что и на главной.
-class CollectionKindScreen extends ConsumerWidget {
+class CollectionKindScreen extends ConsumerStatefulWidget {
   const CollectionKindScreen({super.key, required this.kind});
 
   final CollectionKind kind;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CollectionKindScreen> createState() =>
+      _CollectionKindScreenState();
+}
+
+class _CollectionKindScreenState extends ConsumerState<CollectionKindScreen> {
+  CollectionKind get kind => widget.kind;
+
+  /// Выбранный фильтр по источнику или жанру; null — все треки.
+  FacetKey _facet;
+
+  bool get _hasFacets =>
+      kind == CollectionKind.liked || kind == CollectionKind.downloaded;
+
+  Map<String, TrackFacet> get _facets => _hasFacets
+      ? ref.watch(trackFacetsProvider(kind)).value ??
+            const <String, TrackFacet>{}
+      : const <String, TrackFacet>{};
+
+  List<CollectionRow> _filtered(List<CollectionRow> all) =>
+      applyFacet(all, _facets, _facet);
+
+  @override
+  Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final rows = ref.watch(collectionProvider(kind));
 
@@ -52,70 +75,92 @@ class CollectionKindScreen extends ConsumerWidget {
         body: rows.when(
           loading: () => const Center(child: ExpressiveLoader()),
           error: (error, _) => _ErrorBox(text: l.dbError('$error')),
-          data: (data) => CustomScrollView(
-            slivers: [
-              SliverAppBar(
-                pinned: true,
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                title: Text(title),
-                actions: [
-                  if (kind == CollectionKind.liked)
-                    IconButton(
-                      tooltip: l.collectionDownloadAllLikes,
-                      icon: const Icon(Icons.download_rounded),
-                      onPressed: () => _downloadAll(context, ref),
-                    ),
-                  IconButton(
-                    tooltip: l.collectionSort,
-                    icon: const Icon(Icons.swap_vert_rounded),
-                    onPressed: () => showSortSheet(context, ref),
-                  ),
-                ],
-              ),
-              if (data.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(28),
-                      child: Text(
-                        _emptyFor(l),
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                    ),
-                  ),
-                )
-              else ...[
-                SliverToBoxAdapter(
-                  child: _CollectionHero(
-                    kind: kind,
-                    rows: data,
-                    onPlay: () => _play(context, ref, data, 0),
-                    onShuffle: () =>
-                        _play(context, ref, data, 0, shuffle: true),
-                  ),
-                ),
-                SliverList.builder(
-                  itemCount: data.length,
-                  itemBuilder: (context, index) => RiseIn(
-                    delay: Duration(milliseconds: (index * 18).clamp(0, 180)),
-                    offset: 12,
-                    child: TrackTile(
-                      row: data[index],
-                      queue: data,
-                      index: index,
-                      kind: kind.name,
-                      sourceTitle: title,
-                    ),
-                  ),
-                ),
-              ],
-              const SliverBottomInset(),
-            ],
-          ),
+          data: (data) => _list(context, l, title, data, _filtered(data)),
         ),
       ),
+    );
+  }
+
+  /// [shown] — список после фильтра. Считается один раз на сборку: раньше
+  /// фильтр прогонялся заново для каждой строки, и длинная коллекция с
+  /// выбранным жанром прокручивалась рывками.
+  Widget _list(
+    BuildContext context,
+    AppLocalizations l,
+    String title,
+    List<CollectionRow> data,
+    List<CollectionRow> shown,
+  ) {
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          pinned: true,
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          title: Text(title),
+          actions: [
+            if (kind == CollectionKind.liked)
+              IconButton(
+                tooltip: l.collectionDownloadAllLikes,
+                icon: const Icon(Icons.download_rounded),
+                onPressed: () => _downloadAll(context, ref),
+              ),
+            IconButton(
+              tooltip: l.collectionSort,
+              icon: const Icon(Icons.swap_vert_rounded),
+              onPressed: () => showSortSheet(context, ref),
+            ),
+          ],
+        ),
+        if (data.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Text(
+                  _emptyFor(l),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ),
+            ),
+          )
+        else ...[
+          SliverToBoxAdapter(
+            child: _CollectionHero(
+              kind: kind,
+              rows: shown,
+              onPlay: () => _play(context, ref, shown, 0),
+              onShuffle: () => _play(context, ref, shown, 0, shuffle: true),
+            ),
+          ),
+          // Фильтр по источнику и жанру, как в «Мне нравится» на ПК.
+          if (_hasFacets)
+            SliverToBoxAdapter(
+              child: FacetBar(
+                rows: data,
+                facets: _facets,
+                selected: _facet,
+                onSelect: (key) => setState(() => _facet = key),
+              ),
+            ),
+          SliverList.builder(
+            itemCount: shown.length,
+            itemBuilder: (context, index) => RiseIn(
+              delay: Duration(milliseconds: (index * 18).clamp(0, 180)),
+              offset: 12,
+              child: TrackTile(
+                row: shown[index],
+                queue: shown,
+                index: index,
+                kind: kind.name,
+                sourceTitle: title,
+              ),
+            ),
+          ),
+        ],
+        const SliverBottomInset(),
+      ],
     );
   }
 

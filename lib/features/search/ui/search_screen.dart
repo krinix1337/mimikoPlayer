@@ -340,6 +340,9 @@ class _HitTile extends ConsumerWidget {
   }
 
   Future<void> _play(BuildContext context, WidgetRef ref) async {
+    // Клавиатура закрывала мини-плеер и загрузку трека: казалось, что тап
+    // ничего не сделал. Убираем её сразу.
+    FocusManager.instance.primaryFocus?.unfocus();
     // Роутер берём до await: лист перестраивается во время импорта, и к
     // моменту старта к этому элементу уже нельзя обращаться.
     final router = GoRouter.of(context);

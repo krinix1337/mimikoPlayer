@@ -145,6 +145,18 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final services = ref.read(appServicesProvider);
     final source = ref.read(yandexSourceProvider);
+    if (_importing) return;
+    _importing = true;
+    // Импорт тысячи лайков идёт десятки секунд. Без этого сообщения кнопка
+    // выглядела нерабочей.
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(l.collectionImporting),
+          duration: const Duration(minutes: 5),
+        ),
+      );
 
     try {
       final likes = await importYandexLikes(source: source, db: services.db);
@@ -153,6 +165,9 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
         source: source,
         db: services.db,
       );
+      // Раньше проверки: ушли с экрана — сообщение «импортирую» иначе
+      // оставалось висеть все пять минут.
+      messenger.hideCurrentSnackBar();
       if (!ref.context.mounted) return;
       ref.invalidate(collectionProvider);
       ref.invalidate(playlistsProvider);
@@ -165,11 +180,16 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
         ),
       );
     } on Object catch (error) {
+      messenger.hideCurrentSnackBar();
       messenger.showSnackBar(
         SnackBar(content: Text(l.collectionImportFailed('$error'))),
       );
+    } finally {
+      _importing = false;
     }
   }
+
+  static bool _importing = false;
 
   Future<void> _playAll(
     WidgetRef ref,

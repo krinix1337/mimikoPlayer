@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
@@ -6,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_services.dart';
 import 'core/content/ai_filter.dart';
+import 'core/content/remix_filter.dart';
+import 'features/downloads/offline_lyrics.dart';
 import 'core/content/artist_blocklist.dart';
 import 'core/content/censor_base.dart';
 import 'core/db/daos/downloads_dao.dart';
@@ -17,7 +20,6 @@ import 'core/prefs/prefs_store.dart';
 import 'core/sources/source_dto.dart';
 import 'core/sources/source_id.dart';
 import 'sources/lyrics/lrclib.dart';
-import 'sources/lyrics/lyrics_service.dart';
 import 'features/library/library_actions.dart';
 import 'features/player/playback_controller.dart';
 import 'features/player/player_snapshot.dart';
@@ -274,6 +276,9 @@ class PrefsController extends Notifier<Prefs> {
   Future<void> setWaveOnWifiOnly(bool value) =>
       _write(state.copyWith(waveOnWifiOnly: value));
 
+  Future<void> setRemixFilter(Set<RemixKind> value) =>
+      _write(state.copyWith(remixFilter: value));
+
   Future<void> setWaveSoundCloud(bool value) =>
       _write(state.copyWith(waveSoundCloud: value));
 }
@@ -282,15 +287,48 @@ final prefsProvider = NotifierProvider<PrefsController, Prefs>(
   PrefsController.new,
 );
 
-/// Обложка трека по локальному id — нужна для превью соседнего трека при
-/// свайпе в плеере, где под рукой только очередь из id.
-final trackCoverProvider = FutureProvider.autoDispose.family<String?, String>((
-  ref,
-  id,
-) async {
-  final track = await ref.watch(appServicesProvider).db.tracksDao.byId(id);
-  return track?.coverUrl;
-});
+/// Карточка трека по локальному id — превью соседнего трека при свайпе в
+/// плеере, где под рукой только очередь из id. Те же поля и та же обложка
+/// (у скачанного — файл с диска), что плеер покажет после переключения:
+/// иначе на стыке картинка мигала, а название появлялось с опозданием.
+final trackPreviewProvider = FutureProvider.autoDispose
+    .family<NowPlaying?, String>((ref, id) async {
+      final db = ref.watch(appServicesProvider).db;
+      final track = await db.tracksDao.byId(id);
+      if (track == null) return null;
+      final artists = await db.tracksDao.artistNamesOf(id);
+      final file = await db.streamsDao.downloadedFile(id);
+      final path = file?.coverPath;
+      final cover =
+          file != null &&
+              file.state == 'complete' &&
+              path != null &&
+              File(path).existsSync()
+          ? Uri.file(path).toString()
+          : track.coverUrl;
+      return NowPlaying(
+        localTrackId: id,
+        title: track.title.trim().isNotEmpty ? track.title : id,
+        artist: artists.join(', '),
+        coverUrl: cover,
+        explicitFlag: track.explicitFlag,
+      );
+    });
+
+/// Откуда трек, пока звук ещё не загружен: скачанный файл, иначе первый
+/// сервис из его вариантов (Яндекс в приоритете). Плашка источника в плеере
+/// показывает его сразу, в том числе у соседних треков при свайпе.
+final trackOriginProvider = FutureProvider.autoDispose
+    .family<SourceId?, String>((ref, id) async {
+      final db = ref.watch(appServicesProvider).db;
+      final file = await db.streamsDao.downloadedFile(id);
+      if (file != null && file.state == 'complete') return SourceId.local;
+      final sources = [
+        for (final v in await db.tracksDao.variantsOf(id)) v.ref.source,
+      ];
+      if (sources.contains(SourceId.yandex)) return SourceId.yandex;
+      return sources.firstOrNull;
+    });
 
 /// Полные строки очереди для шторки: номер, обложка, автор и длительность.
 final queueRowsProvider = FutureProvider.autoDispose
@@ -438,6 +476,8 @@ final collectionProvider = FutureProvider.autoDispose
 /// из карточек Яндекса фоном: `topArtists` не должен ждать десяток запросов.
 final topArtistsProvider = FutureProvider<List<ArtistPlaycount>>((ref) async {
   final db = ref.watch(appServicesProvider).db;
+  // После входа и первой синхронизации список меняется — пересчитываем.
+  ref.watch(yandexReadyProvider);
   final artists = await db.libraryDao.topArtists(limit: 12);
   final source = ref.watch(yandexSourceProvider);
   final missing = [
@@ -477,31 +517,16 @@ final trackLyricsProvider = FutureProvider.autoDispose.family<Lyrics, String>((
   ref,
   trackId,
 ) async {
-  final db = ref.watch(appServicesProvider).db;
-  final track = await db.tracksDao.byId(trackId);
-  if (track == null) return const Lyrics(lines: [], synced: false);
-  final artists = await db.tracksDao.artistNamesOf(trackId);
-  final variants = await db.tracksDao.variantsOf(trackId);
-  SourceTrack? yandexVariant;
-  for (final variant in variants) {
-    if (variant.ref.source == SourceId.yandex) {
-      yandexVariant = variant;
-      break;
-    }
+  final services = ref.watch(appServicesProvider);
+  // У скачанного трека текст лежит на диске: открывается и без интернета.
+  final offline = await OfflineLyrics.load(trackId);
+  if (offline != null) return offline;
+  final lyrics = await fetchTrackLyrics(services, trackId);
+  // Скачан раньше, чем появилось сохранение текста, — докладываем сейчас.
+  if (!lyrics.isEmpty && await OfflineLyrics.isDownloaded(services, trackId)) {
+    await OfflineLyrics.save(trackId, lyrics);
   }
-  final yandex = ref.watch(appServicesProvider).yandex;
-  Future<Lyrics?> Function()? official;
-  if (yandexVariant != null && yandex != null) {
-    final remoteId = yandexVariant.ref.remoteId;
-    official = () => yandex.lyrics(remoteId);
-  }
-  return LyricsService.shared.fetch(
-    title: track.title,
-    artist: artists.isEmpty ? '' : artists.first,
-    album: await db.tracksDao.albumTitleOf(trackId),
-    duration: Duration(seconds: track.durationSec),
-    official: official,
-  );
+  return lyrics;
 });
 
 /// Карточка исполнителя из Яндекса: фото, счётчики, популярные треки, альбомы.
@@ -616,7 +641,9 @@ final newReleasesPageProvider = FutureProvider.autoDispose<List<AlbumBrief>>((
 /// Чарт Яндекса: позиция и трек.
 final chartProvider = FutureProvider<List<ChartEntry>>((ref) async {
   final source = ref.watch(yandexSourceProvider);
-  if (source == null) return const [];
+  // До входа в аккаунт чарт приходил пустым и так и оставался в кэше до
+  // перезапуска. Подписка на готовность перезапрашивает его сразу после входа.
+  if (source == null || !ref.watch(yandexReadyProvider)) return const [];
   final entries = await source.chart();
   AppLogger.instance.info('чарт: ${entries.length} треков');
   final hideAi = ref.watch(prefsProvider.select((p) => p.hideAiTracks));
@@ -697,6 +724,10 @@ Future<List<ArtistPlaycount>> _safeArtists(Ref ref) async {
 final librarySyncProvider = FutureProvider<void>((ref) async {
   final services = ref.watch(appServicesProvider);
   final source = ref.watch(yandexSourceProvider);
+  // Вход в аккаунт перезапускает синхронизацию: на свежей установке она
+  // успевала отработать до входа, ничего не находила и молчала до
+  // перезапуска приложения — коллекция оставалась пустой.
+  ref.watch(yandexReadyProvider);
   if (source == null) return;
 
   // Ждём восстановления аккаунта: до него auth не ready, и импорт вернёт
@@ -707,6 +738,10 @@ final librarySyncProvider = FutureProvider<void>((ref) async {
     } on Object {
       return;
     }
+    // Аккаунт восстановился — провайдер уже перезапущен подпиской выше, и
+    // синхронизацию ведёт новый запуск. Без этой проверки старый шёл
+    // параллельно: лайки импортировались дважды.
+    if (!ref.mounted) return;
   }
   if (!source.auth.isReady) return;
 

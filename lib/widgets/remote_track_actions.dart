@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import 'expressive_loader.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_providers.dart';
@@ -119,11 +122,7 @@ class _RemoteTrackActionsState extends ConsumerState<RemoteTrackActions> {
         width: 36,
         height: 40,
         child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2.2),
-          ),
+          child: SizedBox(width: 18, height: 18, child: ExpressiveLoader()),
         ),
       );
     } else if (id == null) {

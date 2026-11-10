@@ -62,9 +62,13 @@ class TrackTile extends ConsumerWidget {
     final hasBadges = row.explicitFlag || isAi || uncensored;
     // Повтор трека в плейлисте даёт два одинаковых Hero-тега и падение при
     // переходе. Анимацию оставляем первой копии, остальным — обычную обложку.
+    // С мини-плеером обложка при сворачивании плеера летит в него, а не в
+    // строку списка: раньше она улетала в выбранный трек посреди экрана.
+    final miniPlayer = ref.watch(prefsProvider.select((p) => p.showMiniPlayer));
     final heroTag =
-        queue.indexWhere((item) => item.localTrackId == row.localTrackId) ==
-            index
+        !miniPlayer &&
+            queue.indexWhere((item) => item.localTrackId == row.localTrackId) ==
+                index
         ? coverHeroTag(row.localTrackId)
         : null;
     final cover = TrackCover(url: row.coverPath ?? row.coverUrl, size: 52);

@@ -884,6 +884,12 @@ abstract class AppLocalizations {
   /// **'Импортировать плейлисты из Яндекса'**
   String get collectionImportPlaylists;
 
+  /// No description provided for @collectionImporting.
+  ///
+  /// In ru, this message translates to:
+  /// **'Загружаю лайки и плейлисты из Яндекса…'**
+  String get collectionImporting;
+
   /// No description provided for @collectionImportedLikes.
   ///
   /// In ru, this message translates to:
@@ -2570,6 +2576,72 @@ abstract class AppLocalizations {
   /// **'Крути и выбирай режим'**
   String get waveWheelHint;
 
+  /// No description provided for @remixFilterTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Без перезаливов'**
+  String get remixFilterTitle;
+
+  /// No description provided for @remixFilterOff.
+  ///
+  /// In ru, this message translates to:
+  /// **'Волна играет всё подряд'**
+  String get remixFilterOff;
+
+  /// No description provided for @remixFilterOn.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скрыто видов: {count}'**
+  String remixFilterOn(int count);
+
+  /// No description provided for @remixFilterAll.
+  ///
+  /// In ru, this message translates to:
+  /// **'Все'**
+  String get remixFilterAll;
+
+  /// No description provided for @remixFilterNone.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сбросить'**
+  String get remixFilterNone;
+
+  /// No description provided for @remixSlowed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Slowed + reverb'**
+  String get remixSlowed;
+
+  /// No description provided for @remixSpedUp.
+  ///
+  /// In ru, this message translates to:
+  /// **'Sped up'**
+  String get remixSpedUp;
+
+  /// No description provided for @remixNightcore.
+  ///
+  /// In ru, this message translates to:
+  /// **'Nightcore'**
+  String get remixNightcore;
+
+  /// No description provided for @remixBassBoost.
+  ///
+  /// In ru, this message translates to:
+  /// **'Bass boosted'**
+  String get remixBassBoost;
+
+  /// No description provided for @remix8d.
+  ///
+  /// In ru, this message translates to:
+  /// **'8D'**
+  String get remix8d;
+
+  /// No description provided for @remixMylancore.
+  ///
+  /// In ru, this message translates to:
+  /// **'Mylancore'**
+  String get remixMylancore;
+
   /// No description provided for @waveBackToUsual.
   ///
   /// In ru, this message translates to:
@@ -3008,6 +3080,12 @@ abstract class AppLocalizations {
   /// **'Хранится только на телефоне. Трек засчитывается после 30 секунд'**
   String get statsCollectNote;
 
+  /// No description provided for @stats1d.
+  ///
+  /// In ru, this message translates to:
+  /// **'День'**
+  String get stats1d;
+
   /// No description provided for @stats7d.
   ///
   /// In ru, this message translates to:
@@ -3055,6 +3133,12 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'По дням'**
   String get statsByDay;
+
+  /// No description provided for @statsByHour.
+  ///
+  /// In ru, this message translates to:
+  /// **'По часам за сегодня'**
+  String get statsByHour;
 
   /// No description provided for @statsTopTracks.
   ///

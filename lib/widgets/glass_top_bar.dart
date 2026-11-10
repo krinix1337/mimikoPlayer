@@ -90,7 +90,7 @@ class GlassTopBar extends StatelessWidget {
                     child: IgnorePointer(
                       child: ClipRect(
                         child: useBlur
-                            ? BackdropFilter(
+                            ? BackdropFilter.grouped(
                                 filter: ui.ImageFilter.blur(
                                   sigmaX: sigma,
                                   sigmaY: sigma,

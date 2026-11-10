@@ -74,7 +74,9 @@ class _ScrollActivityTrackerState extends State<ScrollActivityTracker> {
       _markActive();
     } else if (notification is ScrollEndNotification) {
       _idle?.cancel();
-      _idle = Timer(const Duration(milliseconds: 140), _markIdle);
+      // Чуть дольше ждём после остановки: между двумя быстрыми свайпами
+      // стекло не успевает дёрнуться туда-обратно.
+      _idle = Timer(const Duration(milliseconds: 320), _markIdle);
     }
     return false;
   }

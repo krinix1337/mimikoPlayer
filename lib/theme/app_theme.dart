@@ -21,7 +21,11 @@ class AppTheme {
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: scheme.surface,
-      splashFactory: InkSparkle.splashFactory,
+      // Sparkle на телефоне почти не видно: казалось, что тап не попал.
+      // Обычная волна заметнее, а подсветка держится, пока палец на кнопке.
+      splashFactory: InkRipple.splashFactory,
+      splashColor: scheme.primary.withValues(alpha: 0.16),
+      highlightColor: scheme.onSurface.withValues(alpha: 0.08),
       disabledColor: scheme.onSurface.withValues(alpha: 0.38),
       textTheme: text,
       primaryTextTheme: text,
@@ -33,6 +37,10 @@ class AppTheme {
       ),
       iconTheme: IconThemeData(color: scheme.onSurfaceVariant, size: 24),
       progressIndicatorTheme: ProgressIndicatorThemeData(
+        // Индикатор M3 Expressive: скруглённые концы и зазор между дорожкой
+        // и заполнением, как у слайдера.
+        // ignore: deprecated_member_use
+        year2023: false,
         color: scheme.primary,
         linearTrackColor: scheme.surfaceContainerHighest,
         circularTrackColor: Colors.transparent,
@@ -94,16 +102,21 @@ class AppTheme {
             borderRadius: BorderRadius.circular(radius),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          minimumSize: const Size(64, 52),
           textStyle: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           animationDuration: prefs.scaleMs(200),
         ),
       ),
+      // Та же высота, отступы и шрифт, что у FilledButton: «Играть всё» и
+      // «Перемешать» стоят рядом и должны быть одного размера.
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radius),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          minimumSize: const Size(64, 52),
+          textStyle: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           side: BorderSide(color: scheme.outlineVariant, width: 1),
           foregroundColor: scheme.onSurface,
           animationDuration: prefs.scaleMs(200),
@@ -231,7 +244,9 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radius),
         ),
-        width: 420,
+        // Без фиксированной ширины: 420 больше экрана телефона, и уведомление
+        // растягивалось от края до края без полей.
+        insetPadding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: scheme.surfaceContainerHigh,

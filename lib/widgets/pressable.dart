@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_motion.dart';
 
@@ -11,12 +12,16 @@ class PressableScale extends StatefulWidget {
     this.onTap,
     this.onLongPress,
     this.minScale = 0.94,
+    this.haptic = true,
   });
 
   final Widget child;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final double minScale;
+
+  /// Короткий отклик вибрацией: палец чувствует, что попал.
+  final bool haptic;
 
   @override
   State<PressableScale> createState() => _PressableScaleState();
@@ -47,6 +52,11 @@ class _PressableScaleState extends State<PressableScale>
     }
   }
 
+  void _tap() {
+    if (widget.haptic) HapticFeedback.selectionClick();
+    widget.onTap?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final motion = Motion.of(context);
@@ -67,15 +77,70 @@ class _PressableScaleState extends State<PressableScale>
     );
   }
 
-  Widget _gesture({required Widget child}) => GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    onTap: widget.onTap,
-    onLongPress: widget.onLongPress,
-    onTapDown: (_) => _setPressed(true),
-    onTapUp: (_) => _setPressed(false),
-    onTapCancel: () => _setPressed(false),
-    child: child,
+  Offset? _down;
+
+  /// Нажатие рисуем по сырому касанию, а не по onTapDown: в прокручиваемых
+  /// списках Flutter придерживает onTapDown ~100 мс, чтобы отличить тап от
+  /// прокрутки, и кнопка реагировала заметно позже пальца. Если палец
+  /// поехал — это прокрутка, отпускаем.
+  Widget _gesture({required Widget child}) => Listener(
+    onPointerDown: (event) {
+      if (widget.onTap == null && widget.onLongPress == null) return;
+      _down = event.position;
+      _setPressed(true);
+    },
+    onPointerMove: (event) {
+      final down = _down;
+      if (down != null && (event.position - down).distance > 12) {
+        _down = null;
+        _setPressed(false);
+      }
+    },
+    onPointerUp: (_) {
+      _down = null;
+      _setPressed(false);
+    },
+    onPointerCancel: (_) {
+      _down = null;
+      _setPressed(false);
+    },
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap == null ? null : _tap,
+      onLongPress: widget.onLongPress,
+      child: child,
+    ),
   );
+}
+
+/// Иконка, которая не прыгает, а перетекает: старая сжимается с поворотом,
+/// новая выпрыгивает с недобоем. Для play/pause, лайка и похожих кнопок.
+class MorphIcon extends StatelessWidget {
+  const MorphIcon(this.icon, {super.key, this.size, this.color});
+
+  final IconData icon;
+  final double? size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final motion = Motion.of(context);
+    final child = Icon(icon, key: ValueKey(icon), size: size, color: color);
+    if (!motion.enabled) return child;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 260),
+      switchInCurve: Curves.easeOutBack,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) => ScaleTransition(
+        scale: Tween(begin: 0.4, end: 1.0).animate(animation),
+        child: RotationTransition(
+          turns: Tween(begin: -0.12, end: 0.0).animate(animation),
+          child: FadeTransition(opacity: animation, child: child),
+        ),
+      ),
+      child: child,
+    );
+  }
 }
 
 /// Появление блока: снизу вверх с затуханием. Для секций коллекции и карточек.

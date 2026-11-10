@@ -10,6 +10,36 @@ import '../database.dart';
 class LibraryDao {
   LibraryDao(this._db);
 
+  static final _genre = RegExp(r'"genre"\s*:\s*"([^"]+)"');
+
+  /// Жанр и источники треков — для фильтра коллекции. Жанр берётся из
+  /// карточки Яндекса (жанр альбома); JSON не разбираем целиком, а достаём
+  /// поле регуляркой: на тысяче лайков полный разбор подтормаживал экран.
+  Future<Map<String, TrackFacet>> trackFacets(List<String> ids) async {
+    if (ids.isEmpty) return const {};
+    final out = <String, TrackFacet>{};
+    for (var i = 0; i < ids.length; i += 500) {
+      final chunk = ids.sublist(i, (i + 500).clamp(0, ids.length));
+      final rows = await (_db.select(
+        _db.remoteIdMappings,
+      )..where((t) => t.localTrackId.isIn(chunk))).get();
+      for (final row in rows) {
+        final prev = out[row.localTrackId];
+        final source = SourceId.fromWire(row.source);
+        final genre =
+            prev?.genre ??
+            (row.remoteJson == null
+                ? null
+                : _genre.firstMatch(row.remoteJson!)?.group(1));
+        out[row.localTrackId] = TrackFacet(
+          genre: genre,
+          sources: {...?prev?.sources, source},
+        );
+      }
+    }
+    return out;
+  }
+
   final AppDatabase _db;
 
   /// state: 1 лайк, -1 дизлайк, 0 — снять отметку.
@@ -811,6 +841,14 @@ final class _PlaylistEntry {
 
   final String localTrackId;
   final SourceTrack track;
+}
+
+/// Жанр трека (код Яндекса, например `rusrap`) и откуда он в коллекции.
+final class TrackFacet {
+  const TrackFacet({this.genre, this.sources = const {}});
+
+  final String? genre;
+  final Set<SourceId> sources;
 }
 
 /// Строка списка коллекции: трек + то, что реально видно в строке.

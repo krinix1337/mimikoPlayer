@@ -47,13 +47,19 @@ class HistoryDao {
 
   /// Треки, которые действительно слушали (не пролистали в первые секунды):
   /// волна не предлагает их снова сразу после запуска.
-  Future<Set<String>> recentlyHeardIds({int limit = 150}) async {
+  /// [minPlayedMs] — сколько трек должен был играть, чтобы считаться
+  /// услышанным. Волне хватает и нескольких секунд: пропущенный трек тоже
+  /// не должен возвращаться после перезапуска или смены режима.
+  Future<Set<String>> recentlyHeardIds({
+    int limit = 150,
+    int minPlayedMs = 20000,
+  }) async {
     final rows =
         await (_db.select(_db.history)
               ..where(
                 (t) =>
                     t.completed.equals(true) |
-                    t.playedMs.isBiggerOrEqualValue(20000),
+                    t.playedMs.isBiggerOrEqualValue(minPlayedMs),
               )
               ..orderBy([(t) => OrderingTerm.desc(t.playedAt)])
               ..limit(limit))

@@ -439,6 +439,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get collectionImportPlaylists => 'Import playlists from Yandex';
 
   @override
+  String get collectionImporting =>
+      'Importing likes and playlists from Yandex…';
+
+  @override
   String collectionImportedLikes(int count) {
     return 'Liked tracks in collection: $count';
   }
@@ -1380,6 +1384,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get waveWheelHint => 'Spin and choose a mode';
 
   @override
+  String get remixFilterTitle => 'No re-uploads';
+
+  @override
+  String get remixFilterOff => 'The wave plays everything';
+
+  @override
+  String remixFilterOn(int count) {
+    return 'Hidden kinds: $count';
+  }
+
+  @override
+  String get remixFilterAll => 'All';
+
+  @override
+  String get remixFilterNone => 'Reset';
+
+  @override
+  String get remixSlowed => 'Slowed + reverb';
+
+  @override
+  String get remixSpedUp => 'Sped up';
+
+  @override
+  String get remixNightcore => 'Nightcore';
+
+  @override
+  String get remixBassBoost => 'Bass boosted';
+
+  @override
+  String get remix8d => '8D';
+
+  @override
+  String get remixMylancore => 'Mylancore';
+
+  @override
   String get waveBackToUsual => 'Back to usual';
 
   @override
@@ -1625,6 +1664,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Stored only on this phone. A track counts after 30 seconds';
 
   @override
+  String get stats1d => 'Day';
+
+  @override
   String get stats7d => '7 days';
 
   @override
@@ -1647,6 +1689,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statsByDay => 'By day';
+
+  @override
+  String get statsByHour => 'By hour today';
 
   @override
   String get statsTopTracks => 'Top tracks';

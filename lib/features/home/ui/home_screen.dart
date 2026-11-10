@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app_providers.dart';
+import '../../../core/content/remix_filter.dart';
 import '../../../core/prefs/prefs.dart';
 import '../../../features/downloads/download_service.dart';
 import '../../../features/library/library_actions.dart';
@@ -16,6 +17,7 @@ import '../../../theme/blur_settings.dart';
 import '../../../wave_providers.dart';
 import '../../../widgets/expressive_shapes.dart';
 import '../../../widgets/pressable.dart';
+import '../../../widgets/select_pill.dart';
 import '../../../widgets/track_cover.dart';
 import '../wave_mode_label.dart';
 import '../../../widgets/expressive_loader.dart';
@@ -268,7 +270,8 @@ class _WaveModePill extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          GestureDetector(
+          PressableScale(
+            minScale: 0.8,
             onTap: onClear,
             child: Container(
               width: 24,
@@ -313,68 +316,116 @@ class _WaveStage extends ConsumerWidget {
       playerSnapshotProviderValue.select((s) => s.current != null),
     );
 
-    if (!hasTrack) {
-      return Tooltip(
-        message: busy ? l.commonLoading : l.waveStart,
-        child: SizedBox(
-          width: 116,
-          height: 116,
-          child: PressableScale(
-            minScale: 0.9,
-            onTap: busy ? null : onStart,
-            child: AnimatedContainer(
-              duration: motion.morph,
-              curve: Curves.easeOutBack,
-              decoration: BoxDecoration(
-                color: busy ? scheme.surfaceContainerHigh : scheme.primary,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: scheme.primary.withValues(alpha: busy ? 0 : 0.35),
-                    blurRadius: 34,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: busy
-                  ? Padding(
-                      padding: const EdgeInsets.all(34),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        color: scheme.onPrimary,
-                      ),
-                    )
-                  : Icon(
-                      Icons.play_arrow_rounded,
-                      size: 58,
-                      color: scheme.onPrimary,
-                    ),
-            ),
+    final Widget stage = !hasTrack
+        ? _startButton(context, l, scheme, motion)
+        : _coverStage(context, scheme, motion);
+    if (!motion.enabled) return stage;
+    // Запуск волны: кнопка уходит в точку, а обложка вырастает из неё с
+    // лёгким поворотом — видно, что тап сработал и музыка пошла.
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 520),
+      reverseDuration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutBack,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: CurvedAnimation(
+          parent: animation,
+          curve: const Interval(0, 0.6),
+        ),
+        child: ScaleTransition(
+          scale: Tween(begin: 0.55, end: 1.0).animate(animation),
+          child: RotationTransition(
+            turns: Tween(begin: -0.04, end: 0.0).animate(animation),
+            child: child,
           ),
         ),
-      );
-    }
+      ),
+      child: KeyedSubtree(key: ValueKey(hasTrack), child: stage),
+    );
+  }
 
+  Widget _startButton(
+    BuildContext context,
+    AppLocalizations l,
+    ColorScheme scheme,
+    Motion motion,
+  ) {
+    return Tooltip(
+      message: busy ? l.commonLoading : l.waveStart,
+      child: SizedBox(
+        width: 116,
+        height: 116,
+        child: PressableScale(
+          minScale: 0.9,
+          onTap: busy ? null : onStart,
+          child: AnimatedContainer(
+            duration: motion.morph,
+            curve: Curves.easeOutBack,
+            decoration: BoxDecoration(
+              color: busy ? scheme.surfaceContainerHigh : scheme.primary,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: scheme.primary.withValues(alpha: busy ? 0 : 0.35),
+                  blurRadius: 34,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: busy
+                ? Padding(
+                    padding: const EdgeInsets.all(34),
+                    child: ExpressiveLoader(color: scheme.onPrimary),
+                  )
+                : Icon(
+                    Icons.play_arrow_rounded,
+                    size: 58,
+                    color: scheme.onPrimary,
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _coverStage(BuildContext context, ColorScheme scheme, Motion motion) {
     // Вся обложка ведёт в плеер: отдельной кнопки поверх картинки нет.
     // Обложка квадратная со скруглением, как в плеере и карточках.
-    return GestureDetector(
+    // Смена трека — мягкий перелив обложки, а не мгновенная подмена.
+    final art = cover == null
+        ? Container(
+            key: const ValueKey('none'),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(32),
+            ),
+            child: Icon(
+              Icons.music_note_rounded,
+              size: 64,
+              color: scheme.onSurfaceVariant,
+            ),
+          )
+        : TrackCover(key: ValueKey(cover), url: cover, size: 232, radius: 32);
+    return PressableScale(
+      minScale: 0.96,
       onTap: () => openPlayer(context),
       child: SizedBox(
         width: 232,
         height: 232,
-        child: cover == null
-            ? Container(
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(32),
+        child: !motion.enabled
+            ? art
+            : AnimatedSwitcher(
+                duration: const Duration(milliseconds: 380),
+                switchInCurve: Curves.easeOutCubic,
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(
+                    scale: Tween(begin: 0.92, end: 1.0).animate(animation),
+                    child: child,
+                  ),
                 ),
-                child: Icon(
-                  Icons.music_note_rounded,
-                  size: 64,
-                  color: scheme.onSurfaceVariant,
-                ),
-              )
-            : TrackCover(url: cover, size: 232, radius: 32),
+                child: art,
+              ),
       ),
     );
   }
@@ -427,8 +478,8 @@ class _WaveControls extends ConsumerWidget {
           ],
           Expanded(
             // Тап по плашке трека открывает полный плеер, как мини-плеер.
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
+            child: PressableScale(
+              minScale: 0.97,
               onTap: current == null ? null : () => openPlayer(context),
               child: Container(
                 clipBehavior: Clip.antiAlias,
@@ -593,7 +644,7 @@ class _RoundAction extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: motion.morph,
-          curve: Curves.elasticOut,
+          curve: Curves.easeOutBack,
           width: 56,
           height: 56,
           decoration: BoxDecoration(
@@ -604,7 +655,7 @@ class _RoundAction extends StatelessWidget {
                 : scheme.surfaceContainerHighest.withValues(alpha: 0.72),
             borderRadius: BorderRadius.circular(round ? 28 : 16),
           ),
-          child: Icon(
+          child: MorphIcon(
             icon,
             size: 28,
             color: primary
@@ -800,6 +851,8 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            const SizedBox(height: 14),
+            const _RemixFilterBlock(),
             if (_note != null) ...[
               const SizedBox(height: 8),
               Text(_note!, style: theme.textTheme.bodySmall),
@@ -822,7 +875,7 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: ExpressiveLoader(),
                           )
                         : const Icon(Icons.play_arrow_rounded, size: 26),
                     label: Text(l.waveListen),
@@ -878,6 +931,86 @@ class _WaveSettingsSheetState extends ConsumerState<_WaveSettingsSheet> {
   }
 }
 
+/// «Без перезаливов»: чипсы slowed / sped up / nightcore… Выбор сохраняется
+/// сразу и действует на следующую пачку волны.
+class _RemixFilterBlock extends ConsumerWidget {
+  const _RemixFilterBlock();
+
+  static IconData _icon(RemixKind kind) => switch (kind) {
+    RemixKind.slowed => Icons.slow_motion_video_rounded,
+    RemixKind.spedUp => Icons.fast_forward_rounded,
+    RemixKind.nightcore => Icons.nightlight_round,
+    RemixKind.bassBoost => Icons.graphic_eq_rounded,
+    RemixKind.eightD => Icons.surround_sound_rounded,
+    RemixKind.mylancore => Icons.cloud_queue_rounded,
+  };
+
+  static String _label(AppLocalizations l, RemixKind kind) => switch (kind) {
+    RemixKind.slowed => l.remixSlowed,
+    RemixKind.spedUp => l.remixSpedUp,
+    RemixKind.nightcore => l.remixNightcore,
+    RemixKind.bassBoost => l.remixBassBoost,
+    RemixKind.eightD => l.remix8d,
+    RemixKind.mylancore => l.remixMylancore,
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l = AppLocalizations.of(context);
+    final enabled = ref.watch(prefsProvider.select((p) => p.remixFilter));
+    final notifier = ref.read(prefsProvider.notifier);
+
+    // Спокойная карточка без перекраски целиком: выбор виден по самим
+    // пилюлям, а не по фону блока, который раньше мигал оттенком.
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l.remixFilterTitle, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 2),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: Text(
+              enabled.isEmpty
+                  ? l.remixFilterOff
+                  : l.remixFilterOn(enabled.length),
+              key: ValueKey(enabled.length),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final kind in RemixKind.values)
+                SelectPill(
+                  icon: _icon(kind),
+                  label: _label(l, kind),
+                  selected: enabled.contains(kind),
+                  onTap: () => notifier.setRemixFilter(
+                    enabled.contains(kind)
+                        ? {...enabled.where((k) => k != kind)}
+                        : {...enabled, kind},
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _WaveModeOption {
   const _WaveModeOption({
     required this.label,
@@ -930,7 +1063,7 @@ class _ModeCard extends StatelessWidget {
           scale: 1 - 0.08 * delta.clamp(0.0, 2.0),
           child: Opacity(
             opacity: (1 - 0.22 * delta).clamp(0.25, 1.0),
-            child: GestureDetector(
+            child: PressableScale(
               onTap: onTap,
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),

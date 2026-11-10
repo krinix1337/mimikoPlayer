@@ -4,6 +4,7 @@ import 'core/db/database.dart';
 import 'core/content/ai_filter.dart';
 import 'core/content/artist_blocklist.dart';
 import 'core/content/censor_base.dart';
+import 'core/content/remix_filter.dart';
 import 'core/prefs/prefs_store.dart';
 import 'core/sources/registry.dart';
 import 'core/sources/stream_resolver.dart';
@@ -77,6 +78,7 @@ class AppServices {
     collectStats = prefs.collectStats;
     localeCode = prefs.localeCode;
     hideAiTracks = prefs.hideAiTracks;
+    RemixFilter.instance.enabled = prefs.remixFilter;
     eqEnabled = prefs.eqEnabled;
     eqPreset = prefs.eqPreset;
     eqCustomGains = prefs.eqCustomGains;

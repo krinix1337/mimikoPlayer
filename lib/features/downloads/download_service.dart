@@ -19,6 +19,7 @@ import '../../core/sources/source_id.dart';
 import '../../core/sources/stream_resolver.dart';
 import '../../core/sources/stream_target.dart';
 import 'download_scheduler.dart';
+import 'offline_lyrics.dart';
 
 /// Скачивание трека для офлайна: берём уже подписанный резолвером URL,
 /// кладём файл в приватный каталог приложения и пишем строку в
@@ -137,6 +138,9 @@ class DownloadService {
           'download done $localTrackId ${audio.bytes} bytes ${audio.path}',
         );
         onProgress?.call(1);
+        // Текст — после отметки «скачано»: трек уже считается готовым, а
+        // сбой или обрыв на тексте не оставляет загрузку незавершённой.
+        await _saveLyrics(localTrackId);
         return;
       } on DioException catch (error) {
         final code = error.response?.statusCode;
@@ -437,7 +441,23 @@ class DownloadService {
     if (await temp.exists()) await temp.delete();
     final cover = File(p.join(dir.path, 'covers', '$localTrackId.jpg'));
     if (await cover.exists()) await cover.delete();
+    await OfflineLyrics.delete(localTrackId);
     await _services.db.streamsDao.removeDownload(localTrackId);
+  }
+
+  /// Текст сохраняем вместе с треком. Его может не быть вовсе, и тогда
+  /// загрузка всё равно считается удачной.
+  Future<void> _saveLyrics(String localTrackId) async {
+    try {
+      if (await OfflineLyrics.load(localTrackId) != null) return;
+      final lyrics = await fetchTrackLyrics(
+        _services,
+        localTrackId,
+      ).timeout(const Duration(seconds: 25));
+      await OfflineLyrics.save(localTrackId, lyrics);
+    } on Object catch (error) {
+      AppLogger.instance.warn('текст для офлайна не скачался: $error');
+    }
   }
 
   /// Обложка нужна только для офлайн-списка: ошибка картинки не должна

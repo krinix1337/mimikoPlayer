@@ -78,6 +78,23 @@ class _MimikoAppState extends ConsumerState<MimikoApp>
     });
   }
 
+  Future<void> _afterSignIn() async {
+    try {
+      await ref.read(librarySyncProvider.future);
+    } on Object {
+      // Без сети синхронизация повторится при следующем запуске.
+    }
+    if (!mounted) return;
+    ref.invalidate(collectionProvider);
+    ref.invalidate(playlistsProvider);
+    ref.invalidate(topArtistsProvider);
+    unawaited(ref.read(playlistSyncProvider.notifier).refresh());
+    unawaited(
+      ref.read(collectionWarmupProvider.future).catchError((Object _) {}),
+    );
+    await ref.read(downloadControllerProvider.notifier).kickAutoDownloads();
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -126,6 +143,12 @@ class _MimikoAppState extends ConsumerState<MimikoApp>
     // Прогрев обзора: подписка нужна, чтобы провайдер перезапустился, когда
     // восстановится аккаунт. Без неё новинки грузятся только при открытии.
     ref.watch(discoverWarmupProvider);
+    // Первый вход в аккаунт (или повторный после выхода): коллекцию,
+    // плейлисты и автозагрузку запускаем сразу, а не после перезапуска.
+    ref.listen<bool>(yandexReadyProvider, (previous, ready) {
+      if (!ready || previous == true) return;
+      unawaited(_afterSignIn());
+    });
 
     if (!kKeyboardTestTheme && prefs.palette != AppPalette.dynamic) {
       return _app(prefs, null, null);
@@ -184,7 +207,9 @@ class _MimikoAppState extends ConsumerState<MimikoApp>
             children: [
               _AppReveal(
                 delayed: prefs.animations != AnimationsSpeed.off,
-                child: child ?? const SizedBox(),
+                // Стеклянные панели делят один снимок подложки: раньше каждая
+                // снимала экран отдельно, и GPU не укладывался в кадр на 120 Гц.
+                child: BackdropGroup(child: child ?? const SizedBox()),
               ),
               _LaunchSplash(
                 enabled: prefs.animations != AnimationsSpeed.off,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/pressable.dart';
+
 /// Минимальный Markdown для описаний релизов: заголовки, списки, код,
 /// жирный/курсив и ссылки. Полный парсер ради changelog'а не нужен.
 class ReleaseNotes extends StatelessWidget {
@@ -200,7 +202,7 @@ class _ZoomableImage extends StatelessWidget {
   );
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget build(BuildContext context) => PressableScale(
     onTap: () => Navigator.of(context, rootNavigator: true).push(
       PageRouteBuilder<void>(
         opaque: false,

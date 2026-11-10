@@ -442,6 +442,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get collectionImportPlaylists => 'Импортировать плейлисты из Яндекса';
 
   @override
+  String get collectionImporting => 'Загружаю лайки и плейлисты из Яндекса…';
+
+  @override
   String collectionImportedLikes(int count) {
     return 'Лайков в коллекции: $count';
   }
@@ -1383,6 +1386,41 @@ class AppLocalizationsRu extends AppLocalizations {
   String get waveWheelHint => 'Крути и выбирай режим';
 
   @override
+  String get remixFilterTitle => 'Без перезаливов';
+
+  @override
+  String get remixFilterOff => 'Волна играет всё подряд';
+
+  @override
+  String remixFilterOn(int count) {
+    return 'Скрыто видов: $count';
+  }
+
+  @override
+  String get remixFilterAll => 'Все';
+
+  @override
+  String get remixFilterNone => 'Сбросить';
+
+  @override
+  String get remixSlowed => 'Slowed + reverb';
+
+  @override
+  String get remixSpedUp => 'Sped up';
+
+  @override
+  String get remixNightcore => 'Nightcore';
+
+  @override
+  String get remixBassBoost => 'Bass boosted';
+
+  @override
+  String get remix8d => '8D';
+
+  @override
+  String get remixMylancore => 'Mylancore';
+
+  @override
   String get waveBackToUsual => 'Обычная волна';
 
   @override
@@ -1627,6 +1665,9 @@ class AppLocalizationsRu extends AppLocalizations {
       'Хранится только на телефоне. Трек засчитывается после 30 секунд';
 
   @override
+  String get stats1d => 'День';
+
+  @override
   String get stats7d => '7 дней';
 
   @override
@@ -1649,6 +1690,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get statsByDay => 'По дням';
+
+  @override
+  String get statsByHour => 'По часам за сегодня';
 
   @override
   String get statsTopTracks => 'Топ треков';

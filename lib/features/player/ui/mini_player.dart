@@ -9,6 +9,7 @@ import '../../../theme/app_motion.dart';
 import '../../../theme/blur_settings.dart';
 import '../../../theme/keyboard_theme.dart';
 import '../../../theme/surface.dart';
+import '../../../widgets/pressable.dart';
 import '../../../widgets/track_cover.dart';
 import '../../../widgets/wavy_slider.dart';
 
@@ -33,11 +34,9 @@ class MiniPlayer extends ConsumerWidget {
     final current = snapshot.$1;
     final motion = Motion.of(context);
     if (current == null || hidden) {
-      return AnimatedSize(
-        duration: motion.morph,
-        curve: Curves.easeOutCubic,
-        alignment: Alignment.bottomCenter,
-        child: const SizedBox(width: double.infinity),
+      return _switch(
+        motion,
+        const SizedBox(key: ValueKey('none'), width: double.infinity),
       );
     }
 
@@ -50,114 +49,121 @@ class MiniPlayer extends ConsumerWidget {
     final compact = ref.watch(prefsProvider.select((p) => p.compactUi));
     final side = compact ? 16.0 : 12.0;
 
-    return AnimatedSize(
-      duration: motion.morph,
-      curve: Curves.easeOutCubic,
-      alignment: Alignment.bottomCenter,
-      child: TweenAnimationBuilder<double>(
-        // Пилюля выезжает из-за навигации и проявляется: без этого слот
-        // просто вырастал полоской.
-        tween: Tween(begin: 0, end: 1),
-        duration: motion.morph,
-        curve: Curves.easeOutCubic,
-        builder: (context, t, child) => Opacity(
-          opacity: t,
-          child: Transform.translate(
-            offset: Offset(0, (1 - t) * 28),
-            child: child,
+    return _switch(
+      motion,
+      KeyedSubtree(
+        key: const ValueKey('pill'),
+        child: TweenAnimationBuilder<double>(
+          // Пилюля выезжает из-за навигации и проявляется: без этого слот
+          // просто вырастал полоской.
+          tween: Tween(begin: 0, end: 1),
+          duration: motion.morph,
+          curve: Curves.easeOutCubic,
+          builder: (context, t, child) => Opacity(
+            opacity: t,
+            child: Transform.translate(
+              offset: Offset(0, (1 - t) * 28),
+              child: child,
+            ),
           ),
-        ),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(side, 6, side, 4),
-          child: AppSurface(
-            radius: kKeyboardTestTheme ? 28 : radius,
-            // С размытием пилюля прозрачнее, без него — плотная: иначе
-            // белый текст трека просвечивает сквозь неё.
-            color: kKeyboardTestTheme
-                ? scheme.surfaceContainerHigh
-                : scheme.surfaceContainerHigh.withValues(
-                    alpha: currentBlur.hasBottom ? 0.7 : 0.98,
-                  ),
-            shadow: false,
-            child: GestureDetector(
-              // Свайп вверх по пилюле разворачивает плеер — до кнопки в
-              // углу экрана не нужно тянуться.
-              onVerticalDragEnd: (details) {
-                if ((details.primaryVelocity ?? 0) < -250) openPlayer(context);
-              },
-              child: InkWell(
-                onTap: () => openPlayer(context),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      // Фиксированная высота: обложка, две строки и кнопки считаются
-                      // от одной оси, поэтому строка не «плавает» по вертикали.
-                      height: 64,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            TrackCover(
-                              url: current.coverUrl,
-                              size: 44,
-                              radius: 12,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: Text(
-                                          current.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: theme.textTheme.titleMedium,
-                                        ),
-                                      ),
-                                      _MiniDownloadPin(
-                                        trackId: current.localTrackId,
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    snapshot.$3
-                                        ? l.commonLoading
-                                        : current.artist,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(side, 6, side, 4),
+            child: AppSurface(
+              radius: kKeyboardTestTheme ? 28 : radius,
+              // С размытием пилюля прозрачнее, без него — плотная: иначе
+              // белый текст трека просвечивает сквозь неё.
+              color: kKeyboardTestTheme
+                  ? scheme.surfaceContainerHigh
+                  : scheme.surfaceContainerHigh.withValues(
+                      alpha: currentBlur.hasBottom ? 0.7 : 0.98,
+                    ),
+              shadow: false,
+              child: GestureDetector(
+                // Свайп вверх по пилюле разворачивает плеер — до кнопки в
+                // углу экрана не нужно тянуться.
+                onVerticalDragEnd: (details) {
+                  if ((details.primaryVelocity ?? 0) < -250) {
+                    openPlayer(context);
+                  }
+                },
+                child: InkWell(
+                  onTap: () => openPlayer(context),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        // Фиксированная высота: обложка, две строки и кнопки считаются
+                        // от одной оси, поэтому строка не «плавает» по вертикали.
+                        height: 64,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Без Hero: перелёт обложки в пилюлю при закрытии
+                              // плеера шёл снизу экрана и дёргал обложку, когда
+                              // пилюля уезжала.
+                              TrackCover(
+                                url: current.coverUrl,
+                                size: 44,
+                                radius: 12,
                               ),
-                            ),
-                            _TinyButton(
-                              tooltip: snapshot.$2
-                                  ? l.commonPause
-                                  : l.commonPlay,
-                              icon: snapshot.$2
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              onPressed: controller.togglePlay,
-                            ),
-                            _TinyButton(
-                              tooltip: l.commonNext,
-                              icon: Icons.skip_next_rounded,
-                              onPressed: controller.skipNext,
-                            ),
-                          ],
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            current.title,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: theme.textTheme.titleMedium,
+                                          ),
+                                        ),
+                                        _MiniDownloadPin(
+                                          trackId: current.localTrackId,
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      snapshot.$3
+                                          ? l.commonLoading
+                                          : current.artist,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: scheme.onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              _TinyButton(
+                                tooltip: snapshot.$2
+                                    ? l.commonPause
+                                    : l.commonPlay,
+                                icon: snapshot.$2
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
+                                onPressed: controller.togglePlay,
+                              ),
+                              _TinyButton(
+                                tooltip: l.commonNext,
+                                icon: Icons.skip_next_rounded,
+                                onPressed: controller.skipNext,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    const _MiniProgress(),
-                  ],
+                      const _MiniProgress(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -166,6 +172,39 @@ class MiniPlayer extends ConsumerWidget {
       ),
     );
   }
+
+  /// Появление и уход одной анимацией: пилюля съезжает за навигацию и
+  /// гаснет. Раньше при уходе (переход на волну) содержимое пропадало
+  /// мгновенно, а анимировалась только пустая высота — выглядело как рывок.
+  static Widget _switch(Motion motion, Widget child) => AnimatedSize(
+    duration: motion.morph,
+    curve: Curves.easeOutCubic,
+    alignment: Alignment.bottomCenter,
+    child: AnimatedSwitcher(
+      duration: motion.morph,
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      layoutBuilder: (current, previous) => Stack(
+        alignment: Alignment.bottomCenter,
+        children: [...previous, ?current],
+      ),
+      // Уход — зеркало появления: пилюля съезжает вниз и гаснет целиком.
+      // Сжатие по высоте обрезало размытие подложки, и на миг была видна
+      // полоса на всю ширину.
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: AnimatedBuilder(
+          animation: animation,
+          builder: (context, child) => Transform.translate(
+            offset: Offset(0, (1 - animation.value) * 28),
+            child: child,
+          ),
+          child: child,
+        ),
+      ),
+      child: child,
+    ),
+  );
 }
 
 class _MiniDownloadPin extends ConsumerWidget {
@@ -203,7 +242,7 @@ class _TinyButton extends StatelessWidget {
   Widget build(BuildContext context) => IconButton(
     tooltip: tooltip,
     onPressed: onPressed,
-    icon: Icon(icon, size: 22),
+    icon: MorphIcon(icon, size: 22),
     visualDensity: VisualDensity.compact,
     padding: EdgeInsets.zero,
     constraints: const BoxConstraints.tightFor(width: 38, height: 38),
@@ -239,6 +278,27 @@ class _MiniProgress extends ConsumerWidget {
 /// нет нижней панели, поэтому мини-плеер стоит у нижнего края. Раскладка
 /// одна и та же всегда — иначе при появлении клавиатуры страница
 /// пересоздавалась бы и теряла фокус в поле.
+/// Поднимает плавающие уведомления на [lift] пикселей над нижним краем:
+/// без этого они прятались под мини-плеером и навигацией.
+Widget liftSnackBars(BuildContext context, double lift, Widget child) {
+  final theme = Theme.of(context);
+  return Theme(
+    data: theme.copyWith(
+      // Ширину из темы (420) не берём: она больше экрана телефона, и тогда
+      // поля игнорировались — уведомление растягивалось от края до края.
+      snackBarTheme: SnackBarThemeData(
+        behavior: theme.snackBarTheme.behavior,
+        backgroundColor: theme.snackBarTheme.backgroundColor,
+        contentTextStyle: theme.snackBarTheme.contentTextStyle,
+        actionTextColor: theme.snackBarTheme.actionTextColor,
+        shape: theme.snackBarTheme.shape,
+        insetPadding: EdgeInsets.fromLTRB(16, 8, 16, lift),
+      ),
+    ),
+    child: child,
+  );
+}
+
 class MiniPlayerHost extends ConsumerWidget {
   const MiniPlayerHost({super.key, required this.child});
 
@@ -267,7 +327,12 @@ class MiniPlayerHost extends ConsumerWidget {
               bottom: media.padding.bottom + (visible ? _pillHeight : 0),
             ),
           ),
-          child: child,
+          // Уведомления страницы встают над пилюлей, а не под ней.
+          child: liftSnackBars(
+            context,
+            media.padding.bottom + (visible ? _pillHeight : 0),
+            child,
+          ),
         ),
         Positioned(
           left: 0,

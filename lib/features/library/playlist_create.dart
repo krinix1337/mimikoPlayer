@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+
+import '../../widgets/pressable.dart';
+import '../../widgets/expressive_loader.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app_providers.dart';
@@ -159,7 +163,7 @@ class _CreatePlaylistSheetState extends ConsumerState<_CreatePlaylistSheet> {
           Row(
             children: [
               // Обложка: тап выбирает картинку из галереи.
-              GestureDetector(
+              PressableScale(
                 onTap: _busy ? null : _pickCover,
                 child: _cover == null
                     ? Container(
@@ -274,7 +278,7 @@ class _CreatePlaylistSheetState extends ConsumerState<_CreatePlaylistSheet> {
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: ExpressiveLoader(),
                   )
                 : const Icon(Icons.check_rounded),
             label: Text(l.playlistCreateAction),

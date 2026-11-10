@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app_providers.dart';
+import '../../catalog/ui/track_menu.dart';
 import '../../../core/db/daos/library_dao.dart';
 import '../../../core/sources/source_id.dart';
 import '../../../core/sources/stream_target.dart';
@@ -51,9 +52,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   double _settleTo = 0;
   bool _settling = false;
 
-  /// Внешнее переключение трека во время свайпа: обложку не анимируем
-  /// второй раз, иначе соседняя картинка успевает отъехать и вернуться.
-  bool _suppressSwitch = false;
+  /// Свайп довёл соседний трек до центра: когда плеер подтвердит смену,
+  /// карточку подменяем на месте, без второй анимации. Для этого у
+  /// переключателя обложек меняется ключ — он начинает с чистого листа, и
+  /// прошлый трек не проявляется на миг в центре, прежде чем исчезнуть.
+  int _switchEpoch = 0;
   bool _pendingTrackChange = false;
   String? _lastTrackId;
   int _lastIndex = -1;
@@ -128,11 +131,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     final place = ref.watch(
       playerSnapshotProviderValue.select((s) => (s.queue, s.index)),
     );
-    final nextCover = place.$1.length > place.$2 + 1
-        ? ref.watch(trackCoverProvider(place.$1[place.$2 + 1])).value
+    final nextTrack = place.$2 >= 0 && place.$1.length > place.$2 + 1
+        ? ref.watch(trackPreviewProvider(place.$1[place.$2 + 1])).value
         : null;
-    final prevCover = place.$2 > 0
-        ? ref.watch(trackCoverProvider(place.$1[place.$2 - 1])).value
+    final prevTrack = place.$2 > 0 && place.$2 - 1 < place.$1.length
+        ? ref.watch(trackPreviewProvider(place.$1[place.$2 - 1])).value
         : null;
 
     if (_lastTrackId != current?.localTrackId) {
@@ -142,18 +145,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         _settle.stop();
         _settling = false;
         _drag = 0;
+        _switchEpoch++;
       }
     }
     if (place.$2 != _lastIndex) {
       _swipeDirection = place.$2 > _lastIndex ? 1 : -1;
       _lastIndex = place.$2;
-    }
-    if (_suppressSwitch && !_pendingTrackChange) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _suppressSwitch) {
-          setState(() => _suppressSwitch = false);
-        }
-      });
     }
 
     final height = MediaQuery.sizeOf(context).height;
@@ -186,8 +183,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
             current,
             snapshot,
             place,
-            nextCover,
-            prevCover,
+            nextTrack,
+            prevTrack,
           ),
         ),
       ),
@@ -199,8 +196,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     NowPlaying? current,
     (NowPlaying?, bool) snapshot,
     (List<String>, int) place,
-    String? nextCover,
-    String? prevCover,
+    NowPlaying? nextTrack,
+    NowPlaying? prevTrack,
   ) {
     return Scaffold(
       body: Stack(
@@ -230,9 +227,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                               box.maxWidth,
                             );
                             final toward = offset <= 0 ? 1 : -1;
-                            final neighbor = toward == 1
-                                ? nextCover
-                                : prevCover;
                             return GestureDetector(
                               behavior: HitTestBehavior.opaque,
                               onHorizontalDragStart: (_) {
@@ -255,23 +249,37 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  if (neighbor != null && offset != 0)
-                                    Transform.translate(
-                                      offset: Offset(
-                                        offset + toward * box.maxWidth,
-                                        0,
+                                  // Оба соседа собраны заранее, просто не
+                                  // рисуются: их обложки успевают загрузиться
+                                  // до свайпа, и трек не въезжает серым
+                                  // квадратом.
+                                  for (final (track, side) in [
+                                    (nextTrack, 1),
+                                    (prevTrack, -1),
+                                  ])
+                                    if (track != null)
+                                      Offstage(
+                                        key: ValueKey(side),
+                                        offstage: offset == 0 || toward != side,
+                                        child: Transform.translate(
+                                          offset: Offset(
+                                            offset + side * box.maxWidth,
+                                            0,
+                                          ),
+                                          child: _Artwork(
+                                            current: track,
+                                            artSize: artSize,
+                                            preview: true,
+                                          ),
+                                        ),
                                       ),
-                                      child: _NeighborArt(
-                                        url: neighbor,
-                                        artSize: artSize,
-                                      ),
-                                    ),
                                   Transform.translate(
                                     offset: Offset(offset, 0),
                                     child: AnimatedSwitcher(
-                                      duration: _suppressSwitch
-                                          ? Duration.zero
-                                          : const Duration(milliseconds: 260),
+                                      key: ValueKey(_switchEpoch),
+                                      duration: const Duration(
+                                        milliseconds: 260,
+                                      ),
                                       switchInCurve: Curves.easeOutCubic,
                                       switchOutCurve: Curves.easeInCubic,
                                       transitionBuilder: (child, animation) {
@@ -351,15 +359,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     await _animateDragTo(forward ? -width : width);
     if (!mounted) return;
     _pendingTrackChange = true;
-    _suppressSwitch = true;
     unawaited(controller.skipToIndex(neighborIndex));
-    // Если current так и не сменился (очередь перестроилась или резолв
-    // завис), возвращаем обложку на место, а не оставляем пустой экран.
-    Timer(const Duration(milliseconds: 900), () {
+    // Плеер отвечает за миллисекунды (читает карточку трека из базы). Если
+    // current так и не сменился — очередь перестроилась под рукой, —
+    // возвращаем обложку на место, а не оставляем чужую карточку.
+    Timer(const Duration(milliseconds: 1500), () {
       if (!mounted || !_pendingTrackChange) return;
       _pendingTrackChange = false;
       _settling = false;
-      _suppressSwitch = false;
       _animateDragTo(0);
     });
   }
@@ -388,28 +395,6 @@ double _artworkSize(BuildContext context, double availableHeight) {
   // Под обложкой ещё название, артист и бейджи — примерно 170 dp.
   final byHeight = (availableHeight - 170).clamp(170.0, 340.0);
   return (byWidth < byHeight ? byWidth : byHeight).toDouble();
-}
-
-/// Обложка соседнего трека, въезжающая следом за пальцем.
-class _NeighborArt extends StatelessWidget {
-  const _NeighborArt({required this.url, required this.artSize});
-
-  final String url;
-  final double artSize;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: TrackCover(
-          url: url,
-          size: artSize,
-          radius: _artworkRadius(context, artSize),
-        ),
-      ),
-    );
-  }
 }
 
 class _TopBar extends ConsumerWidget {
@@ -461,6 +446,11 @@ class _TopBar extends ConsumerWidget {
             onPressed: () => context.push(Routes.karaokeFor(trackId)),
           ),
           IconButton(
+            tooltip: l.menuAddToPlaylist,
+            icon: const Icon(Icons.playlist_add_rounded),
+            onPressed: () => showAddToPlaylist(context, ref, trackId),
+          ),
+          IconButton(
             tooltip: l.playerQueue,
             icon: const Icon(Icons.queue_music_rounded),
             onPressed: () => showQueueSheet(context),
@@ -484,14 +474,31 @@ class _TopBar extends ConsumerWidget {
 }
 
 class _Artwork extends ConsumerWidget {
-  const _Artwork({super.key, required this.current, required this.artSize});
+  const _Artwork({
+    super.key,
+    required this.current,
+    required this.artSize,
+    this.preview = false,
+  });
 
   final NowPlaying current;
   final double artSize;
 
+  /// Карточка соседнего трека, въезжающая следом за пальцем: та же
+  /// раскладка — обложка, название, исполнитель, — чтобы после свайпа трек
+  /// не стоял голой картинкой и ничего не прыгало, когда он станет текущим.
+  /// Источник и скачивание относятся к играющему треку — у превью на их
+  /// месте пустое место той же высоты.
+  final bool preview;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final cover = TrackCover(
+      url: current.coverUrl,
+      size: artSize,
+      radius: _artworkRadius(context, artSize),
+    );
 
     return Center(
       child: Padding(
@@ -499,19 +506,15 @@ class _Artwork extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Hero(
-              tag: coverHeroTag(current.localTrackId),
-              child: TrackCover(
-                url: current.coverUrl,
-                size: artSize,
-                radius: _artworkRadius(context, artSize),
-              ),
-            ),
+            if (preview)
+              cover
+            else
+              Hero(tag: coverHeroTag(current.localTrackId), child: cover),
             const SizedBox(height: 28),
             // Тап по названию — альбом трека, как в Яндексе.
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => _openAlbum(context, ref),
+              onTap: preview ? null : () => _openAlbum(context, ref),
               child: Column(
                 children: [
                   Text(
@@ -532,24 +535,49 @@ class _Artwork extends ConsumerWidget {
                 ],
               ),
             ),
-            if (ref.watch(
-              playerSnapshotProviderValue.select(
-                (s) => current.explicitFlag || current.isAi || s.uncensored,
+            if (preview) ...[
+              if (current.explicitFlag) ...[
+                const SizedBox(height: 10),
+                const TrackBadges(explicit: true),
+                const SizedBox(height: 10),
+              ] else
+                const SizedBox(height: 12),
+              // Та же строка, что у играющего трека: при свайпе источник
+              // виден сразу, вместе с обложкой и названием.
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _SourceBadge(trackId: current.localTrackId, live: false),
+                    const SizedBox(width: 4),
+                    _DownloadButton(trackId: current.localTrackId),
+                  ],
+                ),
               ),
-            )) ...[
-              const SizedBox(height: 10),
-              const _TrackFlags(),
-              const SizedBox(height: 10),
-            ] else
-              const SizedBox(height: 12),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const _SourceBadge(),
-                const SizedBox(width: 4),
-                _DownloadButton(trackId: current.localTrackId),
-              ],
-            ),
+            ] else ...[
+              if (ref.watch(
+                playerSnapshotProviderValue.select(
+                  (s) => current.explicitFlag || current.isAi || s.uncensored,
+                ),
+              )) ...[
+                const SizedBox(height: 10),
+                const _TrackFlags(),
+                const SizedBox(height: 10),
+              ] else
+                const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _SourceBadge(trackId: current.localTrackId),
+                    const SizedBox(width: 4),
+                    _DownloadButton(trackId: current.localTrackId),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -956,7 +984,7 @@ class _PlayToggle extends StatelessWidget {
       onTap: busy ? null : onToggle,
       child: AnimatedContainer(
         duration: motion.morph,
-        curve: Curves.elasticOut,
+        curve: Curves.easeOutBack,
         width: playing ? 78 : 92,
         height: 78,
         decoration: BoxDecoration(
@@ -1006,11 +1034,24 @@ class _TrackFlags extends ConsumerWidget {
     final uncensored = ref.watch(
       playerSnapshotProviderValue.select((s) => s.uncensored),
     );
-    if (current == null) return const SizedBox.shrink();
-    return TrackBadges(
-      explicit: current.explicitFlag,
-      ai: current.isAi,
-      uncensored: uncensored,
+    // Метки меняются при каждом переходе (`uncensored` сбрасывается, пока
+    // трек грузится): плавное перетекание вместо мигания плашки.
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 260),
+        child: current == null
+            ? const SizedBox.shrink()
+            : TrackBadges(
+                key: ValueKey(
+                  '${current.explicitFlag}${current.isAi}$uncensored',
+                ),
+                explicit: current.explicitFlag,
+                ai: current.isAi,
+                uncensored: uncensored,
+              ),
+      ),
     );
   }
 }
@@ -1018,19 +1059,35 @@ class _TrackFlags extends ConsumerWidget {
 /// Откуда и в каком качестве играет трек: иконка источника, название
 /// сервиса и качество отдельными строками — вместо голого «yandex · lossless».
 class _SourceBadge extends ConsumerWidget {
-  const _SourceBadge();
+  const _SourceBadge({required this.trackId, this.live = true});
+
+  final String trackId;
+
+  /// false — соседний трек при свайпе: он не играет, источник берём из базы.
+  final bool live;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final state = ref.watch(
+    final snapshot = ref.watch(
       playerSnapshotProviderValue.select(
         (s) => (s.usedSource, s.quality, s.resolving),
       ),
     );
+    final origin = ref.watch(trackOriginProvider(trackId)).value;
+    // Пока звук грузится (или трек восстановлен после перезапуска и ещё не
+    // играл), в снимке плеера источника нет или он от прошлого трека.
+    // Тогда показываем, откуда трек взят, — плашка видна всегда.
+    final known = live && !snapshot.$3 && snapshot.$1 != null;
+    final state = (
+      known ? snapshot.$1 : origin,
+      known ? snapshot.$2 : null,
+      live && snapshot.$3,
+    );
     final source = state.$1;
+    if (source == null && !state.$3) return const SizedBox.shrink();
     final (icon, name) = switch (source) {
       SourceId.yandex => (Icons.music_note_rounded, l.sourceYandex),
       SourceId.soundcloud => (Icons.cloud_rounded, 'SoundCloud'),
@@ -1072,10 +1129,7 @@ class _SourceBadge extends ConsumerWidget {
               child: state.$3
                   ? Padding(
                       padding: const EdgeInsets.all(8),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: scheme.primary,
-                      ),
+                      child: ExpressiveLoader(color: scheme.primary),
                     )
                   : Icon(icon, size: 17, color: scheme.primary),
             ),
@@ -1085,7 +1139,7 @@ class _SourceBadge extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  state.$3 ? l.commonLoading : name,
+                  source == null ? l.commonLoading : name,
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                     height: 1.1,
@@ -1166,6 +1220,9 @@ Future<void> showQueueSheet(BuildContext context) => showModalBottomSheet<void>(
   isScrollControlled: true,
   useSafeArea: true,
   backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+  // Список уходит под закреплённую шапку и не должен вылезать за
+  // скруглённые углы листа.
+  clipBehavior: Clip.antiAlias,
   builder: (context) => const _QueueSheet(),
 );
 
@@ -1201,6 +1258,59 @@ class _QueueSheetState extends ConsumerState<_QueueSheet> {
     });
   }
 
+  /// Высоты листа: половина экрана и почти весь экран. Ниже [_minSize]
+  /// лист закрывается.
+  static const double _minSize = 0.32;
+  static const double _halfSize = 0.58;
+  static const double _fullSize = 0.96;
+
+  final DraggableScrollableController _sheet = DraggableScrollableController();
+
+  @override
+  void dispose() {
+    _sheet.dispose();
+    super.dispose();
+  }
+
+  /// Шапку с полоской тянут как ручку: лист меняет высоту, даже когда
+  /// список прокручен вглубь. Раньше шапка была первой строкой списка и
+  /// уезжала вместе с ним — на весь экран ухватиться было не за что.
+  void _dragHeader(DragUpdateDetails details) {
+    if (!_sheet.isAttached) return;
+    final size = _sheet.pixelsToSize(_sheet.pixels - details.delta.dy);
+    // До самого минимума не доводим: на нём лист закрывается сам, а
+    // закрывать его посреди жеста рано.
+    _sheet.jumpTo(size.clamp(_minSize + 0.02, _fullSize).toDouble());
+  }
+
+  void _releaseHeader(DragEndDetails details) {
+    if (!_sheet.isAttached) return;
+    final velocity = details.primaryVelocity ?? 0;
+    final size = _sheet.size;
+    final double? target;
+    if (velocity > 500) {
+      // Бросок вниз: с полного экрана — на половину, с половины — закрыть.
+      target = size > _halfSize + 0.03 ? _halfSize : null;
+    } else if (velocity < -500) {
+      target = size < _halfSize - 0.03 ? _halfSize : _fullSize;
+    } else if (size < (_minSize + _halfSize) / 2) {
+      target = null;
+    } else {
+      target = size < (_halfSize + _fullSize) / 2 ? _halfSize : _fullSize;
+    }
+    if (target == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    unawaited(
+      _sheet.animateTo(
+        target,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final snapshot = ref.watch(
@@ -1212,72 +1322,84 @@ class _QueueSheetState extends ConsumerState<_QueueSheet> {
     final rows = ref.watch(queueRowsProvider(queue));
 
     return DraggableScrollableSheet(
+      controller: _sheet,
       expand: false,
-      initialChildSize: 0.58,
-      minChildSize: 0.32,
-      maxChildSize: 0.96,
+      initialChildSize: _halfSize,
+      minChildSize: _minSize,
+      maxChildSize: _fullSize,
       snap: true,
+      // Без промежуточной точки бросок вниз с полного экрана пролетал
+      // половину и закрывал лист целиком.
+      snapSizes: const [_halfSize],
       shouldCloseOnMinExtent: true,
-      builder: (context, scroll) => switch (rows) {
-        AsyncValue(:final error?) => ListView(
-          controller: scroll,
-          children: [
-            const _QueueHeader(),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(l.dbError('$error'), textAlign: TextAlign.center),
-            ),
-          ],
-        ),
-        AsyncData() when queue.isEmpty => ListView(
-          controller: scroll,
-          children: [
-            const _QueueHeader(),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(l.playerQueueEmpty, textAlign: TextAlign.center),
-            ),
-          ],
-        ),
-        AsyncValue(:final value?) => (() {
-          _revealCurrent(scroll, current);
-          return ListView.builder(
-            controller: scroll,
-            padding: EdgeInsets.only(
-              bottom: 8 + MediaQuery.viewPaddingOf(context).bottom,
-            ),
-            itemCount: value.length + 1,
-            itemBuilder: (context, index) {
-              if (index == 0) return _QueueHeader(count: value.length);
-              final position = index - 1;
-              return _QueueRow(
-                key: position == current ? _currentRow : null,
-                row: value[position],
-                position: position,
-                current: position == current,
-                onTap: () {
-                  // Позиция, а не id: у повтора в плейлисте одна и та же строка
-                  // стоит несколько раз, и поиск по id прыгал всегда на первую.
-                  ref.read(playbackControllerProvider).skipToIndex(position);
-                  Navigator.of(context).pop();
-                },
-              );
+      builder: (context, scroll) => Column(
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onVerticalDragUpdate: _dragHeader,
+            onVerticalDragEnd: _releaseHeader,
+            child: _QueueHeader(count: queue.isEmpty ? null : queue.length),
+          ),
+          Expanded(
+            child: switch (rows) {
+              AsyncValue(:final error?) => _QueueNote(
+                controller: scroll,
+                child: Text(l.dbError('$error'), textAlign: TextAlign.center),
+              ),
+              AsyncData() when queue.isEmpty => _QueueNote(
+                controller: scroll,
+                child: Text(l.playerQueueEmpty, textAlign: TextAlign.center),
+              ),
+              AsyncValue(:final value?) => (() {
+                _revealCurrent(scroll, current);
+                return ListView.builder(
+                  controller: scroll,
+                  padding: EdgeInsets.only(
+                    bottom: 8 + MediaQuery.viewPaddingOf(context).bottom,
+                  ),
+                  itemCount: value.length,
+                  itemBuilder: (context, position) => _QueueRow(
+                    key: position == current ? _currentRow : null,
+                    row: value[position],
+                    position: position,
+                    current: position == current,
+                    onTap: () {
+                      // Позиция, а не id: у повтора в плейлисте одна и та же
+                      // строка стоит несколько раз, и поиск по id прыгал
+                      // всегда на первую.
+                      ref
+                          .read(playbackControllerProvider)
+                          .skipToIndex(position);
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                );
+              })(),
+              _ => _QueueNote(
+                controller: scroll,
+                child: const Center(child: ExpressiveLoader()),
+              ),
             },
-          );
-        })(),
-        _ => ListView(
-          controller: scroll,
-          children: const [
-            _QueueHeader(),
-            Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: ExpressiveLoader()),
-            ),
-          ],
-        ),
-      },
+          ),
+        ],
+      ),
     );
   }
+}
+
+/// Сообщение вместо списка (пусто, ошибка, загрузка). Прокручиваемое, чтобы
+/// лист по-прежнему тянулся за палец в любом месте.
+class _QueueNote extends StatelessWidget {
+  const _QueueNote({required this.controller, required this.child});
+
+  final ScrollController controller;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    controller: controller,
+    children: [Padding(padding: const EdgeInsets.all(24), child: child)],
+  );
 }
 
 class _QueueHeader extends StatelessWidget {

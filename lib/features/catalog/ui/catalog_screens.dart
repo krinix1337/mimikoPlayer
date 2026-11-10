@@ -577,7 +577,7 @@ Future<void> _showArtistPhoto(BuildContext context, String url, String name) =>
                     height: double.infinity,
                     fit: BoxFit.contain,
                     placeholder: (_, _) => const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
+                      child: ExpressiveLoader(color: Colors.white),
                     ),
                     errorWidget: (_, _, _) => const Center(
                       child: Icon(

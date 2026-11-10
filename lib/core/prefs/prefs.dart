@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../content/remix_filter.dart';
 import '../db/daos/library_dao.dart';
 
 /// Лимит автозагрузки по умолчанию: 10 ГБ. `null` в настройках = без лимита.
@@ -34,6 +35,7 @@ final class Prefs {
     this.collectStats = true,
     this.artworkShape = ArtworkShape.rounded,
     this.hideAiTracks = false,
+    this.remixFilter = const {},
     this.censorBypass = true,
     this.searchHistory = const [],
     this.homeCoverTone = HomeCoverTone.normal,
@@ -101,6 +103,9 @@ final class Prefs {
 
   /// Скрывать треки с явной пометкой ИИ в названии или исполнителе.
   final bool hideAiTracks;
+
+  /// Какие перезаливы (slowed, sped up…) убирать из волны.
+  final Set<RemixKind> remixFilter;
 
   /// Подменять зацензуренные треки версией из открытой базы.
   final bool censorBypass;
@@ -181,6 +186,7 @@ final class Prefs {
     bool? collectStats,
     ArtworkShape? artworkShape,
     bool? hideAiTracks,
+    Set<RemixKind>? remixFilter,
     bool? censorBypass,
     List<String>? searchHistory,
     HomeCoverTone? homeCoverTone,
@@ -223,6 +229,7 @@ final class Prefs {
     collectStats: collectStats ?? this.collectStats,
     artworkShape: artworkShape ?? this.artworkShape,
     hideAiTracks: hideAiTracks ?? this.hideAiTracks,
+    remixFilter: remixFilter ?? this.remixFilter,
     censorBypass: censorBypass ?? this.censorBypass,
     searchHistory: searchHistory ?? this.searchHistory,
     homeCoverTone: homeCoverTone ?? this.homeCoverTone,
@@ -269,6 +276,7 @@ final class Prefs {
     'collect_stats': collectStats,
     'artwork_shape': artworkShape.name,
     'hide_ai_tracks': hideAiTracks,
+    'remix_filter': [for (final kind in remixFilter) kind.name],
     'censor_bypass': censorBypass,
     'search_history': searchHistory,
     'home_cover_tone': homeCoverTone.name,
@@ -348,6 +356,7 @@ final class Prefs {
         ArtworkShape.rounded,
       ),
       hideAiTracks: json['hide_ai_tracks'] == true,
+      remixFilter: RemixKind.fromWire(json['remix_filter']),
       censorBypass: json['censor_bypass'] != false,
       homeCoverTone: required(
         'home_cover_tone',

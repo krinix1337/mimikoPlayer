@@ -143,7 +143,6 @@ class _NewReleasesSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 12),
         _SectionTitle(
           title: l.discoverNewReleases,
           action: l.discoverAll,
@@ -203,7 +202,6 @@ class _NewReleasesSkeleton extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 12),
         _SectionTitle(title: l.discoverNewReleases),
         SizedBox(
           height: 208,
@@ -245,7 +243,6 @@ class _StationsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 12),
         _SectionTitle(title: l.discoverStations),
         SizedBox(
           height: 64,
@@ -300,7 +297,6 @@ class _ArtistsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 20),
         _SectionTitle(title: l.discoverArtists),
         SizedBox(
           height: 150,
@@ -444,7 +440,9 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+      // Ровный ритм между секциями: раньше сверху добавлялись ещё 12–20 px,
+      // и пустота между блоками бросалась в глаза.
+      padding: const EdgeInsets.fromLTRB(16, 20, 8, 4),
       child: Row(
         children: [
           Expanded(child: Text(title, style: theme.textTheme.titleLarge)),

@@ -66,8 +66,14 @@ final class PendingFeedback {
   static Future<int> retry(AppDatabase db, YandexSource source) async {
     final pending = await db.libraryDao.unsyncedFeedback(SourceId.yandex);
     var sent = 0;
+    var failed = 0;
     for (final (localTrackId, remoteId, state) in pending) {
-      if (!await source.setTrackFeedback(remoteId, state)) break;
+      if (!await source.setTrackFeedback(remoteId, state)) {
+        // Один трек, который Яндекс не принимает, не должен навсегда
+        // запирать остальные; а без сети хватит и трёх попыток.
+        if (++failed >= 3) break;
+        continue;
+      }
       await db.libraryDao.markFeedbackSynced(localTrackId, SourceId.yandex);
       sent++;
     }

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../../widgets/expressive_loader.dart';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -129,7 +132,7 @@ class _YandexLoginSheetState extends ConsumerState<_YandexLoginSheet> {
                   const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: ExpressiveLoader(),
                   ),
                   const SizedBox(width: 12),
                   Text(l.authRequestingCode),

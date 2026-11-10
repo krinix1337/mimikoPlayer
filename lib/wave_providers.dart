@@ -112,15 +112,23 @@ final waveTracksProvider = FutureProvider<List<WaveTrack>>((ref) async {
       : fetched;
   final ids = await services.db.tracksDao.ingestAll(tracks);
   final disliked = await services.db.libraryDao.dislikedAmong(ids);
-  final recent = await services.db.historyDao.recentlyHeardIds();
+  // Всё, что уже звучало (хоть несколько секунд), плюс очередь, которая
+  // стояла в плеере: после перезапуска или возврата к обычной волне Яндекс
+  // часто отдаёт ту же пачку, и без этого играли те же треки.
+  final heard = await services.db.historyDao.recentlyHeardIds(
+    limit: 400,
+    minPlayedMs: 3000,
+  );
+  final queued = ref.read(playbackControllerProvider).snapshot.queue;
+  final recent = {...heard, ...queued};
   // Разные remote id (сингл/альбом, копия из SoundCloud) сводятся в один
-  // локальный трек, недавно слушанное уходит в хвост, а один исполнитель не
-  // занимает всю выдачу.
+  // локальный трек, а один исполнитель не занимает всю выдачу.
   final picked = pickWaveIndexes(
     tracks: tracks,
     ids: ids,
     recent: recent,
     disliked: disliked,
+    minFresh: 3,
   );
   return [
     for (final i in picked) WaveTrack(localTrackId: ids[i], source: tracks[i]),
