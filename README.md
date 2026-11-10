@@ -10,7 +10,7 @@
 <a href="https://github.com/krinix1337/mimikoPlayer/releases/latest"><img alt="Версия 1.4.2" src="https://img.shields.io/badge/версия-1.4.2-D8F544?style=for-the-badge&labelColor=1C1B1F"></a>
 <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white&labelColor=1C1B1F">
 <a href="https://flutter.dev"><img alt="Flutter 3.47" src="https://img.shields.io/badge/Flutter-3.47-02569B?style=for-the-badge&logo=flutter&logoColor=white&labelColor=1C1B1F"></a>
-<img alt="203 теста" src="https://img.shields.io/badge/тесты-203-22C7A9?style=for-the-badge&labelColor=1C1B1F">
+<img alt="220 тестов" src="https://img.shields.io/badge/тесты-220-22C7A9?style=for-the-badge&labelColor=1C1B1F">
 <img alt="Лицензия MIT" src="https://img.shields.io/badge/лицензия-MIT-A78BFA?style=for-the-badge&labelColor=1C1B1F">
 
 <h3>Яндекс Музыка, SoundCloud и свои файлы — в одном плеере</h3>
